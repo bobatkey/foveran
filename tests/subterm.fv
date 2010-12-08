@@ -1,0 +1,39 @@
+-- Goal of this file is establish a Desc-generic notion of sub-term,
+-- which is the same as prefix for lists and less-than for natural
+-- numbers. This will be used to provide a generic course-of-values
+-- induction principle.
+
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+lift : (D : Desc) →
+       (A : Set) →
+       (Φ : A → Set 2) →
+       sem D A →
+       Set 2 ;
+lift D A Φ = elimD (λD → sem D A → Set 2)
+                   (λA x → Unit)
+                   (λx → Φ x)
+                   (λF G f g x → f (fst x) × g (snd x))
+                   (λF G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+{------------------------------------------------------------------------------}
+-- x is a subterm of y if there is a list of contexts to put x in such
+-- that it equals y
+
+data Tree (A : Set) : Set :=
+  | leaf : A
+  | node : Tree Tree
+  ;
+
+subtree : (A : Set) → Tree A → Tree A → Set ;
+subtree A = natInduction (λx → Tree A → Set)
+                       

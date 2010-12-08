@@ -1,0 +1,19 @@
+DescFM : Desc → Set → Desc ;
+DescFM D A = “K” A “+” D ;
+
+FM : Desc → Set → Set ;
+FM D A = µ (DescFM D A) ;
+
+return : (D : Desc) → (A : Set) → A → FM D A ;
+return D A a = construct (DescFM D A) (inl a) ;
+
+bind : (D : Desc) → (A B : Set) → FM D A → (A → FM D B) → FM D B ;
+bind D A B a f
+  = fold (DescFM D A) (FM D B)
+         (\x → case x for d. FM D B with
+                 { inl a → f a
+                 ; inr x → construct (DescFM D B) (inr x)
+                 })
+         a ;
+
+-- Now add equality and induction to prove the laws

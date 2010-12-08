@@ -1,0 +1,88 @@
+--------------------------------------------------------------------------------
+-- These two should be built-in (in some sense)
+sem : Desc → Set → Set ;
+sem d = elimD (\x → Set → Set)
+              (\A X → A)
+              (\X → X)
+              (\d1 d2 F G X → F X × G X)
+              (\d1 d2 F G X → F X + G X)
+              d ;
+
+map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
+map F α β f = elimD (\F → sem F α → sem F β)
+                    (\A x → x)
+                    (\x → f x)
+                    (\d1 d2 g h p → «g (fst p), h (snd p)»)
+	            (\d1 d2 g h s → case s for x. sem (d1 “+” d2) β with
+                                      { inl x → inl (g x)
+	   			      ; inr x → inr (h x)
+				      })
+                    F ;
+
+--------------------------------------------------------------------------------
+
+comonad : Set 1;
+comonad = (W      : Set → Set) ×
+          (counit : (α : Set) → W α → α) ×
+          (cojoin : (α : Set) → W α → W (W α)) ×
+          (map    : (α β : Set) → (α → β) → W α → W β) ×
+          Unit ;
+
+F : comonad → Set → Set ;
+F W = fst W ;
+
+counit : (W : comonad) → (A : Set) → F W A → A ;
+counit W = fst (snd W) ;
+
+cojoin : (W : comonad) → (A : Set) → F W A → F W (F W A) ;
+cojoin W = fst (snd (snd W)) ;
+
+comonadMap : (W : comonad) → (α β : Set) → (α → β) → F W α → F W β ;
+comonadMap W = fst (snd (snd (snd W))) ;
+
+--------------------------------------------------------------------------------
+distributiveLaw : comonad → Desc → Set 1;
+distributiveLaw W D = (α : Set) → sem D (F W α) → F W (sem D α) ;
+
+-- recursion combinator using a comonad with a distributive law
+foldW : (W : comonad) → (D : Desc) →
+        (d : distributiveLaw W D) →
+        (α : Set) →
+        (sem D (F W α) → α) →
+        µ D →
+        α  ;
+foldW W D d α k x =
+  counit W α (fold D (F W α)
+                   (\x → comonadMap W (sem D (F W α)) α k (d (F W α) (map D (F W α) (F W (F W α)) (cojoin W α) x))) x) ;
+
+--------------------------------------------------------------------------------
+-- “context” comonad
+C : Set → Set → Set ;
+C E A = E × A ;
+
+counitC : (E A : Set) → C E A → A ;
+counitC E A p = snd p ;
+
+cobindC : (E A : Set) → C E A → C E (C E A) ;
+cobindC E A p = « fst p, « fst p, snd p » » ;
+
+mapC : (E A B : Set) → (A → B) → C E A → C E B ;
+mapC E A B f p = « fst p, f (snd p) » ;
+
+Ccomonad : Set → comonad ;
+Ccomonad E = « C E, « counitC E, « cobindC E, « mapC E, () »»»» ;
+
+distC : (E : Set) → (D : Desc) → (sem D E → E) → distributiveLaw (Ccomonad E) D ;
+distC E D k A x = « k (map D (E × A) E (\x → fst x) x), map D (E × A) A (\x → snd x) x » ;
+
+--------------------------------------------------------------------------------
+-- primitive recursion, derived from the general comonadic recursion
+-- with the environment comonad.
+
+primrec : (D : Desc) →
+          (A : Set) →
+          (sem D (µ D × A) → A) →
+          µ D →
+          A ;
+primrec D = foldW (Ccomonad (µ D)) D (distC (µ D) D (construct D)) ;
+

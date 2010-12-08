@@ -1,0 +1,163 @@
+NatD : Desc ;
+NatD = “K” Unit “+” “Id” ;
+
+zero : µ NatD ;
+zero = cons NatD (inl ()) ;
+
+succ : µ NatD → µ NatD ;
+succ = \n → cons NatD (inr n) ;
+
+plus : µ NatD → µ NatD → µ NatD ;
+plus = fold NatD (µ NatD → µ NatD) (\s n' → case s for a. µ NatD with
+                                              { inl u → n'
+                                	      ; inr f → succ (f n')
+                                              }) ;
+
+sem : Desc → Set → Set ;
+sem = \d → elimD (\x → Set → Set)
+                 (\A X → A)
+                 (\X → X)
+                 (\d1 d2 F G X → F X × G X)
+                 (\d1 d2 F G X → F X + G X)
+                 d ;
+
+cons' : (F : Desc) → sem F (µ F) → µ F ;
+cons' = cons ;
+
+ListD : (A : Set) → Desc ;
+ListD = \A → “K” Unit “+” (“K” A “×” “Id”) ;
+
+
+lift : (F : Desc) → (µ F → Set) → (sem F (µ F) → Set) ;
+lift = \F P → elimD (\d → sem d (µ F) → Set)
+                    (\A x → Unit)
+                    (\x → P x)
+                    (\d1 d2 P1 P2 p → P1 (fst p) × P2 (snd p))
+	            (\d1 d2 P1 P2 s → case s for x. Set with
+	                                { inl x → P1 x
+	        			; inr x → P2 x
+					})
+                    F ;
+
+
+x : Set ;
+x = Unit ;
+
+liftFunctor : (F : Desc) →
+              (P Q : µ F → Set) →
+              (f : (x : µ F) → P x → Q x) →
+              (x : sem F (µ F)) → lift F P x → lift F Q x ;
+liftFunctor = \F → elimD (\F → (P Q : µ F → Set) → (f : (x : µ F) → P x → Q x) →
+                                     (x : sem F (µ F)) → lift F P x → lift F Q x)
+                               Unit
+                               Unit
+                               Unit
+                               Unit
+                               F ;
+
+-- D (“K” X)   = “K” 0
+-- D (“Id”)    = “K” 1
+-- D (F “+” G) = D F “+” D G
+-- D (F “×” G) = (D F “×” G) “+” (F “×” D G)
+
+map : (F : Desc) → (A B : Set) → (A → B) → sem F A → sem F B ;
+map = \F A B f → elimD (\d → sem d A → sem d B)
+                       (\A x → x)
+                       (\x → f x)
+                       (\d1 d2 g h p → «g (fst p), h (snd p)»)
+		       (\d1 d2 g h s → case s for x. sem (d1 “+” d2) B with
+                                         { inl x → inl (g x)
+					 ; inr x → inr (h x)
+					 })
+                       F ;
+
+--assume cons : (F : Desc) → sem F (µ F) → µ F ;
+--assume fold : (F : Desc) → (A : Set) → (sem F A → A) → µ F → A ;
+
+primfold : (F : Desc) → (A : Set) → (µ F → sem F A → A) → µ F → A ;
+primfold = \F A k x → snd (fold F (µ F × A)
+                                (\x → « cons F (map F (µ F × A) (µ F) (\x → fst x) x)
+                                      , k (cons F (map F (µ F × A) (µ F) (\x → fst x) x))
+                                          (map F (µ F × A) A (\x → snd x) x)
+                                      »)
+                                x) ;
+
+x : Set ;
+x = Unit ;
+
+-- New syntax:
+--- elimD F for d. A with
+----   { “K” A   → blah1
+----   ; “Id”    → blah2
+---    ; F “×” G → \x y → blah3
+---    ; F “+” G → \x y → blah4
+---    }
+
+-- goodness me, I need type reconstruction badly. Or some kind of
+-- interactive editor. Would it be too hard to do the type
+-- reconstruction algorithm in Ulf and Catarina's paper?
+
+-- is it possible to go from primfold to full induction? the
+-- difference appears to simply be that full induction uses a sigma
+-- type: (x : µ F) × P x. Need to know that the thing we have bumped
+-- up the induuctive hypothesis with is actually the thing we started
+-- with. Is this a consequence of initiality? Can we capture
+-- initiality in the definitional equality?
+
+-- F ((x : µ F) × P x) → (x : µ F) × P x
+-- lift F (µ F) P x → P (cons x)
+-- how to constructively realise the preservation of initial algebras proof?
+
+K1 : (A : Set) → A → Set ;
+K1 = \A a → Unit ;
+
+package : (F : Desc) → (µ F → Set) → Set ;
+package = \F P → (x : µ F) × P x ;
+
+f : (F : Desc) → (P : µ F → Set) → (sem F (package F P) → package F P) → µ F → package F P ;
+f = \F P k d → fold F (package F P) k d ;
+
+-- if “fold F (µ F) (cons F) x = x”, then “fst (fold F (package F P) k x) = ??”
+
+assume induction : (F : Desc) →
+            (P : µ F → Set) →
+            ((x : sem F (µ F)) → lift F (µ F) P x → P (cons F x)) →
+            (d : µ F) →
+            P (fold F (µ F) (cons F) d) ;
+-- induction = \F P k d → fold F (
+
+-- P : x. lift F (µ F) P x → P (cons F x)
+
+-- Fhat (K1 A) =~ K1 (F A)
+-- is this important?
+
+-- P (fold F (µ F) (cons F) d)
+
+-- cons : [[D]] (µ D) → µ D
+-- K A     = cons (inl A)
+-- Id      = cons (inr (inl ()))
+-- d1 + d2 = cons (inr (inr (inl (d1,d2))))
+-- d1 × d2 = cons (inr (inr (inr (d1,d2))))
+
+-- Now [[-]] is defined in terms of induction on 
+
+-- fold_i : (F : Desc_i) → (A : Set_i) → (sem_i F A → A) → µ F → A
+-- define sem in terms of fold_{i+1}, because Desc_i = µ DescD_i and DescD_i : Desc_{i+1}
+
+sem : Desc_i → Set_i → Set_i ;
+sem = fold Desc_{i+1} (
+
+-- sem (cons (inl A))                 = \X → A
+-- sem (cons (inr (inl ())))          = \X → X
+-- sem (cons (inr (inr (inl (F,G))))) = \X → F X + G X
+-- sem (cons (inr (inr (inr (F,G))))) = \X → F X × G X
+
+-- Desc is really a way of describing a small collection of  
+
+-- so a code is a member of µ (X. Set + () + X×X + X×X)
+
+-- DescD = K Set + K Unit + Id x Id + Id x Id : Desc1
+-- DescD = 
+
+-- Plan:
+--- 

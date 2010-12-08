@@ -1,0 +1,5 @@
+assume A : Set ;
+
+X : Set 1;
+X = A;
+

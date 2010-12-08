@@ -1,0 +1,140 @@
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+lift : (D : Desc) →
+       (α : Set) →
+       (Φ : α → Set 2) →
+       sem D α →
+       Set 2 ;
+lift D α Φ = elimD (\D → sem D α → Set 2)
+                   (\A x → Unit)
+                   (\x → Φ x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x → case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                    { inl u → \u' → φ0
+                    ; inr n → \φn → φS n φn
+                    });
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p → case x for x. A (construct NatDesc x) with
+                                    { inl u → a
+                                    ; inr n → f n
+                                    });
+
+add : Nat → Nat → Nat ;
+add n₁ n₂ = natInduction (λx → Nat) n₂ (λn → succ) n₁;
+
+mul : Nat → Nat → Nat ;
+mul n₁ n₂ = natInduction (λx → Nat) zero (λn → add n₂) n₁;
+
+equal : Nat → Nat → Set;
+equal = natInduction (λx → Nat → Set)
+                     (natCase (λx → Set) Unit (λn → Empty))
+                     (λn f → natCase (λx → Set) Empty f);
+
+equal-refl : (n : Nat) → equal n n;
+equal-refl = natInduction (λn → equal n n) ⋄ (λn p → p);
+
+equal-symm : (n₁ n₂ : Nat) → equal n₁ n₂ → equal n₂ n₁;
+equal-symm = natInduction (λn₁ → (n₂ : Nat) → equal n₁ n₂ → equal n₂ n₁)
+                          (natCase (λn₂ → equal zero n₂ → equal n₂ zero)
+                                   (λeq → ⋄)
+                                   (λn₂ eq → elimEmpty (equal (succ n₂) zero) eq))
+                          (λn₁ ih →
+                             natCase (λn₂ → equal (succ n₁) n₂ → equal n₂ (succ n₁))
+                                     (λeq → elimEmpty (equal zero (succ n₁)) eq)
+                                     ih);
+
+equal-trans : (n₁ n₂ n₃ : Nat) → equal n₁ n₂ → equal n₂ n₃ → equal n₁ n₃;
+equal-trans = natInduction (λn₁ → (n₂ n₃ : Nat) → equal n₁ n₂ → equal n₂ n₃ → equal n₁ n₃)
+                           (natCase (λn₂ → (n₃ : Nat) → equal zero n₂ → equal n₂ n₃ → equal zero n₃)
+                                    (λn₃ eq₁ eq₂ → eq₂)
+                                    (λn₂ n₃ eq₁ eq₂ → elimEmpty (equal zero n₃) eq₁))
+                           (λn₁ ih →
+                              natCase (λn₂ → (n₃ : Nat) → equal (succ n₁) n₂ → equal n₂ n₃ → equal (succ n₁) n₃)
+                                      (λn₃ eq₁ eq₂ → elimEmpty (equal (succ n₁) n₃) eq₁)
+                                      (λn₂ → natCase (λn₃ → equal (succ n₁) (succ n₂) → equal (succ n₂) n₃ → equal (succ n₁) n₃)
+                                                     (λeq₁ eq₂ → elimEmpty (equal (succ n₁) zero) eq₂)
+                                                     (λn₃ eq₁ eq₂ → ih n₂ n₃ eq₁ eq₂)));
+
+add-zero : (n : Nat) → equal (add n zero) n;
+add-zero = natInduction (λn → equal (add n zero) n)
+                        ⋄
+                        (λn ih → ih);
+
+add-succ : (n₁ n₂ : Nat) → equal (add n₁ (succ n₂)) (succ (add n₁ n₂));
+add-succ = natInduction (λn₁ → (n₂ : Nat) → equal (add n₁ (succ n₂)) (succ (add n₁ n₂)))
+                        (λn₂ → equal-refl n₂)
+                        (λn₁ ih n₂ → ih n₂);
+
+add-commutative : (n₁ n₂ : Nat) → equal (add n₁ n₂) (add n₂ n₁) ;
+add-commutative = natInduction (λn₁ → (n₂ : Nat) → equal (add n₁ n₂) (add n₂ n₁))
+                               (λn₂ → equal-symm (add n₂ zero) n₂ (add-zero n₂))
+                               (λn₁ ih n₂ → equal-trans (succ (add n₁ n₂))
+                                                        (succ (add n₂ n₁))
+                                                        (add n₂ (succ n₁))
+                                                        (ih n₂)
+                                                        (equal-symm (add n₂ (succ n₁))
+                                                                    (succ (add n₂ n₁))
+                                                                    (add-succ n₂ n₁)));
+
+add-assoc : (n₁ n₂ n₃ : Nat) → equal (add n₁ (add n₂ n₃)) (add (add n₁ n₂) n₃);
+add-assoc = natInduction (λn₁ → (n₂ n₃ : Nat) → equal (add n₁ (add n₂ n₃)) (add (add n₁ n₂) n₃))
+                         (λn₂ n₃ → equal-refl (add n₂ n₃))
+                         (λn₁ ih n₂ n₃ → ih n₂ n₃);
+
+– is it possible to prove that succ is injective?
+succ-inj : (n₁ n₂ : Nat) → equal (succ n₁) (succ n₂) → equal n₁ n₂;
+succ-inj n₁ n₂ eq = eq;
+
+– a disequality
+succ-ne-zero : (n : Nat) → equal zero (succ n) → Empty;
+succ-ne-zero n eq = eq;
+
+– the above two properties seem to follow directly from the definition
+– of equality as a recursive definition.
+
+{- presumably, for this equality to be substitutive, we would need to
+add that as an axiom (with some computational behaviour) -}
+{- is it possible to do that also in some predicate-lifting kind of way? -}
+
+{-
+equal-subst : (P : Nat → Set) → (n₁ n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂;
+equal-subst P = natInduction (λn₁ → (n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂)
+                             (natCase (λn₂ → equal zero n₂ → P zero → P n₂)
+                                      (λeq p → p)
+                                      (λn₂ eq p → elimEmpty (P (succ n₂)) eq))
+                             (λn₁ ih →
+                                natCase (λn₂ → equal (succ n₁) n₂ → P (succ n₁) → P n₂)
+                                        (λeq p → elimEmpty (P zero) eq)
+                                        (λn₂ eq p → ih n₂ eq p));
+-}
+– ih : (n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂
+– n₂ : Nat
+– eq : equal (succ n₁) (succ n₂)
+– p  : P (succ n₁)
+–
+– P (succ n₂)
+

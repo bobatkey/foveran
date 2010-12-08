@@ -1,0 +1,18 @@
+case1 : (A B : Set) → A + B → A + B ;
+case1 = \A B x → case x for a. A + B with { inl y → inl y; inr z → inr z } ;
+
+Bool : Set ;
+Bool = Unit + Unit ;
+
+switch : (A B : Set) → Bool → Set ;
+switch = \A B x → case x for a. Set with { inl y → A; inr z → B } ;
+
+left : (A B : Set) → A → switch A B (inl ()) ;
+left = \A B a → a ;
+
+right : (A B : Set) → B → switch A B (inr ());
+right = \A B b → b ;
+
+both : (A B : Set) → (a : A) → (b : B) → (x : Bool) → switch A B x ;
+both = \A B a b x → case x for x. switch A B x with { inl y → a; inr z → b } ;
+

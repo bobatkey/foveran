@@ -1,0 +1,40 @@
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+lift : (D : Desc) →
+       (α : Set) →
+       (P : α → Set 2) →
+       sem D α →
+       Set 2 ;
+lift D α P = elimD (\D → sem D α → Set 2)
+                   (\A x → Unit)
+                   (\x → P x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+drop : (D : Desc) →
+       (A : Set) →
+       (x : sem D (µ D)) →
+       lift D (µ D) (λx → A) x →
+       sem D A ;
+drop D A = elimD (λD' → (x : sem D' (µ D)) → lift D' (µ D) (λx → A) x → sem D' A)
+                 (λA x u → x)
+                 (λx a → a)
+                 (λF G f g x a → «f (fst x) (fst a), g (snd x) (snd a)»)
+                 (λF G f g x → case x for x. lift (F “+” G) (µ D) (λx → A) x → sem (F “+” G) A with
+                                 { inl y → λa → inl (f y a)
+                                 ; inr z → λa → inr (g z a)
+                                 })
+                 D;
+
+cata : (D : Desc) → (α : Set) → (sem D α → α) → µ D → α ;
+cata D α k = induction D (λx → α) (λx a → k (drop D α x a));
+

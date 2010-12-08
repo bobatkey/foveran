@@ -1,0 +1,75 @@
+module Text.PrettyPrintPrec
+    (PrecDoc (),
+     atPrecedenceLevel,
+     resetPrec,
+     text,
+     (<>), (<+>), ($$), hang, nest, hsep, punctuate, sep, paren, cat, down, vcat,
+     int,
+     render)
+    where
+
+import qualified Text.PrettyPrint as PP
+import           Text.PrettyPrint (Doc)
+import           Data.String
+
+-- FIXME: replicate the rest of the PrettyPrint interface
+
+-- Wrapper to track precedence levels
+newtype PrecDoc = PrecDoc { atPrecedenceLevel :: Int -> Doc }
+
+instance IsString PrecDoc where
+    fromString s = PrecDoc $ \lev -> PP.text s
+
+text :: String -> PrecDoc
+text s = fromString s
+
+(<>) :: PrecDoc -> PrecDoc -> PrecDoc
+p1 <> p2 = PrecDoc $ \lev -> (PP.<>) (p1 `atPrecedenceLevel` lev) (p2 `atPrecedenceLevel` lev)
+
+(<+>) :: PrecDoc -> PrecDoc -> PrecDoc
+p1 <+> p2 = PrecDoc $ \lev -> (PP.<+>) (p1 `atPrecedenceLevel` lev) (p2 `atPrecedenceLevel` lev)
+
+($$) :: PrecDoc -> PrecDoc -> PrecDoc
+p1 $$ p2 = PrecDoc $ \lev -> (PP.$$) (p1 `atPrecedenceLevel` lev) (p2 `atPrecedenceLevel` lev)
+
+($+$) :: PrecDoc -> PrecDoc -> PrecDoc
+p1 $+$ p2 = PrecDoc $ \lev -> (PP.$+$) (p1 `atPrecedenceLevel` lev) (p2 `atPrecedenceLevel` lev)
+
+hang :: PrecDoc -> Int -> PrecDoc -> PrecDoc
+hang p1 n p2 = PrecDoc $ \lev -> PP.hang (p1 `atPrecedenceLevel` lev) n (p2 `atPrecedenceLevel` lev)
+
+nest :: Int -> PrecDoc -> PrecDoc
+nest n p = PrecDoc $ \lev -> PP.nest n (p `atPrecedenceLevel` lev)
+
+hsep :: [PrecDoc] -> PrecDoc
+hsep l = PrecDoc $ \lev -> PP.hsep $ map (`atPrecedenceLevel` lev) l
+
+sep :: [PrecDoc] -> PrecDoc
+sep l = PrecDoc $ \lev -> PP.sep $ map (`atPrecedenceLevel` lev) l
+
+vcat :: [PrecDoc] -> PrecDoc
+vcat l = PrecDoc $ \lev -> PP.vcat $ map (`atPrecedenceLevel` lev) l
+
+cat :: [PrecDoc] -> PrecDoc
+cat l = PrecDoc $ \lev -> PP.cat $ map (`atPrecedenceLevel` lev) l
+
+punctuate :: PrecDoc -> [PrecDoc] -> [PrecDoc]
+punctuate p []     = []
+punctuate p [d]    = [d]
+punctuate p (d:ds) = (d <> p) : punctuate p ds
+
+paren :: Int -> PrecDoc -> PrecDoc
+paren braklev p
+    = PrecDoc $ \lev -> if braklev > lev then PP.parens (p `atPrecedenceLevel` braklev) else p `atPrecedenceLevel` braklev
+
+down :: PrecDoc -> PrecDoc
+down p = PrecDoc $ \lev -> p `atPrecedenceLevel` (lev - 1)
+
+resetPrec :: PrecDoc -> PrecDoc
+resetPrec p = PrecDoc $ \_ -> p `atPrecedenceLevel` 10
+
+int :: Int -> PrecDoc
+int i = PrecDoc $ \_ -> PP.int i
+
+render :: PrecDoc -> String
+render d = PP.render (d `atPrecedenceLevel` 10)

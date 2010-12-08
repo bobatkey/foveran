@@ -1,0 +1,117 @@
+sem : Desc → Set → Set ;
+sem d = elimD (\x → Set → Set)
+              (\A X → A)
+              (\X → X)
+              (\d1 d2 F G X → F X × G X)
+              (\d1 d2 F G X → F X + G X)
+              d ;
+
+map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
+map F α β f = elimD (\F → sem F α → sem F β)
+                    (\A x → x)
+                    (\x → f x)
+                    (\d1 d2 g h p → «g (fst p), h (snd p)»)
+	            (\d1 d2 g h s → case s for x. sem (d1 “+” d2) β with
+                                      { inl x → inl (g x)
+	   			      ; inr x → inr (h x)
+				      })
+                    F ;
+
+lift : (D : Desc) →
+       (X : Set) →
+       (P : X → Set 2) →
+       sem D X →
+       Set 2;
+lift D X P = elimD (\D → sem D X → Set 2)
+                   (\A x → Unit)
+                   (\x → P x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+--assume induction : (D : Desc) →
+--                   (P : µ D → Set) →
+--                   (k : (x : sem D (µ D)) → lift D (µ D) P x → P (construct D x)) →
+--                   (x : µ D) →
+--                   P x;
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+;
+
+{-
+-- should do this with a built-in case (or “out” operator)
+-- actually, we should (and have) do(ne) this using the generic induction method that provides all we need. See below.
+caseNat : (A : Set 1) → A → (Nat → A) → Nat → A ;
+caseNat A a f n = snd (fold NatDesc
+                            (Nat × A)
+                            (\x → case x for d. Nat × A with
+                                    { inl u → «zero, a»
+                                    ; inr p → «succ (fst p), f (fst p)»
+                                    })
+                            n);
+
+deconstruct' : (F : Desc) → µ F → sem F (µ F) ;
+deconstruct' F = fold F
+                      (sem F (µ F))
+                      (\x → map F (sem F (µ F)) (µ F) (construct F) x) ;
+-}
+deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
+deconstruct'' F = induction F (\x → sem F (µ F)) (\x p → x);
+
+genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct D x)) → (x : µ D) → P x ;
+genericCase D P k = induction D P (λx p → k x);
+
+caseNat2 : (A : Set 1) → A → (Nat → A) → Nat → A ;
+caseNat2 A a f n = case deconstruct'' NatDesc n for x. A with
+                     { inl u → a
+                     ; inr n → f n
+                     };
+
+-- I think that if you define deconstruct' using induction (and
+-- induction has the right computational behaviour), then the
+-- following will succeed.
+
+--test : (F : Desc) → (P : sem F (µ F) → Set) → (x : sem F (µ F)) → P x → P (deconstruct' F (construct F x)) ;
+--test F P x p = p ;
+
+natInduction : (P : Nat → Set 2) →
+               (P zero) →
+               ((n : Nat) → P n → P (succ n)) →
+               (n : Nat) → P n;
+natInduction P p0 pS =
+  induction NatDesc P
+            (\x → case x for x. lift NatDesc Nat P x → P (construct NatDesc x) with
+                    { inl u → \u' → p0
+                    ; inr n → \pn → pS n pn
+                    });
+
+Le : Nat → Nat → Set ;
+Le = natInduction (λx → Nat → Set)
+                  (\y → Unit)
+                  (\n f → caseNat2 Set Empty f);
+
+owotoNat : (x y : Nat) → (P : Set) →
+           (Le x y → P) →
+           (Le y x → P) →
+           P ;
+owotoNat x y P =
+  natInduction
+    (\x → (y : Nat) → (Le x y → P) → (Le y x → P) → P)
+    (\y ple pge → ple ())
+    (\x f →
+        natInduction
+          (\n → (Le (succ x) n → P) → (Le n (succ x) → P) → P)
+          (\ple pge → pge ())
+          (\y g ple pge → f y ple pge))
+    x
+    y;
+
+-- y   : Nat
+-- f   : (y : Nat) → (Le x y → P) → (Le y x → P) → P
+-- ple : (Le (succ x) (succ y) → P)
+-- pge : (Le (succ y) (succ x) → P)
