@@ -1,0 +1,30 @@
+– leibniz equality can be defined as an inhabitant of Set 1
+
+– but we can't prove that it is equivalent to the identity without
+– parametricity (and identity extension, I think, which would require
+– equality to state anyways)
+
+leibniz : (A : Set) → A → A → Set 1;
+leibniz A a₁ a₂ = (F : A → Set) → F a₁ → F a₂;
+
+refl : (A : Set) → (a : A) → leibniz A a a;
+refl A a = λF x → x;
+
+symm : (A : Set) → (a₁ a₂ : A) → leibniz A a₁ a₂ → leibniz A a₂ a₁;
+symm A a₁ a₂ e = λF x → e (λa → F a → F a₁) (λx → x) x;
+
+trans : (A : Set) → (a₁ a₂ a₃ : A) → leibniz A a₁ a₂ →
+                                     leibniz A a₂ a₃ →
+                                     leibniz A a₁ a₃;
+trans A a₁ a₂ a₃ e₁ e₂ = λF x → e₂ F (e₁ F x);
+
+subst : (A : Set) → (F : A → Set) → (a₁ a₂ : A) → leibniz A a₁ a₂ → F a₁ → F a₂;
+subst A F a₁ a₂ e = e F;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– functional-extensionality?? Don't think so.
+
+–fext : (A B : Set) → (f g : A → B) → ((a : A) → leibniz B (f a) (g a)) → leibniz (A → B) f g;
+–fext A B f g e = λF x → ??
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
