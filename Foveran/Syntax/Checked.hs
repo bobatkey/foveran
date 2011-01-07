@@ -41,6 +41,16 @@ data TermCon tm
     | Mu        tm
     | Construct
     | Induction
+      
+    {- Descriptions of indexed types -}
+    | IDesc
+    | IDesc_K
+    | IDesc_Id
+    | IDesc_Pair
+    | IDesc_Sg
+    | IDesc_Pi
+
+    | IDesc_Elim
     deriving (Show, Functor)
 
 --------------------------------------------------------------------------------
@@ -80,6 +90,14 @@ bind' fnm Desc_Elim        = pure Desc_Elim
 bind' fnm (Mu t)           = Mu <$> t
 bind' fnm Construct        = pure Construct
 bind' fnm Induction        = pure Induction
+
+bind' fnm IDesc            = pure IDesc
+bind' fnm IDesc_K          = pure IDesc_K
+bind' fnm IDesc_Id         = pure IDesc_Id
+bind' fnm IDesc_Pair       = pure IDesc_Pair
+bind' fnm IDesc_Sg         = pure IDesc_Sg
+bind' fnm IDesc_Pi         = pure IDesc_Pi
+bind' fnm IDesc_Elim       = pure IDesc_Elim
 
 bindFree :: Ident -> Term -> Term
 bindFree nm x = translateRec (bind' nm) x 0
@@ -132,6 +150,14 @@ toDisplay Desc_Elim               = pure DS.Desc_Elim
 toDisplay (Mu t)                  = DS.Mu <$> t
 toDisplay Construct               = pure DS.Construct
 toDisplay Induction               = pure DS.Induction
+
+toDisplay IDesc                   = pure DS.IDesc
+toDisplay IDesc_Id                = pure DS.IDesc_Id
+toDisplay IDesc_K                 = pure DS.IDesc_K
+toDisplay IDesc_Pair              = pure DS.IDesc_Pair
+toDisplay IDesc_Sg                = pure DS.IDesc_Sg
+toDisplay IDesc_Pi                = pure DS.IDesc_Pi
+toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 
 toDisplaySyntax :: NameSupply f => Term -> f DS.Term
 toDisplaySyntax = translateRec toDisplay
@@ -192,4 +218,13 @@ instance Eq Term where
   In (Mu t)     == In (Mu t')        = t == t'
   In Construct  == In Construct      = True
   In Induction  == In Induction      = True
+  
+  In IDesc      == In IDesc          = True
+  In IDesc_K    == In IDesc_K        = True
+  In IDesc_Id   == In IDesc_Id       = True
+  In IDesc_Pair == In IDesc_Pair     = True
+  In IDesc_Sg   == In IDesc_Sg       = True
+  In IDesc_Pi   == In IDesc_Pi       = True
+  In IDesc_Elim == In IDesc_Elim     = True
+  
   _             == _                 = False

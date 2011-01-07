@@ -103,6 +103,7 @@ muFlength : Set → Nat → Set;
 muFlength A n = (l : List A) × eqNat (length A l) n;
 
 – there just so happens, in this case, to be an object that represents muFlength2
+– using a large induction
 muFlength2 : Set → Nat → Set;
 muFlength2 A = natInduction (λn → Set)
                             Unit
@@ -125,6 +126,14 @@ assume Rec   : (α : Set) → α → IDesc α;
 assume Pair  : (α : Set) → IDesc α → IDesc α → IDesc α;
 assume Sg    : (α : Set) → (β : Set) → (β → IDesc α) → IDesc α;
 
+{-
+data idesc (α : Set) : Set :=
+  | unit :
+  | rec  : α
+  | pair : idesc idesc
+  | sg   : 
+-}
+
 lift3 : (D : Desc) →
         (α : Set) →
         sem D α →
@@ -139,7 +148,7 @@ lift3 D α = elimD (λD → sem D α → IDesc α)
                                   })
                   D;
 
-– this is a big different, because it acts on functors, not on indexed sets
+– this is a bit different, because it acts on functors, not on indexed sets
 invLength2 : (A α : Set) → (sem (ListDesc A) Nat → IDesc α) → Nat → IDesc α ;
 invLength2 A α X n = caseNat (IDesc α)
                              (X (inl ()))

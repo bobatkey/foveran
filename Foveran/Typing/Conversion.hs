@@ -44,6 +44,13 @@ data Value
     | VDesc_Sum  Value Value
     | VMu        Value
     | VConstruct Value  Value
+      
+    | VIDesc      Value
+    | VIDesc_K    Value Value
+    | VIDesc_Id   Value Value
+    | VIDesc_Pair Value Value Value
+    | VIDesc_Sg   Value Value Value
+    | VIDesc_Pi   Value Value Value
     | VNeutral   (Int -> Term)
     deriving Show
 
@@ -150,6 +157,35 @@ vdesc_elim vP vK vI vPr vSu = loop
                                          `tmApp` n)
       loop x                  = error $ "internal: type error in the evaluator: vdesc_elim"
 
+videsc_elim vI vP vId vK vPair vSg vPi = loop
+    where
+      loop (VIDesc_Id _ i)       = vId $$ i
+      loop (VIDesc_K _ a)        = vK $$ a
+      loop (VIDesc_Pair _ d1 d2) = vPair $$ d1 $$ d2 $$ loop d1 $$ loop d2
+      loop (VIDesc_Sg _ a d)     = vSg $$ a $$ d $$ (VLam "a" $ \a -> loop (d $$ a))
+      loop (VIDesc_Pi _ a d)     = vPi $$ a $$ d $$ (VLam "a" $ \a -> loop (d $$ a))
+      loop (VNeutral n)          = reflect (vP $$ VNeutral n)
+                                           (pure (In IDesc_Elim) 
+                                            `tmApp` reify (VSet 0) vI
+                                            `tmApp` reify (VIDesc vI .->. VSet 10) vP
+                                            `tmApp` reify (forall "x" vI $ \x -> vP $$ VIDesc_Id vI x) vId
+                                            `tmApp` reify (forall "A" (VSet 0) $ \a -> vP $$ VIDesc_K vI a) vK
+                                            `tmApp` reify (forall "D1" (VIDesc vI) $ \d1 ->
+                                                           forall "D2" (VIDesc vI) $ \d2 ->
+                                                           (vP $$ d1) .->.
+                                                           (vP $$ d2) .->.
+                                                           (vP $$ VIDesc_Pair vI d1 d2)) vPair
+                                            `tmApp` reify (forall "A" (VSet 0) $ \a ->
+                                                           forall "D" (a .->. VIDesc vI) $ \d ->
+                                                           (forall "x" a $ \x -> vP $$ (d $$ x)) .->.
+                                                           (vP $$ VIDesc_Sg vI a d)) vSg
+                                            `tmApp` reify (forall "A" (VSet 0) $ \a ->
+                                                           forall "D" (a .->. VIDesc vI) $ \d ->
+                                                           (forall "x" a $ \x -> vP $$ (d $$ x)) .->.
+                                                           (vP $$ VIDesc_Pi vI a d)) vPi
+                                            `tmApp` n)
+      loop x                  = error $ "internal: type error in the evaluator: videsc_elim"
+                                            
 vcase :: Value -> Value -> Value -> Ident -> (Value -> Value) -> Ident -> (Value -> Value) -> Ident -> (Value -> Value) -> Value
 vcase (VInl v)     vA vB x vP y vL z vR = vL v
 vcase (VInr v)     vA vB x vP y vL z vR = vR v
@@ -241,6 +277,7 @@ reifyType VUnit          = \i -> In $ Unit
 reifyType VEmpty         = \i -> In $ Empty
 reifyType VDesc          = \i -> In $ Desc
 reifyType (VMu v)        = \i -> In $ Mu (reify VDesc v i)
+reifyType (VIDesc s)     = pure (In IDesc) `tmApp` reifyType s
 reifyType (VNeutral t)   = \i -> t i
 reifyType v              = error ("internal: reifyType given non-type: " ++ show v)
 
@@ -270,6 +307,19 @@ reify VDesc            (VDesc_Prod v1 v2) = \i -> In $ Desc_Prod (reify VDesc v1
 reify VDesc            (VDesc_Sum v1 v2)  = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
 reify (VMu tA)         (VConstruct v1 v2) = pure (In Construct) `tmApp` reify VDesc v1
                                                                 `tmApp` reify (vsem $$ v1 $$ (VMu v1)) v2
+reify (VIDesc tI)      (VIDesc_Id i x)    = pure (In IDesc_Id) `tmApp` reifyType i
+                                                               `tmApp` reify i x
+reify (VIDesc tI)      (VIDesc_K i a)     = pure (In IDesc_K) `tmApp` reifyType i
+                                                              `tmApp` reifyType a
+reify (VIDesc tI)      (VIDesc_Pair i d1 d2) = pure (In IDesc_Pair) `tmApp` reifyType i
+                                                                    `tmApp` reify (VIDesc tI) d1
+                                                                    `tmApp` reify (VIDesc tI) d2
+reify (VIDesc tI)      (VIDesc_Sg i a d)  = pure (In IDesc_Sg) `tmApp` reifyType i
+                                                               `tmApp` reifyType a
+                                                               `tmApp` reify (a .->. VIDesc i) d
+reify (VIDesc tI)      (VIDesc_Pi i a d)  = pure (In IDesc_Pi) `tmApp` reifyType i
+                                                               `tmApp` reifyType a
+                                                               `tmApp` reify (a .->. VIDesc i) d
 reify _                (VNeutral tm)      = tm
 reify _                v                  = error $ "reify: attempt to reify: " ++ show v
 
@@ -337,6 +387,22 @@ eval Induction          = pure (VLam "F" $ \f ->
                                 VLam "k" $ \k ->
                                 VLam "x" $ \x ->
                                 vinduction f p k x)
+
+eval IDesc              = pure (VLam "I" $ \i -> VIDesc i)
+eval IDesc_K            = pure (VLam "I" $ \i -> VLam "A" $ \a -> VIDesc_K i a)
+eval IDesc_Id           = pure (VLam "I" $ \i -> VLam "i" $ \x -> VIDesc_Id i x)
+eval IDesc_Pair         = pure (VLam "I" $ \i -> VLam "d1" $ \d1 -> VLam "d2" $ \d2 -> VIDesc_Pair i d1 d2)
+eval IDesc_Sg           = pure (VLam "I" $ \i -> VLam "A" $ \a -> VLam "d" $ \d -> VIDesc_Sg i a d)
+eval IDesc_Pi           = pure (VLam "I" $ \i -> VLam "A" $ \a -> VLam "d" $ \d -> VIDesc_Pi i a d)
+eval IDesc_Elim         = pure (VLam "I" $ \i ->
+                                VLam "P" $ \p ->
+                                VLam "pId" $ \pId ->
+                                VLam "pK"  $ \pK ->
+                                VLam "pPair" $ \pPair ->
+                                VLam "pSg" $ \pSg ->
+                                VLam "pPi" $ \pPi ->
+                                VLam "d" $ \d ->
+                                videsc_elim i p pId pK pPair pSg pPi d)
 
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value

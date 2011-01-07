@@ -12,18 +12,6 @@ import qualified Data.Text as T
 import           Control.StreamReader
 
 {------------------------------------------------------------------------------}
-instance Monad (Either a) where
-    return = Right
-    Left x  >>= _ = Left x
-    Right a >>= f = f a
-
-instance Applicative (Either a) where
-    pure x = Right x
-    Left a  <*> _       = Left a
-    Right _ <*> Left a  = Left a
-    Right f <*> Right a = Right (f a)
-
-{------------------------------------------------------------------------------}
 data Parser tok a
     = Return   a
     | Terminal tok (Lexeme tok -> Parser tok a)

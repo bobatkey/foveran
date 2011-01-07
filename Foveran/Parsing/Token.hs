@@ -48,6 +48,14 @@ data Token
     | Number
     | Pipe
     | Data
+      
+    | IDesc
+    | IDesc_K
+    | IDesc_Id
+    | IDesc_Pair
+    | IDesc_Sg
+    | IDesc_Pi
+    | IDesc_Elim
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -96,3 +104,10 @@ instance Show Token where
   show Number      = "<number>"
   show Pipe        = "|"
   show Data        = "data"
+  show IDesc       = "IDesc"
+  show IDesc_K     = "'K"
+  show IDesc_Id    = "'Id"
+  show IDesc_Pair  = "'Pair"
+  show IDesc_Sg    = "'Sg"
+  show IDesc_Pi    = "'Pi"
+  show IDesc_Elim  = "elimID"

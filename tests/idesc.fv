@@ -30,8 +30,8 @@ lift D α Φ = elimD (\D → sem D α → Set 2)
                                    })
                    D;
 
-semI : (I : Set) → IDesc I → (I → Set) → Set;
-semI I D X = elimID I (λD → Set)
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD → Set 2)
                     (λi → X i)
                     (λA → A)
                     (λD₁ D₂ semD₁ semD₂ → semD₁ × semD₂)
@@ -56,9 +56,9 @@ lift2 D A = elimD (λD → sem D A → IDesc A)
 lift3 : (I : Set) →
         (D : IDesc I) →
         (A : I → Set) →
-        semI I D A →
+        semI I D (λi → A i) →
         IDesc ((i : I) × A i);
-lift3 I D A = elimID I (λD → semI I D A → IDesc ((i : I) × A i))
+lift3 I D A = elimID I (λD → semI I D (λi → A i) → IDesc ((i : I) × A i))
                      (λi a                 → 'Id ((i : I) × A i) «i,a»)
                      (λA' a                → 'K ((i : I) × A i) Unit)
                      (λD₁ D₂ lift₁ lift₂ p → 'Pair ((i : I) × A i) (lift₁ (fst p)) (lift₂ (snd p)))
@@ -69,20 +69,20 @@ lift3 I D A = elimID I (λD → semI I D A → IDesc ((i : I) × A i))
 lift4 : (I : Set) →
         (D : IDesc I) →
         (A : I → Set) →
-        (P : (i : I) → A i → Set) →
-        semI I D A →
-        Set;
+        (P : (i : I) → A i → Set 2) →
+        semI I D (λi → A i) →
+        Set 2;
 lift4 I D A P x = semI ((i : I) × A i) (lift3 I D A x) (λp → P (fst p) (snd p));
 
 
 allI : (I  : Set) →
        (D  : IDesc I) →
        (A  : I → Set) →
-       (P  : (i : I) → A i → Set) →
+       (P  : (i : I) → A i → Set 2) →
        (p  : (i : I) → (x : A i) → P i x) →
-       (xs : semI I D A) →
+       (xs : semI I D (λi → A i)) →
        lift4 I D A P xs;
-allI I D A P p = elimID I (λD → (xs : semI I D A) → lift4 I D A P xs)
+allI I D A P p = elimID I (λD → (xs : semI I D (λi → A i)) → lift4 I D A P xs)
                         (λx xs              → p x xs)
                         (λA xs              → ⋄)
                         (λD₁ D₂ all₁ all₂ x → «all₁ (fst x), all₂ (snd x)»)
@@ -91,12 +91,12 @@ allI I D A P p = elimID I (λD → (xs : semI I D A) → lift4 I D A P xs)
                         D;
 
 assume muI        : (I : Set) → (I → IDesc I) → I → Set;
-assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (muI I D) → muI I D i;
+assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi → muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
                     (D : I → IDesc I) →
-                    (P : (i : I) → muI I D i → Set) →
+                    (P : (i : I) → muI I D i → Set 2) →
                     (k : (i : I) →
-                         (x : semI I (D i) (muI I D)) →
+                         (x : semI I (D i) (λi → muI I D i)) →
                          lift4 I (D i) (muI I D) P x →
                          P i (constructI I D i x)) →
                     (i : I) →

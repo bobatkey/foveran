@@ -230,5 +230,55 @@ tySynth (Annot p (Proj2 t)) ctxt =
          VSigma _ _ tB -> return (tB (vfst $ tmP `evalIn` ctxt), In $ CS.Proj2 tmP)
          v             -> Error p (Proj2FromNonSigma ctxt v)
 
+{------------------------------------------------------------------------------}
+-- Descriptions of indexed types
+tySynth (Annot p IDesc) ctxt =
+    do return (VSet 0 .->. VSet 1, In $ CS.IDesc)
+       
+tySynth (Annot p IDesc_K) ctxt =
+    do return ( forall "I" (VSet 0) $ \i -> VSet 0 .->. VIDesc i
+              , In CS.IDesc_K
+              )
+
+tySynth (Annot p IDesc_Id) ctxt =
+    do return ( forall "I" (VSet 0) $ \i -> i .->. VIDesc i
+              , In CS.IDesc_Id
+              )
+
+tySynth (Annot p IDesc_Pair) ctxt =
+    do return ( forall "I" (VSet 0) $ \i -> VIDesc i .->. VIDesc i .->. VIDesc i
+              , In CS.IDesc_Pair)
+
+tySynth (Annot p IDesc_Sg) ctxt =
+    do return ( forall "I" (VSet 0) $ \i -> forall "A" (VSet 0) $ \a -> (a .->. VIDesc i) .->. VIDesc i
+              , In CS.IDesc_Sg
+              )
+
+tySynth (Annot p IDesc_Pi) ctxt =
+    do return ( forall "I" (VSet 0) $ \i -> forall "A" (VSet 0) $ \a -> (a .->. VIDesc i) .->. VIDesc i
+              , In CS.IDesc_Pi)
+
+tySynth (Annot p IDesc_Elim) ctxt =
+    do return ( forall "I" (VSet 0) $ \i ->
+                forall "P" (VIDesc i .->. VSet 10) $ \p ->
+                (forall "x" i $ \x -> p $$ VIDesc_Id i x) .->.
+                (forall "A" (VSet 0) $ \a -> p $$ VIDesc_K i a) .->.
+                (forall "D1" (VIDesc i) $ \d1 ->
+                 forall "D2" (VIDesc i) $ \d2 ->
+                 (p $$ d1) .->.
+                 (p $$ d2) .->.
+                 (p $$ (VIDesc_Pair i d1 d2))) .->.
+                (forall "A" (VSet 0) $ \a ->
+                 forall "D" (a .->. VIDesc i) $ \d ->
+                 (forall "x" a $ \x -> p $$ (d $$ x)) .->.
+                 (p $$ (VIDesc_Sg i a d))) .->.
+                (forall "A" (VSet 0) $ \a ->
+                 forall "D" (a .->. VIDesc i) $ \d ->
+                 (forall "x" a $ \x -> p $$ (d $$ x)) .->.
+                 (p $$ (VIDesc_Pi i a d))) .->.
+                (forall "D" (VIDesc i) $ \d -> p $$ d)
+              , In $ CS.IDesc_Elim
+              )
+
 tySynth (Annot p t) ctxt =
     Error p UnableToSynthesise

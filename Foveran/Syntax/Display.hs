@@ -49,6 +49,16 @@ data TermCon tm
     | Mu        tm
     | Construct
     | Induction
+      
+    {- Descriptions of indexed types -}
+    | IDesc
+    | IDesc_K
+    | IDesc_Id
+    | IDesc_Pair
+    | IDesc_Sg
+    | IDesc_Pi
+
+    | IDesc_Elim
     deriving (Show, Functor)
 
 data Constructor

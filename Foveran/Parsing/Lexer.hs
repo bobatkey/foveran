@@ -53,6 +53,13 @@ lexer = addPositions >>> $(makeStaticLexer
         , ("Desc",            Emit Desc)
         , ("data",            Emit Data)
         , ("|",               Emit Pipe)
+        , ("IDesc",           Emit IDesc)
+        , ("'K",              Emit IDesc_K)
+        , ("'Id",             Emit IDesc_Id)
+        , ("'Pair",           Emit IDesc_Pair)
+        , ("'Sg",             Emit IDesc_Sg)
+        , ("'Pi",             Emit IDesc_Pi)
+        , ("elimID",          Emit IDesc_Elim)
         , (tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar),
                               Emit Ident)
         , (oneOrMore (tok num),

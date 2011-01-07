@@ -55,6 +55,14 @@ pprint (Mu t)              = paren 01 ("µ" <+> down t)
 pprint Construct           = "construct"
 pprint Induction           = "induction"
 
+pprint IDesc               = "IDesc"
+pprint IDesc_Id            = "'Id"
+pprint IDesc_K             = "'K"
+pprint IDesc_Pair          = "'Pair"
+pprint IDesc_Sg            = "'Sg"
+pprint IDesc_Pi            = "'Pi"
+pprint IDesc_Elim          = "elimID"
+
 pp :: TermPos -> PrecDoc
 pp = foldAnnot pprint
 

@@ -6,44 +6,44 @@ Author:        Robert Atkey
 Synopsis:      A dependently-typed programming language
 Build-Type:    Simple
 
-library
-  Exposed-Modules:
-        Control.StreamProcessor,
-        Control.StreamProcessor.ByteString,
-        Control.StreamProcessor.DecodeUTF8,
-        Control.StreamProcessor.Positions,
-        Control.StreamProcessor.Rewindable,
-        Control.StreamReader,
-        Control.StreamReader.Binary,
-        Control.StreamReader.IO,
+-- library
+--   Exposed-Modules:
+--         Control.StreamProcessor,
+--         Control.StreamProcessor.ByteString,
+--         Control.StreamProcessor.DecodeUTF8,
+--         Control.StreamProcessor.Positions,
+--         Control.StreamProcessor.Rewindable,
+--         Control.StreamReader,
+--         Control.StreamReader.Binary,
+--         Control.StreamReader.IO,
         
-        Data.Rec,
-        Data.FreeMonad,
-        Data.BooleanAlgebra,
-        Data.RangeSet,
+--         Data.Rec,
+--         Data.FreeMonad,
+--         Data.BooleanAlgebra,
+--         Data.RangeSet,
 
-        Text.CharacterSet,
-        Text.LexerGenerator,
-        Text.ParserCombinators,
-        Text.Position,
-        Text.PrettyPrint.IsString,
-        Text.PrettyPrintPrec,
-        Text.Regexp,
-        Text.Regexp.DFA,
-        Text.Regexp.DFATH,
-        Text.SExpr
+--         Text.CharacterSet,
+--         Text.LexerGenerator,
+--         Text.ParserCombinators,
+--         Text.Position,
+--         Text.PrettyPrint.IsString,
+--         Text.PrettyPrintPrec,
+--         Text.Regexp,
+--         Text.Regexp.DFA,
+--         Text.Regexp.DFATH,
+--         Text.SExpr
                    
-  Build-Depends: text >= 0.7.1.0,
-                 containers >= 0.3.0.0,
-                 base >= 4,
-                 pretty,
-                 th-lift >= 0.3,
-                 bytestring >= 0.9.1.5,
-                 template-haskell,
-                 QuickCheck >= 2.1.0.3,
-                 array >= 0.3.0.0,
-                 dlist >= 0.5,
-                 mtl >= 1.1.0.2  
+--   Build-Depends: text >= 0.7.1.0,
+--                  containers >= 0.3.0.0,
+--                  base >= 4,
+--                  pretty,
+--                  th-lift >= 0.3,
+--                  bytestring >= 0.9.1.5,
+--                  template-haskell,
+--                  QuickCheck >= 2.1.0.3,
+--                  array >= 0.3.0.0,
+--                  dlist >= 0.5,
+--                  mtl >= 1.1.0.2  
 
 Executable foveran
   Build-Depends: text >= 0.7.1.0,

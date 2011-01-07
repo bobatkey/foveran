@@ -202,4 +202,18 @@ term00 =
     <|>
     keyword Desc <$> token Tok.Desc
     <|>
+    keyword IDesc <$> token Tok.IDesc
+    <|>
+    keyword IDesc_K <$> token Tok.IDesc_K
+    <|>
+    keyword IDesc_Id <$> token Tok.IDesc_Id
+    <|>
+    keyword IDesc_Pair <$> token Tok.IDesc_Pair
+    <|>
+    keyword IDesc_Sg <$> token Tok.IDesc_Sg
+    <|>
+    keyword IDesc_Pi <$> token Tok.IDesc_Pi
+    <|>
+    keyword IDesc_Elim <$> token Tok.IDesc_Elim
+    <|>
     (\(nm,p) -> Annot p (Var nm)) <$> tokenWithText Tok.Ident
