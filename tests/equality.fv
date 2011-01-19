@@ -25,6 +25,116 @@ subst A F a₁ a₂ e = e F;
 – functional-extensionality?? Don't think so.
 
 –fext : (A B : Set) → (f g : A → B) → ((a : A) → leibniz B (f a) (g a)) → leibniz (A → B) f g;
-–fext A B f g e = λF x → ??
+–fext A B f g eq = λF p₁ → ();
+– where do we get an 'A' from to apply to eq?
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– injectivity of sums
+inj-inl : (A B : Set) → (a₁ a₂ : A) →
+          leibniz (A + B) (inl a₁) (inl a₂) →
+          leibniz A a₁ a₂;
+inj-inl A B a₁ a₂ eq = λF f₁ → eq (λs → case s for s. Set with
+                                          { inl a → F a
+                                          ; inr b → Empty
+                                          })
+                                 f₁;
+
+inj-inr : (A B : Set) → (b₁ b₂ : B) →
+          leibniz (A + B) (inr b₁) (inr b₂) →
+          leibniz B b₁ b₂;
+inj-inr A B b₁ b₂ eq = λF f₁ → eq (λs → case s for s. Set with
+                                          { inl a → Empty
+                                          ; inr b → F b
+                                          })
+                                 f₁;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– injectivity of pairs
+inj-pair1 : (A B : Set) → (a₁ a₂ : A) → (b₁ b₂ : B) →
+            leibniz (A × B) «a₁,b₁» «a₂,b₂» →
+            leibniz A a₁ a₂;
+inj-pair1 A B a₁ a₂ b₁ b₂ eq =
+  λF f₁ → eq (λp → F (fst p)) f₁;
+
+inj-pair2 : (A B : Set) → (a₁ a₂ : A) → (b₁ b₂ : B) →
+            leibniz (A × B) «a₁,b₁» «a₂,b₂» →
+            leibniz B b₁ b₂;
+inj-pair2 A B a₁ a₂ b₁ b₂ eq =
+  λF f₁ → eq (λp → F (snd p)) f₁;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– injectivity of construct
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+deconstruct : (D : Desc) → µ D → sem D (µ D);
+deconstruct D = induction D (λx → sem D (µ D)) (λx p → x);
+
+inj-construct : (D : Desc) →
+                (x₁ x₂ : sem D (µ D)) →
+                leibniz (µ D) (construct D x₁) (construct D x₂) →
+                leibniz (sem D (µ D)) x₁ x₂;
+inj-construct D x₁ x₂ eq =
+  λF f₁ → eq (λx → F (deconstruct D x)) f₁;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– relation to an inductively defined equality
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+lift : (D : Desc) →
+       (α : Set) →
+       (Φ : α → Set 2) →
+       sem D α →
+       Set 2 ;
+lift D α Φ = elimD (\D → sem D α → Set 2)
+                   (\A x → Unit)
+                   (\x → Φ x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x → case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                    { inl u → \u' → φ0
+                    ; inr n → \φn → φS n φn
+                    });
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p → case x for x. A (construct NatDesc x) with
+                                    { inl u → a
+                                    ; inr n → f n
+                                    });
+
+equal : Nat → Nat → Set;
+equal = natInduction (λx → Nat → Set)
+                     (natCase (λx → Set) Unit (λn → Empty))
+                     (λn f → natCase (λx → Set) Empty f);
+
+equal-to-leibniz : (n₁ n₂ : Nat) → equal n₁ n₂ → leibniz Nat n₁ n₂;
+equal-to-leibniz =
+  natInduction (λn₁ → (n₂ : Nat) → equal n₁ n₂ → leibniz Nat n₁ n₂)
+               (natCase (λn₂ → equal zero n₂ → leibniz Nat zero n₂)
+                        (λu → refl Nat zero)
+                        (λn₂ e → elimEmpty (leibniz Nat zero (succ n₂)) e))
+               (λn₁ ih → natCase (λn₂ → equal (succ n₁) n₂ → leibniz Nat (succ n₁) n₂)
+                                 (λe → elimEmpty (leibniz Nat (succ n₁) zero) e)
+                                 (λn₂ eq → λF f₁ → ih n₂ eq (λn → F (succ n)) f₁));
+
+– define generic equality for any data type?, and prove it reflects
+– the leibniz equality?

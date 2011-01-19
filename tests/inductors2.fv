@@ -1,0 +1,272 @@
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+lift : (D : Desc) →
+       (α : Set) →
+       (Φ : α → Set 2) →
+       sem D α → Set 2 ;
+lift D α Φ = elimD (\D → sem D α → Set 2)
+                   (\A x → Unit)
+                   (\x → Φ x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD → Set 2)
+                    (λi → X i)
+                    (λA → A)
+                    (λD₁ D₂ semD₁ semD₂ → semD₁ × semD₂)
+                    (λA D semD → (a : A) × semD a)
+                    (λA D semD → (a : A) → semD a)
+                    D;
+
+semI' : (I J : Set) → (I → IDesc J) → (J → Set 2) → (I → Set 2);
+semI' I J D X i = semI J (D i) X;
+
+compose : (A B : Set) → IDesc A → (A → IDesc B) → IDesc B;
+compose A B D f = elimID A (λD → IDesc B)
+                         (λa → f a)
+                         (λA → 'K B A)
+                         (λD₁ D₂ d₁ d₂ → 'Pair B d₁ d₂)
+                         (λC D g → 'Sg B C g)
+                         (λC D g → 'Pi B C g)
+                         D;
+
+commute : (I J : Set) →
+          (D₁ : IDesc I) →
+          (D₂ : I → IDesc J) →
+          (Φ  : J → Set 2) →
+          semI I D₁ (λa → semI J (D₂ a) Φ) →
+          semI J (compose I J D₁ D₂) Φ;
+commute I J D₁ D₂ Φ =
+  elimID I (λD₁ → semI I D₁ (λa → semI J (D₂ a) Φ) → semI J (compose I J D₁ D₂) Φ)
+         (λi x → x)
+         (λA a → a)
+         (λD₁ D₂ c₁ c₂ p → «c₁ (fst p), c₂ (snd p)»)
+         (λA D g p → «fst p, g (fst p) (snd p)»)
+         (λA D g f → λa → g a (f a))
+         D₁;
+
+{-
+commute2 : (I J : Set) →
+           (D₁ : IDesc I) →
+           (D₂ : I → IDesc J) →
+           (Φ  : J → Set 2) →
+           semI J (compose I J D₁ D₂) Φ →
+           semI I D₁ (λa → semI J (D₂ a) Φ);
+-}
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+map : (A : Set) →
+      (D : IDesc A) →
+      (Φ Ψ : A → Set 2) →
+      (f : (a : A) → Φ a → Ψ a) →
+      semI A D Φ →
+      semI A D Ψ;
+map A D Φ Ψ f =
+ elimID A (λD' → semI A D' Φ → semI A D' Ψ)
+        f
+        (λA a → a)
+        (λD₁ D₂ map₁ map₂ p → «map₁ (fst p), map₂ (snd p)»)
+        (λA D map p → «fst p, map (fst p) (snd p)»)
+        (λA D map f → λa → map a (f a))
+        D;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+inductor : Set → Set 3;
+inductor A = (H : A → IDesc A) ×
+             ((Φ : A → Set 2) →
+              ((x : A) → semI' A A H Φ x → Φ x) →
+              (x : A) → Φ x);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+deconstruct : (D : Desc) → µ D → sem D (µ D);
+deconstruct D = induction D (λx → sem D (µ D)) (λx p → x);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– every unindexed inductive type has an inductor
+lift2 : (D : Desc) →
+        (A : Set) →
+        sem D A →
+        IDesc A;
+lift2 D A = elimD (λD → sem D A → IDesc A)
+                  (λA' x → 'K A Unit)
+                  (λx → 'Id A x)
+                  (λD₁ D₂ f g x → 'Pair A (f (fst x)) (g (snd x)))
+ 		  (λD₁ D₂ f g x → case x for d. IDesc A with
+		                    { inl y → f y
+		 		    ; inr z → g z
+				    })
+                  D;
+
+lift-to-lift2 : (D : Desc) →
+                (A : Set) →
+                (Φ : A → Set 2) →
+                (x : sem D A) →
+                lift D A Φ x →
+                semI' (sem D A) A (lift2 D A) Φ x;
+lift-to-lift2 D A Φ =
+  elimD (λD' → (x : sem D' A) → lift D' A Φ x → semI' (sem D' A) A (lift2 D' A) Φ x)
+        (λA x u → ⋄)
+        (λx p → p)
+        (λD₁ D₂ f₁ f₂ x p → « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
+        (λD₁ D₂ f₁ f₂ x →
+            case x for x. lift (D₁ “+” D₂) A Φ x → semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x with
+              { inl y → λa → f₁ y a
+              ; inr z → λb → f₂ z b
+              })
+        D;
+
+desc-inductor : (D : Desc) → inductor (µ D);
+desc-inductor D = « λx → lift2 D (µ D) (deconstruct D x)
+                  , λΦ k → induction D Φ (λx p → k (construct D x) (lift-to-lift2 D (µ D) Φ x p))
+                  »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+bleh : (A B : Set) → A → IDesc (A × B);
+bleh A B a = 'Pi (A × B) B (λb → 'Id (A × B) «a,b»);
+
+bloo : (A B : Set) → A → B → IDesc (A × B);
+bloo A B a b = 'Id (A × B) «a,b»;
+
+lex-inductor : (A : Set) → inductor A →
+               (B : Set) → inductor B →
+               inductor (A × B);
+lex-inductor A AI B BI =
+  « λp → 'Pair (A × B) (compose A (A × B) (fst AI (fst p)) (bleh A B))
+                       (compose B (A × B) (fst BI (snd p)) (bloo A B (fst p)))
+  , λΦ k p → snd AI (λa → (b : B) → Φ «a,b»)
+                    (λa φa → snd BI (λb → Φ «a,b»)
+                                    (λb φb → k «a,b»
+                                               « commute A (A × B) (fst AI a) (bleh A B) Φ φa
+                                               , commute B (A × B) (fst BI b) (bloo A B a) Φ φb
+                                               »))
+                    (fst p)
+                    (snd p)
+  »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+flat : (A : Set) → inductor A;
+flat A = « λx → 'K A Unit
+         , λΦ k x → k x ⋄
+         »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+floo : (A B : Set) → B → A → IDesc (A × B);
+floo A B b a = 'Id (A × B) «a,b»;
+
+pair-inductor : (A : Set) → inductor A →
+                (B : Set) → inductor B →
+                inductor (A × B);
+pair-inductor A AI B BI =
+  « λp → 'Pair (A × B) (compose A (A × B) (fst AI (fst p)) (floo A B (snd p)))
+                       (compose B (A × B) (fst BI (snd p)) (bloo A B (fst p)))
+  , λΦ k p → snd AI (λa → (b : B) → Φ «a,b»)
+                    (λa φa → snd BI (λb → Φ «a,b»)
+                                    (λb φb → k «a,b»
+                                               « commute A (A × B)
+                                                         (fst AI a)
+                                                         (floo A B b)
+                                                         Φ
+                                                         (map A (fst AI a)
+                                                              (λa → (b : B) → Φ «a,b»)
+                                                              (λa → Φ «a,b»)
+                                                              (λa f → f b)
+                                                              φa)
+                                               , commute B (A × B) (fst BI b) (bloo A B a) Φ φb
+                                               »))
+                    (fst p)
+                    (snd p)
+  »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– adding tops and bottoms
+maybe : Set → Set;
+maybe A = Unit + A;
+
+with-bottom : (A : Set) → inductor A → inductor (maybe A);
+with-bottom A AI =
+  « λx → case x for x. IDesc (maybe A) with
+           { inl u → 'Pi (maybe A) A (λa → 'Id (maybe A) (inr a))
+           ; inr a → compose A (maybe A) (fst AI a) (λa → 'Id (maybe A) (inr a))
+           }
+  , λΦ k x → case x for x. Φ x with
+               { inl u → k (inl u)
+                           (snd AI (λa → Φ (inr a))
+                                (λa φ → k (inr a)
+                                          (commute A (maybe A) (fst AI a) (λa → 'Id (maybe A) (inr a)) Φ φ)))
+               ; inr a → snd AI (λa → Φ (inr a))
+                             (λa φ → k (inr a)
+                                       (commute A (maybe A) (fst AI a) (λa → 'Id (maybe A) (inr a)) Φ φ))
+                             a
+               }
+  »;
+
+with-top : (A : Set) → inductor A → inductor (maybe A);
+with-top A AI =
+  « λx → case x for x. IDesc (maybe A) with
+           { inl u → 'K (maybe A) Unit
+           ; inr a → 'Pair (maybe A)
+                           (compose A (maybe A) (fst AI a) (λa → 'Id (maybe A) (inr a)))
+                           ('Id (maybe A) (inl ⋄))
+           }
+  , λΦ k x → case x for x. Φ x with
+               { inl u → k (inl u) ⋄
+               ; inr a → snd AI (λa → Φ (inr a))
+                             (λa φ → k (inr a)
+                                       « commute A (maybe A) (fst AI a) (λa → 'Id (maybe A) (inr a)) Φ φ
+                                       , k (inl ⋄) ⋄
+                                       »)
+                             a
+               }
+  »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– comonadic induction
+
+– comonads, but without the laws
+comonad : Set → Set 3;
+comonad A = (W      : A → IDesc A) ×
+            (counit : (P : A → Set 2) → (a : A) → semI' A A W P a → P a) ×
+	    (cojoin : (P : A → Set 2) → (a : A) → semI' A A W P a → semI' A A W (semI' A A W P) a) ×
+            Unit;
+
+counit : (A : Set) → (W : comonad A) → (P : A → Set 2) → (a : A) → semI' A A (fst W) P a → P a;
+counit A W = fst (snd W);
+
+cojoin : (A : Set) → (W : comonad A) → (P : A → Set 2) → (a : A) → semI' A A (fst W) P a → semI' A A (fst W) (semI' A A (fst W) P) a;
+cojoin A W = fst (snd (snd W));
+
+comonadic-inductor : (A  : Set) →
+                     (W  : comonad A) →
+                     (AI : inductor A) →
+                     (d  : (P : A → Set 2) →
+                           (a : A) →
+                           semI' A A (fst AI) (semI' A A (fst W) P) a →
+                           semI' A A (fst W) (semI' A A (fst AI) P) a) →
+                     inductor A;
+comonadic-inductor A W AI d =
+  « λa → compose A A (fst AI a) (fst W)
+  , λΦ k a → counit A W Φ a (snd AI (semI' A A (fst W) Φ)
+                                 (λa φ → map A (fst W a)
+                                             (semI' A A (fst AI) (semI' A A (fst W) Φ))
+                                             Φ
+					     (λa φ → k a (commute A A (fst AI a) (fst W) Φ φ))
+                                             (d (semI' A A (fst W) Φ)
+                                                a
+                                                (map A (fst AI a)
+                                                     (semI' A A (fst W) Φ)
+                                                     (semI' A A (fst W) (semI' A A (fst W) Φ))
+                                                     (cojoin A W Φ)
+                                                     φ)))
+                                 a)
+  »;
+

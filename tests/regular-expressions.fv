@@ -1,0 +1,138 @@
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+lift : (D : Desc) →
+       (α : Set) →
+       (Φ : α → Set 2) →
+       sem D α →
+       Set 2 ;
+lift D α Φ = elimD (\D → sem D α → Set 2)
+                   (\A x → Unit)
+                   (\x → Φ x)
+                   (\F G f g x → f (fst x) × g (snd x))
+                   (\F G f g x → case x for d. Set 2 with
+                                   { inl y → f y
+                                   ; inr z → g z
+                                   })
+                   D;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+bool : Set;
+bool = Unit + Unit;
+
+true : bool;
+true = inl ⋄;
+
+false : bool;
+false = inr ⋄;
+
+or : bool → bool → bool;
+or b₁ = case b₁ for b₁. bool → bool with
+          { inl u → λb₂ → true
+          ; inr u → λb₂ → b₂
+          };
+
+and : bool → bool → bool;
+and b₁ = case b₁ for b₁. bool → bool with
+           { inl u → λb₂ → b₂
+           ; inr u → λb₂ → false
+           };
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+alphabet : Set;
+alphabet = Unit + Unit;
+
+symbol-eq : alphabet → alphabet → bool;
+symbol-eq s₁ s₂ =
+  case s₁ for s₁. bool with
+    { inl u → case s₂ for s₂. bool with
+                { inl u → true
+                ; inr u → false
+                }
+    ; inr u → case s₂ for s₂. bool with
+                { inl u → false
+                ; inr u → true
+                }
+    };
+
+data regexp : Set :=
+  | eps  :
+  | emp  :
+  | alt  : regexp regexp
+  | seq  : regexp regexp
+  | star : regexp
+  | tok  : alphabet
+  ;
+
+– goodness me...
+regexpInduction : (Φ : regexp → Set 2) →
+                  (Φ eps) →
+                  (Φ emp) →
+                  ((r₁ r₂ : regexp) → Φ r₁ → Φ r₂ → Φ (alt r₁ r₂)) →
+                  ((r₁ r₂ : regexp) → Φ r₁ → Φ r₂ → Φ (seq r₁ r₂)) →
+                  ((r : regexp) → Φ r → Φ (star r)) →
+                  ((s : alphabet) → Φ (tok s)) →
+                  (r : regexp) → Φ r;
+regexpInduction Φ φeps φemp φalt φseq φstar φtok =
+  induction regexpDesc Φ
+  (λr → case r for r. lift regexpDesc regexp Φ r →
+                      Φ (construct regexpDesc r) with
+          { inl u → λu' → φeps
+          ; inr r →
+             case r for r. lift regexpDesc regexp Φ (inr r) →
+                           Φ (construct regexpDesc (inr r)) with
+               { inl u → λu' → φemp
+               ; inr r →
+                  case r for r. lift regexpDesc regexp Φ (inr (inr r)) →
+                                Φ (construct regexpDesc (inr (inr r))) with
+                    { inl p → λφ → φalt (fst p) (snd p) (fst φ) (snd φ)
+                    ; inr r →
+                       case r for r. lift regexpDesc regexp Φ (inr (inr (inr r))) →
+                                     Φ (construct regexpDesc (inr (inr (inr r)))) with
+                         { inl p → λφ → φseq (fst p) (snd p) (fst φ) (snd φ)
+                         ; inr r →
+                            case r for r. lift regexpDesc regexp Φ (inr (inr (inr (inr r)))) →
+                                          Φ (construct regexpDesc (inr (inr (inr (inr r))))) with
+                              { inl r → λφ → φstar r φ
+                              ; inr s → λu → φtok s
+                              }
+                         }
+                    }
+               }
+           });
+
+acceptsEmpty : regexp → bool;
+acceptsEmpty =
+  regexpInduction (λr → bool)
+                  (true)
+                  (false)
+                  (λr₁ r₂ accEmpty₁ accEmpty₂ → or  accEmpty₁ accEmpty₂)
+                  (λr₁ r₂ accEmpty₁ accEmpty₂ → and accEmpty₁ accEmpty₂)
+                  (λr accEmpty → true)
+                  (λs → false);
+
+step : regexp → alphabet → regexp;
+step r s =
+  regexpInduction (λr → regexp)
+                  (emp)
+                  (emp)
+                  (λr₁ r₂ step₁ step₂ → alt step₁ step₂)
+                  (λr₁ r₂ step₁ step₂ →
+                      case acceptsEmpty r₁ for b. regexp with
+                        { inl u → alt (seq step₁ r₂) step₂
+			; inr u → seq step₁ r₂
+                        })
+                  (λr step → seq step (star r))
+                  (λs' → case symbol-eq s s' for b. regexp with
+                           { inl u → eps
+                           ; inr u → emp
+                           })
+                  r;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– now define a type of strings that satisfy a regular expression,
+– using refinement2.fv

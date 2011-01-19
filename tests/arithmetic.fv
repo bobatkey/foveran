@@ -116,25 +116,11 @@ succ-ne-zero n eq = eq;
 – the above two properties seem to follow directly from the definition
 – of equality as a recursive definition.
 
-{- presumably, for this equality to be substitutive, we would need to
-add that as an axiom (with some computational behaviour) -}
-{- is it possible to do that also in some predicate-lifting kind of way? -}
-
-{-
-equal-subst : (P : Nat → Set) → (n₁ n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂;
-equal-subst P = natInduction (λn₁ → (n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂)
-                             (natCase (λn₂ → equal zero n₂ → P zero → P n₂)
-                                      (λeq p → p)
-                                      (λn₂ eq p → elimEmpty (P (succ n₂)) eq))
-                             (λn₁ ih →
-                                natCase (λn₂ → equal (succ n₁) n₂ → P (succ n₁) → P n₂)
-                                        (λeq p → elimEmpty (P zero) eq)
-                                        (λn₂ eq p → ih n₂ eq p));
--}
-– ih : (n₂ : Nat) → equal n₁ n₂ → P n₁ → P n₂
-– n₂ : Nat
-– eq : equal (succ n₁) (succ n₂)
-– p  : P (succ n₁)
-–
-– P (succ n₂)
-
+decide-equal : (n₁ n₂ : Nat) → (equal n₁ n₂) + (equal n₁ n₂ → Empty);
+decide-equal = natInduction (λn₁ → (n₂ : Nat) → (equal n₁ n₂) + (equal n₁ n₂ → Empty))
+                            (natCase (λn₂ → equal zero n₂ + (equal zero n₂ → Empty))
+                                     (inl ⋄)
+                                     (λn₂ → inr (λe → e)))
+                            (λn₁ p → natCase (λn₂ → equal (succ n₁) n₂ + (equal (succ n₁) n₂ → Empty))
+                                             (inr (λe → e))
+                                             (λn₂ → p n₂));

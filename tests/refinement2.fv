@@ -1,0 +1,209 @@
+– refinements by fiddling with indexing
+
+sem : Desc → Set → Set ;
+sem = elimD (λx → Set → Set)
+            (λA X → A)
+            (λX → X)
+            (λF G semF semG X → semF X × semG X)
+            (λF G semF semG X → semF X + semG X);
+
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD → Set 2)
+                    (λi → X i)
+                    (λA → A)
+                    (λD₁ D₂ semD₁ semD₂ → semD₁ × semD₂)
+                    (λA D semD → (a : A) × semD a)
+                    (λA D semD → (a : A) → semD a)
+                    D;
+
+lift2 : (D : Desc) →
+        (A : Set) →
+        sem D A →
+        IDesc A;
+lift2 D A = elimD (λD → sem D A → IDesc A)
+                  (λA' x → 'K A Unit)
+                  (λx → 'Id A x)
+                  (λD₁ D₂ f g x → 'Pair A (f (fst x)) (g (snd x)))
+ 		  (λD₁ D₂ f g x → case x for d. IDesc A with
+		                    { inl y → f y
+		 		    ; inr z → g z
+				    })
+                  D;
+
+liftI : (I : Set) →
+        (D : IDesc I) →
+        (A : I → Set 2) →
+        (Φ : (i : I) → A i → Set 2) →
+        semI I D A →
+        Set 2;
+liftI I D A Φ =
+  elimID I (λD → semI I D A → Set 2)
+         (λi a                 → Φ i a)
+         (λA' a                → Unit)
+         (λD₁ D₂ lift₁ lift₂ p → lift₁ (fst p) × lift₂ (snd p))
+         (λB D liftD p         → liftD (fst p) (snd p))
+         (λB D liftD f         → (b : B) → liftD b (f b))
+         D;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Need to actually implement these...
+assume muI        : (I : Set) → (I → IDesc I) → I → Set;
+assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi → muI I D i) → muI I D i;
+assume inductionI : (I : Set) →
+                    (D : I → IDesc I) →
+                    (Φ : (i : I) → muI I D i → Set 2) →
+                    (k : (i : I) →
+                         (x : semI I (D i) (λi → muI I D i)) →
+                         liftI I (D i) (λi → muI I D i) Φ x →
+                         Φ i (constructI I D i x)) →
+                    (i : I) →
+                    (x : muI I D i) →
+                    Φ i x;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+refinement : Desc → Set → Set 1;
+refinement D A = A → (X : Set) × (X → sem D A);
+
+refinement2 : Desc → Set → Set 1;
+refinement2 D A = A → (X : Set) × (X → sem D A + Unit);
+
+apply-refinement : (D : Desc) →
+                   (A : Set) →
+                   refinement D A →
+                   A → IDesc A;
+apply-refinement D A r a = 'Sg A (fst (r a)) (λx → lift2 D A (snd (r a) x));
+
+apply-refinement2 : (D : Desc) →
+                    (A : Set) →
+                    refinement2 D A →
+                    A → IDesc A;
+apply-refinement2 D A r =
+  λa → 'Sg A (fst (r a))
+           (λx → case snd (r a) x for d. IDesc A with
+                   { inl y → lift2 D A y
+                   ; inr u → 'K A Empty
+                   });
+
+refinement-to-refinement2 : (D : Desc) →
+                            (A : Set) →
+                            refinement D A →
+                            refinement2 D A;
+refinement-to-refinement2 D A r = λa → «fst (r a), λx → inl (snd (r a) x)»;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+recons : (A : Set) →
+         (D : Desc) →
+         (Ψ : A → Set 2) →
+         (x : sem D A) →
+         (y : semI A (lift2 D A x) Ψ) →
+         liftI A (lift2 D A x) Ψ (λi x → µ D) y →
+         sem D (µ D);
+recons A D Ψ =
+  elimD (λD' → (x : sem D' A) →
+               (y : semI A (lift2 D' A x) Ψ) →
+               liftI A (lift2 D' A x) Ψ (λi x → µ D) y →
+               sem D' (µ D))
+        (λA x u u' → x)
+        (λx y r → r)
+        (λD₁ D₂ r₁ r₂ x y p → « r₁ (fst x) (fst y) (fst p)
+                              , r₂ (snd x) (snd y) (snd p)
+                              »)
+        (λD₁ D₂ r₁ r₂ x →
+           case x for x. (y : semI A (lift2 (D₁ “+” D₂) A x) Ψ) →
+                         liftI A (lift2 (D₁ “+” D₂) A x) Ψ (λi x → µ D) y →
+                         sem (D₁ “+” D₂) (µ D) with
+             { inl x₁ → λy₁ p₁ → inl (r₁ x₁ y₁ p₁)
+	     ; inr x₂ → λy₂ p₂ → inr (r₂ x₂ y₂ p₂)
+             })
+        D;
+
+forget : (D : Desc) →
+         (A : Set) →
+         (r : refinement D A) →
+         (a : A) →
+         muI A (apply-refinement D A r) a →
+         µ D;
+forget D A r =
+  inductionI A (apply-refinement D A r)
+             (λa x → µ D)
+             (λa x φ →
+                construct D
+                          (recons A D (λi → muI A (apply-refinement D A r) i)
+                                  (snd (r a) (fst x)) (snd x) φ));
+
+– a : A
+– x : semI A (apply-refinement  D A r a) (λa → muI A (apply-refinement D A r) a)
+–     = (x : fst (r a)) × semI A (lift2 D A (snd (r a) x)) (λi → muI A (apply-refinement D A r) i)
+
+– snd (r a) (fst x) : sem D A
+– φ : liftI A (apply-refinement D A r a) (λi → muI A (apply-refinement D A r) i) (λi x → µ D) x
+–      = liftI A (lift2 D A (snd (r a) (fst x))) (muI ...) (λi x → µ D) (snd x)
+
+– want (x : sem D A) →
+–      (y : semI A (lift2 D A x) Ψ) →
+–      liftI A (lift2 D A x) Ψ (λi x → µ D) y → sem D (µ D)
+
+– use the first part to get a value of type sem D A
+– use the second part and the φ to fill in all the holes to get a value of type sem D (µ D)
+– apply “construct D”
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+caseNat : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+caseNat A a f = induction NatDesc A
+                          (λx p → case x for x. A (construct NatDesc x) with
+                                    { inl u → a
+                                    ; inr n → f n
+                                    });
+
+data List (A : Set) : Set :=
+  | nil  :
+  | cons : A List
+  ;
+
+– go from lists to vectors
+vec-refinement : (A : Set) → refinement (ListDesc A) Nat;
+vec-refinement A = 
+  caseNat (λn → (X : Set) × (X → sem (ListDesc A) Nat))
+          (     « Unit, λu → inl ⋄     »)
+          (λn → « A,    λa → inr «a,n» »);
+
+– go from natural numbers to lists
+list-refinement : (A : Set) → refinement NatDesc Unit;
+list-refinement A =
+  λu → « Unit + A
+       , λx → case x for d. sem NatDesc Unit with
+                { inl u → inl ⋄
+                ; inr a → inr ⋄
+                }
+       »;
+
+Vec : (A : Set) → (n : Nat) → Set;
+Vec A = muI Nat (apply-refinement (ListDesc A) Nat (vec-refinement A));
+
+List2 : (A : Set) → Set;
+List2 A = muI Unit (apply-refinement NatDesc Unit (list-refinement A)) ⋄;
+
+vec-to-list : (A : Set) →
+              (n : Nat) → Vec A n → List A;
+vec-to-list A = forget (ListDesc A)
+                       Nat
+                       (vec-refinement A);
+
+– length:
+list-to-nat : (A : Set) → List2 A → Nat;
+list-to-nat A = forget NatDesc Unit (list-refinement A) ⋄;
+
+– can Nat→List be turned into List→Vec?
+
+– need to prove some semantic correctness properties
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– questions:
+– generate from an algebra?
+– generic correctness proofs?

@@ -21,4 +21,104 @@ lift D α Φ = elimD (\D → sem D α → Set 2)
                                    })
                    D;
 
--- 
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φzero φsucc =
+   induction NatDesc Φ
+             (λx → case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                     { inl u → λu' → φzero
+                     ; inr n → λφn → φsucc n φn
+                     });
+
+lexicographic : (Φ : Nat → Nat → Set 2) →
+                (Φ zero zero) →
+                ((n : Nat) → Φ zero n → Φ zero (succ n)) →
+                ((n : Nat) → ((m : Nat) → Φ n m) → Φ (succ n) zero) →
+                ((n : Nat) → ((m : Nat) → Φ n m) → (m : Nat) → Φ (succ n) m → Φ (succ n) (succ m)) →
+                (n m : Nat) → Φ n m;
+lexicographic Φ φ₁ φ₂ φ₃ φ₄ =
+  natInduction (λn → (m : Nat) → Φ n m)
+               (natInduction (Φ zero) φ₁ φ₂)
+               (λn φn → natInduction (Φ (succ n)) (φ₃ n φn) (φ₄ n φn));
+
+– and in general:
+
+lex : (D₁ D₂ : Desc) →
+      (Φ : µ D₁ → µ D₂ → Set 2) →
+      (k : (x : sem D₁ (µ D₁)) →
+           (y : sem D₂ (µ D₂)) →
+           lift D₁ (µ D₁) (λx → (y : µ D₂) → Φ x y) x →
+           lift D₂ (µ D₂) (λy → Φ (construct D₁ x) y) y →
+           Φ (construct D₁ x) (construct D₂ y)) →
+      (x : µ D₁) → (y : µ D₂) → Φ x y;
+lex D₁ D₂ Φ k =
+  induction D₁ (λx → (y : µ D₂) → Φ x y)
+            (λx φx → induction D₂ (Φ (construct D₁ x))
+                              (λy φy → k x y φx φy));
+
+--assume induction : (D : Desc) →
+--                   (P : µ D → Set 2) →
+--                   (k : (x : sem D (µ D)) → lift D (µ D) P x → P (construct D x)) →
+--                   (x : µ D) →
+--                   P x;
+
+– components:
+– 1. A : The type “µ D”
+– 2. B : The type sem “D (µ D)”
+– 3. c : The function “construct : sem D (µ D) → µ D”
+– 4. H : The function “lift D (µ D) : (µ D → Set 2) → sem D (µ D) → Set 2”
+– 5. induct : (A → Set 2) → ((x : B) → H P x → P (c x)) → (x : A) → P x
+
+inductor : Set → Set 3;
+inductor A = (B : Set) ×
+             (c : B → A) ×
+             (H : (A → Set 2) → B → Set 2) ×
+             ((Φ : A → Set 2) → ((x : B) → H Φ x → Φ (c x)) → (x : A) → Φ x);
+
+subCarrier : (A : Set) → inductor A → Set;
+subCarrier A I = fst I;
+
+cons : (A : Set) → (I : inductor A) → subCarrier A I → A;
+cons A I = fst (snd I);
+
+indHyp : (A : Set) → (I : inductor A ) → (A → Set 2) → subCarrier A I → Set 2;
+indHyp A I = fst (snd (snd I));
+
+induct : (A : Set) →
+         (I : inductor A) →
+         (Φ : A → Set 2) →
+         ((x : subCarrier A I) → indHyp A I Φ x → Φ (cons A I x)) →
+         (x : A) → Φ x;
+induct A I = snd (snd (snd I));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– every description's µ has an inductor:
+desc-inductor : (D : Desc) → inductor (µ D);
+desc-inductor D = « sem D (µ D), « construct D, « lift D (µ D), induction D »»»;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– combination by lexicographic induction
+lexico-inductor : (A : Set) → (AI : inductor A) →
+                  (B : Set) → (BI : inductor B) →
+                  inductor (A × B);
+lexico-inductor A AI B BI =
+  « subCarrier A AI × subCarrier B BI,
+  « λp → «cons A AI (fst p), cons B BI (snd p)»,
+  « λΦ p →   indHyp A AI (λa → (b : B) → Φ «a,b») (fst p)
+           × indHyp B BI (λb → Φ «cons A AI (fst p), b») (snd p),
+  λΦ k p → induct A AI (λa → (b : B) → Φ «a,b»)
+                  (λa φa → induct B BI (λb → Φ «cons A AI a, b»)
+                                  (λb φb → k «a,b» «φa, φb»))
+                  (fst p)
+                  (snd p)
+  »»»;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– complete induction
