@@ -103,9 +103,6 @@ bindFree :: Ident -> Term -> Term
 bindFree nm x = translateRec (bind' nm) x 0
 
 --------------------------------------------------------------------------------
--- FIXME: gather up sequences of bound variables (using cofree
--- comonad?)
-
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term
 gatheringLam nm (In (DS.Lam nms body)) = DS.Lam (nm:nms) body
 gatheringLam nm body                   = DS.Lam [nm] body
