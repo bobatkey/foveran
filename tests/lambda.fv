@@ -1,22 +1,22 @@
 sem : Desc → Set → Set ;
-sem = elimD (λx → Set → Set)
-            (λA X → A)
-            (λX → X)
-            (λF G semF semG X → semF X × semG X)
-            (λF G semF semG X → semF X + semG X);
+sem = elimD (λx. Set → Set)
+            (λA X. A)
+            (λX. X)
+            (λF G semF semG X. semF X × semG X)
+            (λF G semF semG X. semF X + semG X);
 
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α Φ = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → Φ x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
@@ -31,33 +31,33 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x → case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
-                    { inl u → \u' → φ0
-                    ; inr n → \φn → φS n φn
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
                     });
 
 deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
-deconstruct'' F = induction F (\x → sem F (µ F)) (\x p → x);
+deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
 
 -- FIXME: just define this in terms of induction (and automaticaly generate it from the data decl above)
 caseNat : (A : Set 1) → A → (Nat → A) → Nat → A ;
 caseNat A a f n = case deconstruct'' NatDesc n for x. A with
-                    { inl u → a
-                    ; inr n → f n
+                    { inl u. a
+                    ; inr n. f n
                     };
 
 -- this should be auto-generated from the data decl
 caseNat2 : (A : Set 1) → A → (Nat → A) → Nat → A ;
-caseNat2 A a f = induction NatDesc (\x → A)
-                           (\x p → case x for x. A with
-                                     { inl u → a
-                                     ; inr n → f n
+caseNat2 A a f = induction NatDesc (\x. A)
+                           (\x p. case x for x. A with
+                                     { inl u. a
+                                     ; inr n. f n
                                      });
 
 lt : Nat → Nat → Set;
-lt = natInduction (λx → Nat → Set)
-                  (λy → caseNat Set Empty (λy → Unit) y)
-                  (λx f y → caseNat Set Empty f y);
+lt = natInduction (λx. Nat → Set)
+                  (λy. caseNat Set Empty (λy. Unit) y)
+                  (λx f y. caseNat Set Empty f y);
 
 data Term : Set :=
   | var  : Nat
@@ -72,20 +72,20 @@ termInduction : (Φ : Term → Set 2) →
                 (t : Term) → Φ t ;
 termInduction Φ φvar φapp φlam =
   induction TermDesc Φ
-    (λx → case x for x. lift TermDesc Term Φ x → Φ (construct TermDesc x) with
-            { inl n → λu → φvar n
-            ; inr x → case x for x. lift TermDesc Term Φ (inr x) → Φ (construct TermDesc (inr x)) with
-                        { inl t₁t₂ → λφt₁t₂ → φapp (fst t₁t₂) (snd t₁t₂) (fst φt₁t₂) (snd φt₁t₂)
-                        ; inr t    → λφt    → φlam t φt
+    (λx. case x for x. lift TermDesc Term Φ x → Φ (construct TermDesc x) with
+            { inl n. λu. φvar n
+            ; inr x. case x for x. lift TermDesc Term Φ (inr x) → Φ (construct TermDesc (inr x)) with
+                        { inl t₁t₂. λφt₁t₂. φapp (fst t₁t₂) (snd t₁t₂) (fst φt₁t₂) (snd φt₁t₂)
+                        ; inr t. λφt. φlam t φt
                         }
             });
 
 goodTerm : Term → Nat → Set ;
 goodTerm =
-  termInduction (λt → Nat → Set)
-    (λk n → lt k n)
-    (λt₁ t₂ p₁ p₂ n → p₁ n × p₂ n)
-    (λt p n → p (succ n));
+  termInduction (λt. Nat → Set)
+    (λk n. lt k n)
+    (λt₁ t₂ p₁ p₂ n. p₁ n × p₂ n)
+    (λt p n. p (succ n));
 
 -- just specify the good ones by a \hat{F}-algebra into some universe?
 
@@ -107,10 +107,10 @@ wsTermInduction : (Φ : (n : Nat) → wsTerm n → Set 2) →
                   ((n : Nat) → (t : wsTerm (succ n)) → Φ (succ n) t → Φ n (wsLam n t)) →
                   (n : Nat) → (t : wsTerm n) → Φ n t;
 wsTermInduction Φ φvar φapp φlam n t =
-  termInduction (λt → (n : Nat) → (p : goodTerm t n) → Φ n «t, p»)
-    (λk n p → φvar n k p)
-    (λt₁ t₂ p₁ p₂ n p → φapp n «t₁, fst p» «t₂, snd p» (p₁ n (fst p)) (p₂ n (snd p)))
-    (λt p n g → φlam n «t,g» (p (succ n) g))
+  termInduction (λt. (n : Nat) → (p : goodTerm t n) → Φ n «t, p»)
+    (λk n p. φvar n k p)
+    (λt₁ t₂ p₁ p₂ n p. φapp n «t₁, fst p» «t₂, snd p» (p₁ n (fst p)) (p₂ n (snd p)))
+    (λt p n g. φlam n «t,g» (p (succ n) g))
     (fst t)
     n
     (snd t);
@@ -127,17 +127,17 @@ F X n =   ((k : Nat) × lt k n)
 
 constr : (n : Nat) → F wsTerm n → wsTerm n;
 constr n x = case x for x. wsTerm n with
-               { inl p → wsVar n (fst p) (snd p)
-               ; inr x → case x for x. wsTerm n with
-                           { inl p → wsApp n (fst p) (snd p)
-                           ; inr p → wsLam n p
+               { inl p. wsVar n (fst p) (snd p)
+               ; inr x. case x for x. wsTerm n with
+                           { inl p. wsApp n (fst p) (snd p)
+                           ; inr p. wsLam n p
                            }
                };
 
 {------------------------------------------------------------------------------}
 
 relAlg : Desc → Set → Set 2;
-relAlg D A = (x : sem D (µ D)) → lift D (µ D) (\x → A → Set) x → A → Set;
+relAlg D A = (x : sem D (µ D)) → lift D (µ D) (\x. A → Set) x → A → Set;
 
 -- Doing the above generally
 goodOnes : (D : Desc) →
@@ -146,7 +146,7 @@ goodOnes : (D : Desc) →
            µ D →
            A →
            Set;
-goodOnes D A k = induction D (\x → A → Set) k;
+goodOnes D A k = induction D (\x. A → Set) k;
 
 wf : (D : Desc) → (A : Set) → relAlg D A → A → Set ;
 wf D A k a = (x : µ D) × goodOnes D A k x a;

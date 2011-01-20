@@ -1,9 +1,9 @@
 sem : Desc → Set → Set;
-sem d = elimD (λx → Set → Set)
-              (λA X → A)
-              (λX → X)
-              (λd1 d2 F G X → F X × G X)
-              (λd1 d2 F G X → F X + G X)
+sem d = elimD (λx. Set → Set)
+              (λA X. A)
+              (λX. X)
+              (λd1 d2 F G X. F X × G X)
+              (λd1 d2 F G X. F X + G X)
               d ;
 
 lift : (D : Desc) →
@@ -11,24 +11,24 @@ lift : (D : Desc) →
        (Φ : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α Φ = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → Φ x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
 map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
-map F α β f = elimD (\F → sem F α → sem F β)
-                    (\A x → x)
-                    (\x → f x)
-                    (\d1 d2 g h p → «g (fst p), h (snd p)»)
-	            (\d1 d2 g h s → case s for x. sem (d1 “+” d2) β with
-                                      { inl x → inl (g x)
-	   			      ; inr x → inr (h x)
+map F α β f = elimD (\F. sem F α → sem F β)
+                    (\A x. x)
+                    (\x. f x)
+                    (\d1 d2 g h p. «g (fst p), h (snd p)»)
+	            (\d1 d2 g h s. case s for x. sem (d1 “+” d2) β with
+                                      { inl x. inl (g x)
+	   			      ; inr x. inr (h x)
 				      })
                     F ;
 
@@ -48,9 +48,9 @@ listInduction : (A : Set) →
                 (l : List A) → Φ l;
 listInduction A Φ pnil pcons =
   induction (ListDesc A) Φ
-    (\x → case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct (ListDesc A) x) with
-            { inl u → λu' → pnil
-            ; inr p → λih → pcons (fst p) (snd p) (snd ih)
+    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct (ListDesc A) x) with
+            { inl u. λu'. pnil
+            ; inr p. λih. pcons (fst p) (snd p) (snd ih)
             });
 
 data Tree : Set :=
@@ -73,23 +73,23 @@ append α = foldList α (List α → List α)
 -}
 
 ∂ : Desc → Desc ;
-∂ = elimD (\x → Desc)
-          (\A → “K” 𝟘)
+∂ = elimD (\x. Desc)
+          (\A. “K” 𝟘)
           (“K” 𝟙)
-          (\F G ∂F ∂G → (∂F “×” G) “+” (F “×” ∂G))
-          (\F G ∂F ∂G → ∂F “+” ∂G) ;
+          (\F G ∂F ∂G. (∂F “×” G) “+” (F “×” ∂G))
+          (\F G ∂F ∂G. ∂F “+” ∂G) ;
 
 up : (F : Desc) → (X : Set) → X → sem (∂ F) X → sem F X ;
-up F X x = elimD (\F → sem (∂ F) X → sem F X)
-                 (\A x → elimEmpty A x)
-                 (\x' → x)
-                 (\F G f g s → case s for a. sem (F “×” G) X with
-                                 { inl s → «f (fst s), snd s»
-                                 ; inr s → «fst s, g (snd s)»
+up F X x = elimD (\F. sem (∂ F) X → sem F X)
+                 (\A x. elimEmpty A x)
+                 (\x'. x)
+                 (\F G f g s. case s for a. sem (F “×” G) X with
+                                 { inl s. «f (fst s), snd s»
+                                 ; inr s. «fst s, g (snd s)»
 	 		         })
-                 (\F G f g s → case s for a. sem (F “+” G) X with
-		                 { inl s1 → inl (f s1)
-		                 ; inr s2 → inr (g s2)
+                 (\F G f g s. case s for a. sem (F “+” G) X with
+		                 { inl s1. inl (f s1)
+		                 ; inr s2. inr (g s2)
 				 })
                  F ;
 
@@ -97,24 +97,24 @@ Div : Desc → Desc ;
 Div F = “Id” “×” ∂ F ;
 
 down : (F : Desc) → (X : Set) → sem F X → sem F (sem (Div F) X) ;
-down = \F X → elimD (\F → sem F X → sem F (sem (Div F) X))
-                    (\A x → x)
-                    (\x → «x, ()»)
-                    (\F G f g p →
+down = \F X. elimD (\F. sem F X → sem F (sem (Div F) X))
+                    (\A x. x)
+                    (\x. «x, ()»)
+                    (\F G f g p.
                         « map F (sem (Div F) X) (sem (Div (F “×” G)) X)
-                                (\p' → « fst p', inl « snd p', snd p »»)
+                                (\p'. « fst p', inl « snd p', snd p »»)
                                 (f (fst p))
                         , map G (sem (Div G) X) (sem (Div (F “×” G)) X)
-                                (\p' → « fst p', inr « fst p, snd p' »»)
+                                (\p'. « fst p', inr « fst p, snd p' »»)
                                 (g (snd p))
                         »)
-                    (\F G downf downg s →
+                    (\F G downf downg s.
            
                         case s for a. sem (F “+” G) (sem (Div (F “+” G)) X) with
-                          { inl f → inl (map F (sem (Div F) X) (sem (Div (F “+” G)) X)
-                                             (\x → « fst x, inl (snd x) ») (downf f))
-                          ; inr g → inr (map G (sem (Div G) X) (sem (Div (F “+” G)) X)
-                                             (\x → « fst x, inr (snd x) ») (downg g))
+                          { inl f. inl (map F (sem (Div F) X) (sem (Div (F “+” G)) X)
+                                             (\x. « fst x, inl (snd x) ») (downf f))
+                          ; inr g. inr (map G (sem (Div G) X) (sem (Div (F “+” G)) X)
+                                             (\x. « fst x, inr (snd x) ») (downg g))
 			  })
                     F ;
 
@@ -126,6 +126,6 @@ Ctx F = List (sem (∂ F) (µ F)) ;
 
 plug : (F : Desc) → Ctx F → µ F → µ F ;
 plug F = listInduction (sem (∂ F) (µ F))
-                       (λl → µ F → µ F)
-                       (λx → x)
-                       (λc l f x → construct F (up F (µ F) (f x) c));
+                       (λl. µ F → µ F)
+                       (λx. x)
+                       (λc l f x. construct F (up F (µ F) (f x) c));

@@ -1,22 +1,22 @@
 sem : Desc → Set → Set ;
-sem = elimD (λx → Set → Set)
-            (λA X → A)
-            (λX → X)
-            (λF G semF semG X → semF X × semG X)
-            (λF G semF semG X → semF X + semG X);
+sem = elimD (λx. Set → Set)
+            (λA X. A)
+            (λX. X)
+            (λF G semF semG X. semF X × semG X)
+            (λF G semF semG X. semF X + semG X);
 
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α Φ = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → Φ x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
@@ -30,9 +30,9 @@ Ty-induction : (Φ : Ty → Set 2) →
                ((t₁ t₂ : Ty) → Φ t₁ → Φ t₂ → Φ (arr t₁ t₂)) →
                (t : Ty) → Φ t;
 Ty-induction Φ φv φarr = induction TyDesc Φ
-                                   (λx → case x for x. lift TyDesc Ty Φ x → Φ (construct TyDesc x) with
-                                           { inl u    → λu'     → φv
-                                           ; inr t₁t₂ → λih₁ih₂ → φarr (fst t₁t₂) (snd t₁t₂) (fst ih₁ih₂) (snd ih₁ih₂)
+                                   (λx. case x for x. lift TyDesc Ty Φ x → Φ (construct TyDesc x) with
+                                           { inl u. λu'. φv
+                                           ; inr t₁t₂. λih₁ih₂. φarr (fst t₁t₂) (snd t₁t₂) (fst ih₁ih₂) (snd ih₁ih₂)
                                            });
 
 data Ctxt : Set :=
@@ -45,30 +45,30 @@ Ctxt-induction : (Φ : Ctxt → Set 2) →
                  ((τ : Ty) → (Γ : Ctxt) → Φ Γ → Φ (cons τ Γ)) →
                  (Γ : Ctxt) → Φ Γ;
 Ctxt-induction Φ φemp φcons = induction CtxtDesc Φ
-                                        (λx → case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct CtxtDesc x) with
-                                                { inl u  → λu' → φemp
-                                                ; inr Γτ → λih → φcons (fst Γτ) (snd Γτ) (snd ih)
+                                        (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct CtxtDesc x) with
+                                                { inl u. λu'. φemp
+                                                ; inr Γτ. λih. φcons (fst Γτ) (snd Γτ) (snd ih)
                                                 });
 
 ty-sem : Ty → Set → Set ;
-ty-sem ty α = Ty-induction (λx → Set)
+ty-sem ty α = Ty-induction (λx. Set)
                            α
-                           (λt₁ t₂ sem-t₁ sem-t₂ → sem-t₁ → sem-t₂)
+                           (λt₁ t₂ sem-t₁ sem-t₂. sem-t₁ → sem-t₂)
                            ty;
 
 ctxt-sem : Ctxt → Set → Set ;
-ctxt-sem Γ α = Ctxt-induction (λx → Set) 𝟙 (λτ Γ Γ-sem → ty-sem τ α × Γ-sem) Γ;
+ctxt-sem Γ α = Ctxt-induction (λx. Set) 𝟙 (λτ Γ Γ-sem. ty-sem τ α × Γ-sem) Γ;
 
 ty-pred : (τ : Ty) → (α : Set) → (Φ : α → Set) → ty-sem τ α → Set ;
-ty-pred τ α Φ = Ty-induction (λτ → ty-sem τ α → Set)
-                             (λa → Φ a)
-                             (λτ₁ τ₂ φ₁ φ₂ f → (a : ty-sem τ₁ α) → φ₁ a → φ₂ (f a))
+ty-pred τ α Φ = Ty-induction (λτ. ty-sem τ α → Set)
+                             (λa. Φ a)
+                             (λτ₁ τ₂ φ₁ φ₂ f. (a : ty-sem τ₁ α) → φ₁ a → φ₂ (f a))
                              τ;
 
 ctxt-pred : (Γ : Ctxt) → (α : Set) → (Φ : α → Set) → ctxt-sem Γ α → Set ;
-ctxt-pred Γ α Φ = Ctxt-induction (λΓ → ctxt-sem Γ α → Set)
-                                 (λu → Unit)
-                                 (λτ Γ φ γ → ty-pred τ α Φ (fst γ) × φ (snd γ))
+ctxt-pred Γ α Φ = Ctxt-induction (λΓ. ctxt-sem Γ α → Set)
+                                 (λu. Unit)
+                                 (λτ Γ φ γ. ty-pred τ α Φ (fst γ) × φ (snd γ))
                                  Γ;
 
 assume param : (Γ : Ctxt) →
@@ -102,7 +102,7 @@ church-nat-induction : (α : Set) →
                        (n : church-nat) → Φ (n α z s);
 church-nat-induction α z s Φ φz φs n =
    param emp (arr v (arr (arr v v) v))
-         (λα u → n α)
+         (λα u. n α)
          α
          Φ
          ⋄

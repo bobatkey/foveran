@@ -1,78 +1,78 @@
 toI : Desc → IDesc Unit;
-toI = elimD (λx → IDesc Unit)
-            (λA → 'K Unit A)
+toI = elimD (λx. IDesc Unit)
+            (λA. 'K Unit A)
             ('Id Unit ⋄)
-	    (λD₁ D₂ ID₁ ID₂ → 'Pair Unit ID₁ ID₂)
-            (λD₁ D₂ ID₁ ID₂ → 'Sg Unit (Unit + Unit) (λb → case b for d. IDesc Unit with
-                                                             { inl u → ID₁
-							     ; inr u → ID₂
+	    (λD₁ D₂ ID₁ ID₂. 'Pair Unit ID₁ ID₂)
+            (λD₁ D₂ ID₁ ID₂. 'Sg Unit (Unit + Unit) (λb. case b for d. IDesc Unit with
+                                                             { inl u. ID₁
+							     ; inr u. ID₂
 							     }));
 
 sem : Desc → Set → Set ;
-sem = elimD (λx → Set → Set)
-            (λA X → A)
-            (λX → X)
-            (λF G semF semG X → semF X × semG X)
-            (λF G semF semG X → semF X + semG X);
+sem = elimD (λx. Set → Set)
+            (λA X. A)
+            (λX. X)
+            (λF G semF semG X. semF X × semG X)
+            (λF G semF semG X. semF X + semG X);
 
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α Φ = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → Φ x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD → Set 2)
-                    (λi → X i)
-                    (λA → A)
-                    (λD₁ D₂ semD₁ semD₂ → semD₁ × semD₂)
-                    (λA D semD → (a : A) × semD a)
-                    (λA D semD → (a : A) → semD a)
+semI I D X = elimID I (λD. Set 2)
+                    (λi. X i)
+                    (λA. A)
+                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
+                    (λA D semD. (a : A) × semD a)
+                    (λA D semD. (a : A) → semD a)
                     D;
 
 lift2 : (D : Desc) →
         (A : Set) →
         sem D A →
         IDesc A;
-lift2 D A = elimD (λD → sem D A → IDesc A)
-                  (λA' x → 'K A Unit)
-                  (λx → 'Id A x)
-                  (λD₁ D₂ f g x → 'Pair A (f (fst x)) (g (snd x)))
- 		  (λD₁ D₂ f g x → case x for d. IDesc A with
-		                    { inl y → f y
-		 		    ; inr z → g z
+lift2 D A = elimD (λD. sem D A → IDesc A)
+                  (λA' x. 'K A Unit)
+                  (λx. 'Id A x)
+                  (λD₁ D₂ f g x. 'Pair A (f (fst x)) (g (snd x)))
+ 		  (λD₁ D₂ f g x. case x for d. IDesc A with
+		                    { inl y. f y
+		 		    ; inr z. g z
 				    })
                   D;
 
 lift3 : (I : Set) →
         (D : IDesc I) →
         (A : I → Set) →
-        semI I D (λi → A i) →
+        semI I D (λi. A i) →
         IDesc ((i : I) × A i);
-lift3 I D A = elimID I (λD → semI I D (λi → A i) → IDesc ((i : I) × A i))
-                     (λi a                 → 'Id ((i : I) × A i) «i,a»)
-                     (λA' a                → 'K ((i : I) × A i) Unit)
-                     (λD₁ D₂ lift₁ lift₂ p → 'Pair ((i : I) × A i) (lift₁ (fst p)) (lift₂ (snd p)))
-                     (λB D liftD p         → liftD (fst p) (snd p))
-                     (λB D liftD f         → 'Pi ((i : I) × A i) B (λb → liftD b (f b)))
+lift3 I D A = elimID I (λD. semI I D (λi. A i) → IDesc ((i : I) × A i))
+                     (λi a. 'Id ((i : I) × A i) «i,a»)
+                     (λA' a. 'K ((i : I) × A i) Unit)
+                     (λD₁ D₂ lift₁ lift₂ p. 'Pair ((i : I) × A i) (lift₁ (fst p)) (lift₂ (snd p)))
+                     (λB D liftD p. liftD (fst p) (snd p))
+                     (λB D liftD f. 'Pi ((i : I) × A i) B (λb. liftD b (f b)))
                      D;
 
 lift4 : (I : Set) →
         (D : IDesc I) →
         (A : I → Set) →
         (P : (i : I) → A i → Set 2) →
-        semI I D (λi → A i) →
+        semI I D (λi. A i) →
         Set 2;
-lift4 I D A P x = semI ((i : I) × A i) (lift3 I D A x) (λp → P (fst p) (snd p));
+lift4 I D A P x = semI ((i : I) × A i) (lift3 I D A x) (λp. P (fst p) (snd p));
 
 
 allI : (I  : Set) →
@@ -80,23 +80,23 @@ allI : (I  : Set) →
        (A  : I → Set) →
        (P  : (i : I) → A i → Set 2) →
        (p  : (i : I) → (x : A i) → P i x) →
-       (xs : semI I D (λi → A i)) →
+       (xs : semI I D (λi. A i)) →
        lift4 I D A P xs;
-allI I D A P p = elimID I (λD → (xs : semI I D (λi → A i)) → lift4 I D A P xs)
-                        (λx xs              → p x xs)
-                        (λA xs              → ⋄)
-                        (λD₁ D₂ all₁ all₂ x → «all₁ (fst x), all₂ (snd x)»)
-                        (λB D all x         → all (fst x) (snd x))
-                        (λB D all x         → λb → all b (x b))
+allI I D A P p = elimID I (λD. (xs : semI I D (λi. A i)) → lift4 I D A P xs)
+                        (λx xs. p x xs)
+                        (λA xs. ⋄)
+                        (λD₁ D₂ all₁ all₂ x. «all₁ (fst x), all₂ (snd x)»)
+                        (λB D all x. all (fst x) (snd x))
+                        (λB D all x. λb. all b (x b))
                         D;
 
 assume muI        : (I : Set) → (I → IDesc I) → I → Set;
-assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi → muI I D i) → muI I D i;
+assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi. muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
                     (D : I → IDesc I) →
                     (P : (i : I) → muI I D i → Set 2) →
                     (k : (i : I) →
-                         (x : semI I (D i) (λi → muI I D i)) →
+                         (x : semI I (D i) (λi. muI I D i)) →
                          lift4 I (D i) (muI I D) P x →
                          P i (constructI I D i x)) →
                     (i : I) →

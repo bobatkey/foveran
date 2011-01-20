@@ -1,21 +1,21 @@
 --------------------------------------------------------------------------------
 -- These two should be built-in (in some sense)
 sem : Desc → Set → Set ;
-sem d = elimD (\x → Set → Set)
-              (\A X → A)
-              (\X → X)
-              (\d1 d2 F G X → F X × G X)
-              (\d1 d2 F G X → F X + G X)
+sem d = elimD (\x. Set → Set)
+              (\A X. A)
+              (\X. X)
+              (\d1 d2 F G X. F X × G X)
+              (\d1 d2 F G X. F X + G X)
               d ;
 
 map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
-map F α β f = elimD (\F → sem F α → sem F β)
-                    (\A x → x)
-                    (\x → f x)
-                    (\d1 d2 g h p → «g (fst p), h (snd p)»)
-	            (\d1 d2 g h s → case s for x. sem (d1 “+” d2) β with
-                                      { inl x → inl (g x)
-	   			      ; inr x → inr (h x)
+map F α β f = elimD (\F. sem F α → sem F β)
+                    (\A x. x)
+                    (\x. f x)
+                    (\d1 d2 g h p. «g (fst p), h (snd p)»)
+	            (\d1 d2 g h s. case s for x. sem (d1 “+” d2) β with
+                                      { inl x. inl (g x)
+	   			      ; inr x. inr (h x)
 				      })
                     F ;
 
@@ -53,7 +53,7 @@ foldW : (W : comonad) → (D : Desc) →
         α  ;
 foldW W D d α k x =
   counit W α (fold D (F W α)
-                   (\x → comonadMap W (sem D (F W α)) α k (d (F W α) (map D (F W α) (F W (F W α)) (cojoin W α) x))) x) ;
+                   (\x. comonadMap W (sem D (F W α)) α k (d (F W α) (map D (F W α) (F W (F W α)) (cojoin W α) x))) x) ;
 
 --------------------------------------------------------------------------------
 -- “context” comonad
@@ -73,7 +73,7 @@ Ccomonad : Set → comonad ;
 Ccomonad E = « C E, « counitC E, « cobindC E, « mapC E, () »»»» ;
 
 distC : (E : Set) → (D : Desc) → (sem D E → E) → distributiveLaw (Ccomonad E) D ;
-distC E D k A x = « k (map D (E × A) E (\x → fst x) x), map D (E × A) A (\x → snd x) x » ;
+distC E D k A x = « k (map D (E × A) E (\x. fst x) x), map D (E × A) A (\x. snd x) x » ;
 
 --------------------------------------------------------------------------------
 -- primitive recursion, derived from the general comonadic recursion

@@ -1,9 +1,9 @@
 sem : Desc → Set → Set ;
-sem d = elimD (\x → Set → Set)
-              (\A X → A)
-              (\X → X)
-              (\d1 d2 F G X → F X × G X)
-              (\d1 d2 F G X → F X + G X)
+sem d = elimD (\x. Set → Set)
+              (\A X. A)
+              (\X. X)
+              (\d1 d2 F G X. F X × G X)
+              (\d1 d2 F G X. F X + G X)
               d ;
 
 lift : (D : Desc) →
@@ -11,13 +11,13 @@ lift : (D : Desc) →
        (P : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α P = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → P x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α P = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. P x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
@@ -39,10 +39,10 @@ data Nat : Set :=
 --succ = \n → construct NatD (inr n) ;
 
 foldNat : (A : Set 1) → A → (A → A) → Nat → A ;
-foldNat A a f = induction NatDesc (λx → A)
-                          (λx → case x for x. lift NatDesc Nat (λx → A) x → A with
-                                  { inl u → λu' → a
-				  ; inr x → λa → f a
+foldNat A a f = induction NatDesc (λx. A)
+                          (λx. case x for x. lift NatDesc Nat (λx. A) x → A with
+                                  { inl u. λu'. a
+				  ; inr x. λa. f a
                                   });
 
 {-
@@ -55,19 +55,19 @@ FoldNat = \A a f → fold NatDesc A (\s → case s for x. A with { inl u → a; 
 --                          (λx a → k (construct F x) a);
 
 plus : Nat → Nat → Nat ;
-plus = foldNat (Nat → Nat) (\x → x) (\f n → succ (f n)) ;
+plus = foldNat (Nat → Nat) (\x. x) (\f n. succ (f n)) ;
 
 vec : (A : Set) → Nat → Set ;
-vec = \A → foldNat Set Unit (\B → A × B) ;
+vec = \A. foldNat Set Unit (\B. A × B) ;
 
 two : Nat ;
 two = succ (succ zero) ;
 
 pair : (A : Set) → A → A → vec A two ;
-pair = \A a1 a2 → «a1, «a2, ()»» ;
+pair = \A a1 a2. «a1, «a2, ()»» ;
 
 conVec : (A : Set) → (n : Nat) → A → vec A n → vec A (succ n) ;
-conVec = \A n a v → «a,v» ;
+conVec = \A n a v. «a,v» ;
 
 natInduction : (P : Nat → Set 2) →
                (P zero) →
@@ -75,18 +75,18 @@ natInduction : (P : Nat → Set 2) →
                (n : Nat) → P n;
 natInduction P p0 pS =
   induction NatDesc P
-            (\x → case x for x. lift NatDesc Nat P x → P (construct NatDesc x) with
-                    { inl u → \u' → p0
-                    ; inr n → \pn → pS n pn
+            (\x. case x for x. lift NatDesc Nat P x → P (construct NatDesc x) with
+                    { inl u. \u'. p0
+                    ; inr n. \pn. pS n pn
                     });
 
 natPrimrec : (A : Set) → A → (Nat → A → A) → Nat → A ;
-natPrimrec A = natInduction (\x → A);
+natPrimrec A = natInduction (\x. A);
 
 
 append : (A : Set) → (m n : Nat) → vec A m → vec A n → vec A (plus m n) ;
 append A m n = natInduction
-                 (\m → vec A m → vec A n → vec A (plus m n))
-                 (\xs ys → ys)
-                 (\m f xs ys → conVec A (plus m n) (fst xs) (f (snd xs) ys))
+                 (\m. vec A m → vec A n → vec A (plus m n))
+                 (\xs ys. ys)
+                 (\m f xs ys. conVec A (plus m n) (fst xs) (f (snd xs) ys))
                  m;

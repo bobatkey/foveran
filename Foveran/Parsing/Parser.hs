@@ -109,7 +109,7 @@ term = term10
 
 term10 :: Parser Tok.Token TermPos
 term10 =
-    leftDelimited Lam <$> token Tok.Lambda <* commit <*> identifierList <* token Tok.Arrow <*> term10
+    leftDelimited Lam <$> token Tok.Lambda <* commit <*> identifierList <* token Tok.FullStop <*> term10
     <|>
     (\p idents t1 con t2 -> Annot (makeSpan p t2) (con idents t1 t2))
        <$> token Tok.LParen
@@ -184,9 +184,9 @@ term00 =
               <*> (Case <$> term10
                         <* token Tok.For <*> identifier <* token Tok.FullStop <*> term10 <* token Tok.With
                         <* token Tok.LBrace
-                        <* token Tok.Inl <*> identifier <* token Tok.Arrow <*> term10
+                        <* token Tok.Inl <*> identifier <* token Tok.FullStop <*> term10
                         <* token Tok.Semicolon
-                        <* token Tok.Inr <*> identifier <* token Tok.Arrow <*> term10)
+                        <* token Tok.Inr <*> identifier <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)

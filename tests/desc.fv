@@ -5,37 +5,37 @@ zero : µ NatD ;
 zero = cons NatD (inl ()) ;
 
 succ : µ NatD → µ NatD ;
-succ = \n → cons NatD (inr n) ;
+succ = \n. cons NatD (inr n) ;
 
 plus : µ NatD → µ NatD → µ NatD ;
-plus = fold NatD (µ NatD → µ NatD) (\s n' → case s for a. µ NatD with
-                                              { inl u → n'
-                                	      ; inr f → succ (f n')
+plus = fold NatD (µ NatD → µ NatD) (\s n'. case s for a. µ NatD with
+                                              { inl u. n'
+                                	      ; inr f. succ (f n')
                                               }) ;
 
 sem : Desc → Set → Set ;
-sem = \d → elimD (\x → Set → Set)
-                 (\A X → A)
-                 (\X → X)
-                 (\d1 d2 F G X → F X × G X)
-                 (\d1 d2 F G X → F X + G X)
+sem = \d. elimD (\x. Set → Set)
+                 (\A X. A)
+                 (\X. X)
+                 (\d1 d2 F G X. F X × G X)
+                 (\d1 d2 F G X. F X + G X)
                  d ;
 
 cons' : (F : Desc) → sem F (µ F) → µ F ;
 cons' = cons ;
 
 ListD : (A : Set) → Desc ;
-ListD = \A → “K” Unit “+” (“K” A “×” “Id”) ;
+ListD = \A. “K” Unit “+” (“K” A “×” “Id”) ;
 
 
 lift : (F : Desc) → (µ F → Set) → (sem F (µ F) → Set) ;
-lift = \F P → elimD (\d → sem d (µ F) → Set)
-                    (\A x → Unit)
-                    (\x → P x)
-                    (\d1 d2 P1 P2 p → P1 (fst p) × P2 (snd p))
-	            (\d1 d2 P1 P2 s → case s for x. Set with
-	                                { inl x → P1 x
-	        			; inr x → P2 x
+lift = \F P. elimD (\d. sem d (µ F) → Set)
+                    (\A x. Unit)
+                    (\x. P x)
+                    (\d1 d2 P1 P2 p. P1 (fst p) × P2 (snd p))
+	            (\d1 d2 P1 P2 s. case s for x. Set with
+	                                { inl x. P1 x
+	        			; inr x. P2 x
 					})
                     F ;
 
@@ -47,7 +47,7 @@ liftFunctor : (F : Desc) →
               (P Q : µ F → Set) →
               (f : (x : µ F) → P x → Q x) →
               (x : sem F (µ F)) → lift F P x → lift F Q x ;
-liftFunctor = \F → elimD (\F → (P Q : µ F → Set) → (f : (x : µ F) → P x → Q x) →
+liftFunctor = \F. elimD (\F. (P Q : µ F → Set) → (f : (x : µ F) → P x → Q x) →
                                      (x : sem F (µ F)) → lift F P x → lift F Q x)
                                Unit
                                Unit
@@ -61,13 +61,13 @@ liftFunctor = \F → elimD (\F → (P Q : µ F → Set) → (f : (x : µ F) → 
 -- D (F “×” G) = (D F “×” G) “+” (F “×” D G)
 
 map : (F : Desc) → (A B : Set) → (A → B) → sem F A → sem F B ;
-map = \F A B f → elimD (\d → sem d A → sem d B)
-                       (\A x → x)
-                       (\x → f x)
-                       (\d1 d2 g h p → «g (fst p), h (snd p)»)
-		       (\d1 d2 g h s → case s for x. sem (d1 “+” d2) B with
-                                         { inl x → inl (g x)
-					 ; inr x → inr (h x)
+map = \F A B f. elimD (\d. sem d A → sem d B)
+                       (\A x. x)
+                       (\x. f x)
+                       (\d1 d2 g h p. «g (fst p), h (snd p)»)
+		       (\d1 d2 g h s. case s for x. sem (d1 “+” d2) B with
+                                         { inl x. inl (g x)
+					 ; inr x. inr (h x)
 					 })
                        F ;
 
@@ -75,10 +75,10 @@ map = \F A B f → elimD (\d → sem d A → sem d B)
 --assume fold : (F : Desc) → (A : Set) → (sem F A → A) → µ F → A ;
 
 primfold : (F : Desc) → (A : Set) → (µ F → sem F A → A) → µ F → A ;
-primfold = \F A k x → snd (fold F (µ F × A)
-                                (\x → « cons F (map F (µ F × A) (µ F) (\x → fst x) x)
-                                      , k (cons F (map F (µ F × A) (µ F) (\x → fst x) x))
-                                          (map F (µ F × A) A (\x → snd x) x)
+primfold = \F A k x. snd (fold F (µ F × A)
+                                (\x. « cons F (map F (µ F × A) (µ F) (\x. fst x) x)
+                                      , k (cons F (map F (µ F × A) (µ F) (\x. fst x) x))
+                                          (map F (µ F × A) A (\x. snd x) x)
                                       »)
                                 x) ;
 
@@ -109,13 +109,13 @@ x = Unit ;
 -- how to constructively realise the preservation of initial algebras proof?
 
 K1 : (A : Set) → A → Set ;
-K1 = \A a → Unit ;
+K1 = \A a. Unit ;
 
 package : (F : Desc) → (µ F → Set) → Set ;
-package = \F P → (x : µ F) × P x ;
+package = \F P. (x : µ F) × P x ;
 
 f : (F : Desc) → (P : µ F → Set) → (sem F (package F P) → package F P) → µ F → package F P ;
-f = \F P k d → fold F (package F P) k d ;
+f = \F P k d. fold F (package F P) k d ;
 
 -- if “fold F (µ F) (cons F) x = x”, then “fst (fold F (package F P) k x) = ??”
 

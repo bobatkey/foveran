@@ -1,50 +1,50 @@
 id : (A : Set) → A → A ;
-id = \A x → x ;
+id = \A x. x ;
 
 compose : (A B C : Set) -> (B -> C) -> (A -> B) -> (A -> C) ;
-compose = \A B C f g a -> f (g a) ;
+compose = \A B C f g a. f (g a) ;
 
 assume A : Set ;
 assume T : A → Set ;
 
 pair : (A B : Set) → A → B → A × B ;
-pair = \A B a b → «a,b» ;
+pair = \A B a b. «a,b» ;
 
 pair2 : (x : A) → T x → (x : A) × T x ;
-pair2 = \x y → «x, y» ;
+pair2 = \x y. «x, y» ;
 
 p1 : (A B : Set) → A × B → A ;
-p1 = \A B p → fst p ;
+p1 = \A B p. fst p ;
 
 proj1 : ((x : A) × T x) → A ;
-proj1 = \x → fst x ;
+proj1 = \x. fst x ;
 
 proj2 : (a : (x : A) × T x) → T (proj1 a) ;
-proj2 = \x → snd x ;
+proj2 = \x. snd x ;
 
 id2 : ((x : A) × T x) → ((y : A) × T y) ;
-id2 = \x → x ;
+id2 = \x. x ;
 
 id3 : (A B C : Set) → A + B + C → A + B + C ;
-id3 = \A B C x → x ;
+id3 = \A B C x. x ;
 
 inl' : (A B : Set) → A → A + B ;
-inl' = \A B x → inl x ;
+inl' = \A B x. inl x ;
 
 hoas : (A : Set) -> ((A -> A) -> A) -> (A -> A -> A) -> A ;
-hoas = \A lam app -> lam (\x -> app x x) ;
+hoas = \A lam app. lam (\x. app x x) ;
 
 apply : (Set -> Set) -> Set -> Set ;
-apply = \f a -> f a ;
+apply = \f a. f a ;
 
 big : Set 1;
 big = Set -> Set ;
 
 k : (A B : Set) -> A -> B -> A ;
-k = \A B x y -> y ;
+k = \A B x y. y ;
 
 small : big ;
-small = \x -> x ;
+small = \x. x ;
 
 err : Set ;
-err = \x -> x ;
+err = \x. x ;

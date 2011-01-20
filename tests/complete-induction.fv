@@ -1,22 +1,22 @@
 sem : Desc → Set → Set ;
-sem = elimD (λx → Set → Set)
-            (λA X → A)
-            (λX → X)
-            (λF G semF semG X → semF X × semG X)
-            (λF G semF semG X → semF X + semG X);
+sem = elimD (λx. Set → Set)
+            (λA X. A)
+            (λX. X)
+            (λF G semF semG X. semF X × semG X)
+            (λF G semF semG X. semF X + semG X);
 
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →
        sem D α →
        Set 2 ;
-lift D α Φ = elimD (\D → sem D α → Set 2)
-                   (\A x → Unit)
-                   (\x → Φ x)
-                   (\F G f g x → f (fst x) × g (snd x))
-                   (\F G f g x → case x for d. Set 2 with
-                                   { inl y → f y
-                                   ; inr z → g z
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
                                    })
                    D;
 
@@ -37,27 +37,27 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x → case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
-                    { inl u → \u' → φ0
-                    ; inr n → \φn → φS n φn
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
                     });
 
 deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
-deconstruct'' F = induction F (\x → sem F (µ F)) (\x p → x);
+deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
 
 destructNat : (Φ : Nat → Set 2) → Φ zero → ((n : Nat) → Φ (succ n)) → (n : Nat) → Φ n;
-destructNat Φ z s = natInduction Φ z (λn p → s n);
+destructNat Φ z s = natInduction Φ z (λn p. s n);
 
 caseNat : (A : Set 1) → A → (Nat → A) → Nat → A ;
 caseNat A a f n = case deconstruct'' NatDesc n for x. A with
-                    { inl u → a
-                    ; inr n → f n
+                    { inl u. a
+                    ; inr n. f n
                     };
 
 lt : Nat → Nat → Set;
-lt = natInduction (λx → Nat → Set)
-                  (λy → caseNat Set Empty (λy → Unit) y)
-                  (λx f y → caseNat Set Empty f y);
+lt = natInduction (λx. Nat → Set)
+                  (λy. caseNat Set Empty (λy. Unit) y)
+                  (λx f y. caseNat Set Empty f y);
 
 one : Nat ;
 one = succ zero;
@@ -69,9 +69,9 @@ three : Nat ;
 three = succ two;
 
 ltZero : (n : Nat) → lt n zero → Empty;
-ltZero = destructNat (λn → lt n zero → Empty)
-                     (λx → x)
-                     (λn x → x);
+ltZero = destructNat (λn. lt n zero → Empty)
+                     (λx. x)
+                     (λn x. x);
 
 {-
 ltOne : (Φ : Nat → Set 2) → Φ zero → (n : Nat) → lt n one → Φ n;
@@ -91,16 +91,16 @@ lt_succ = natInduction
 assume lt_le_trans : (a b c : Nat) → lt a b → lt b (succ c) → lt a c;
 
 lt_succ : (n : Nat) → lt n (succ n);
-lt_succ = natInduction (\n → lt n (succ n)) () (\n p → p);
+lt_succ = natInduction (\n. lt n (succ n)) () (\n p. p);
 
 completeNatInduction : (Φ : Nat → Set 2) →
 		       ((n : Nat) → ((m : Nat) → lt m n → Φ m) → Φ n) →
                        (n : Nat) → Φ n;
 completeNatInduction Φ k n =
   natInduction
-    (λn → (m : Nat) → lt m n → Φ m)
-    (λm p → elimEmpty (Φ m) (ltZero m p))
-    (λn p₁ m p₂ → k m (λo p₃ → p₁ o (lt_le_trans o m n p₃ p₂)))
+    (λn. (m : Nat) → lt m n → Φ m)
+    (λm p. elimEmpty (Φ m) (ltZero m p))
+    (λn p₁ m p₂. k m (λo p₃. p₁ o (lt_le_trans o m n p₃ p₂)))
     (succ n)
     n
     (lt_succ n);
@@ -110,7 +110,7 @@ completeNatInduction Φ k n =
 -- how to describe what the generic version of sub-term is?
 
 out : (F : Desc) → µ F → sem F (µ F) ;
-out F = induction F (\x → sem F (µ F)) (\x p → x);
+out F = induction F (\x. sem F (µ F)) (\x p. x);
 
 all : (D : Desc) →
       (X : Set) →
@@ -118,28 +118,28 @@ all : (D : Desc) →
       (p : (x : X) → P x) →
       (xs : sem D X) →
       lift D X P xs ;
-all D X P p = elimD (\D → (xs : sem D X) → lift D X P xs)
-                    (\A x → ())
-                    (\x → p x)
-                    (\F G f g x → «f (fst x), g (snd x)»)
-                    (\F G f g x → case x for d. lift (F “+” G) X P d with
-                                    { inl y → f y
-                                    ; inr z → g z
+all D X P p = elimD (\D. (xs : sem D X) → lift D X P xs)
+                    (\A x. ())
+                    (\x. p x)
+                    (\F G f g x. «f (fst x), g (snd x)»)
+                    (\F G f g x. case x for d. lift (F “+” G) X P d with
+                                    { inl y. f y
+                                    ; inr z. g z
                                     }) 
                    D;
 
 swizzle : (F : Desc) →
           (X : Set) →
           (x : sem F X) →
-          (p : lift F X (λx → Set) x) →
+          (p : lift F X (λx. Set) x) →
           Set ;
-swizzle F X = elimD (λF' → (x : sem F' X) → lift F' X (λx → Set) x → Set)
-                    (λA x u → Unit)
-                    (λx S → S)
-                    (λG H g h x p → g (fst x) (fst p) × h (snd x) (snd p))
-                    (λG H g h x → case x for x. lift (G “+” H) X (λx → Set) x → Set with
-                                    { inl x₁ → g x₁
-                                    ; inr x₂ → h x₂
+swizzle F X = elimD (λF'. (x : sem F' X) → lift F' X (λx. Set) x → Set)
+                    (λA x u. Unit)
+                    (λx S. S)
+                    (λG H g h x p. g (fst x) (fst p) × h (snd x) (snd p))
+                    (λG H g h x. case x for x. lift (G “+” H) X (λx. Set) x → Set with
+                                    { inl x₁. g x₁
+                                    ; inr x₂. h x₂
                                     })
                     F;
 
@@ -147,82 +147,82 @@ swizzle F X = elimD (λF' → (x : sem F' X) → lift F' X (λx → Set) x → S
 – other way would be to define an inductive family that describes the
 – same data.
 ciRec : (F : Desc) → (µ F → Set) → µ F → Set ;
-ciRec F P = induction F (λx → Set) (λx p → P (construct F x) × swizzle F (µ F) x p);
+ciRec F P = induction F (λx. Set) (λx p. P (construct F x) × swizzle F (µ F) x p);
 
 step : (F : Desc) →
        (P : µ F → Set) →
        (x : sem F (µ F)) →
-       lift F (µ F) (λx → ciRec F P x) x →
-       swizzle F (µ F) x (all F (µ F) (λx → Set) (λx → ciRec F P x) x) ;
+       lift F (µ F) (λx. ciRec F P x) x →
+       swizzle F (µ F) x (all F (µ F) (λx. Set) (λx. ciRec F P x) x) ;
 step F P =
-  elimD (λF' → (x : sem F' (µ F)) →
-               lift F' (µ F) (λx → ciRec F P x) x →
-               swizzle F' (µ F) x (all F' (µ F) (λx → Set) (λx → ciRec F P x) x))
-        (λA x u → ⋄)
-        (λx p → p)
-        (λG H g h x p → « g (fst x) (fst p), h (snd x) (snd p) »)
-        (λG H g h x → case x for x. lift (G “+” H) (µ F) (λx → ciRec F P x) x →
-                                    swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx → Set) (λx → ciRec F P x) x) with
-                        { inl x₁ → g x₁
-                        ; inr x₂ → h x₂
+  elimD (λF'. (x : sem F' (µ F)) →
+               lift F' (µ F) (λx. ciRec F P x) x →
+               swizzle F' (µ F) x (all F' (µ F) (λx. Set) (λx. ciRec F P x) x))
+        (λA x u. ⋄)
+        (λx p. p)
+        (λG H g h x p. « g (fst x) (fst p), h (snd x) (snd p) »)
+        (λG H g h x. case x for x. lift (G “+” H) (µ F) (λx. ciRec F P x) x →
+                                    swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx. Set) (λx. ciRec F P x) x) with
+                        { inl x₁. g x₁
+                        ; inr x₂. h x₂
                         })
         F;
 
 unstep : (F : Desc) →
          (P : µ F → Set) →
          (x : sem F (µ F)) →
-         swizzle F (µ F) x (all F (µ F) (λx → Set) (λx → ciRec F P x) x) →
-         lift F (µ F) (λx → ciRec F P x) x ;
+         swizzle F (µ F) x (all F (µ F) (λx. Set) (λx. ciRec F P x) x) →
+         lift F (µ F) (λx. ciRec F P x) x ;
 unstep F P =
-  elimD (λF' → (x : sem F' (µ F)) →
-               swizzle F' (µ F) x (all F' (µ F) (λx → Set) (λx → ciRec F P x) x) →
-               lift F' (µ F) (λx → ciRec F P x) x)
-        (λA x u → ⋄)
-        (λx p → p)
-        (λG H g h x p → « g (fst x) (fst p), h (snd x) (snd p) »)
-        (λG H g h x → case x for x. swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx → Set) (λx → ciRec F P x) x) →
-                                    lift (G “+” H) (µ F) (λx → ciRec F P x) x with
-                        { inl x₁ → g x₁
-                        ; inr x₂ → h x₂
+  elimD (λF'. (x : sem F' (µ F)) →
+               swizzle F' (µ F) x (all F' (µ F) (λx. Set) (λx. ciRec F P x) x) →
+               lift F' (µ F) (λx. ciRec F P x) x)
+        (λA x u. ⋄)
+        (λx p. p)
+        (λG H g h x p. « g (fst x) (fst p), h (snd x) (snd p) »)
+        (λG H g h x. case x for x. swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx. Set) (λx. ciRec F P x) x) →
+                                    lift (G “+” H) (µ F) (λx. ciRec F P x) x with
+                        { inl x₁. g x₁
+                        ; inr x₂. h x₂
                         })
         F;
 
 – FIXME: prove that this is the inverse to ‘step’.
 
 genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct D x)) → (x : µ D) → P x ;
-genericCase D P k = induction D P (λx p → k x);
+genericCase D P k = induction D P (λx p. k x);
 
 project₁ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → P x;
-project₁ F P = genericCase F (λx → ciRec F P x → P x) (λx p → fst p);
+project₁ F P = genericCase F (λx. ciRec F P x → P x) (λx p. fst p);
 
 – to make the fibonacci example below easier, why not write a second
 – projection function that extracts lift F (µ F) (λx → ciRec F P x) (deconstruct x) 
-project₂ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → lift F (µ F) (λx → ciRec F P x) (deconstruct'' F x);
-project₂ F P = genericCase F (λx → ciRec F P x → lift F (µ F) (λx → ciRec F P x) (deconstruct'' F x))
-                           (λx p → unstep F P x (snd p));
+project₂ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → lift F (µ F) (λx. ciRec F P x) (deconstruct'' F x);
+project₂ F P = genericCase F (λx. ciRec F P x → lift F (µ F) (λx. ciRec F P x) (deconstruct'' F x))
+                           (λx p. unstep F P x (snd p));
 
 completeInduction : (F : Desc) →
                     (P : µ F → Set) →
-                    ((x : sem F (µ F)) → lift F (µ F) (λx → ciRec F P x) x → P (construct F x)) →
+                    ((x : sem F (µ F)) → lift F (µ F) (λx. ciRec F P x) x → P (construct F x)) →
                     (x : µ F) →
                     P x;
 completeInduction F P f x = project₁ F P x
-                                     (induction F (λx → ciRec F P x)
-                                                (λx p → «f x p, step F P x p»)
+                                     (induction F (λx. ciRec F P x)
+                                                (λx p. «f x p, step F P x p»)
                                                 x);
 
 caseNat2 : (A : Nat → Set 2) → (A zero) → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 caseNat2 A a f = induction NatDesc A
-                           (λx p → case x for x. A (construct NatDesc x) with
-                                     { inl u → a
-                                     ; inr n → f n
+                           (λx p. case x for x. A (construct NatDesc x) with
+                                     { inl u. a
+                                     ; inr n. f n
                                      });
 
 add : Nat → Nat → Nat;
-add n₁ n₂ = natInduction (λx → Nat) n₂ (λx → succ) n₁;
+add n₁ n₂ = natInduction (λx. Nat) n₂ (λx. succ) n₁;
 
 mul : Nat → Nat → Nat;
-mul n₁ n₂ = natInduction (λx → Nat) zero (λn → add n₂) n₁;
+mul n₁ n₂ = natInduction (λx. Nat) zero (λn. add n₂) n₁;
 
 – this seems unneccesarily difficult. I think this is because the next
 – step of the recursion is hidden in the definition of ciRec, and needs
@@ -232,34 +232,34 @@ mul n₁ n₂ = natInduction (λx → Nat) zero (λn → add n₂) n₁;
 
 – or we could use project to extract the current level.
 fibonacci : Nat → Nat;
-fibonacci = completeInduction NatDesc (λx → Nat)
-                              (λx → case x for x. lift NatDesc Nat (λx → ciRec NatDesc (λx → Nat) x) x → Nat with
-                                      { inl u → λd → succ zero
-                                      ; inr n → caseNat2
-                                                  (λx → lift NatDesc Nat (λx → ciRec NatDesc (λx → Nat) x) (inr x) → Nat)
-                                                  (λp → fst p)
-                                                  (λn p →
-                                                     caseNat2 (λx → lift NatDesc Nat (λx → ciRec NatDesc (λx → Nat) x) (inr x) → Nat)
-                                                              (λq → add (fst p) (fst q))
-                                                              (λn q → add (fst p) (fst q))
+fibonacci = completeInduction NatDesc (λx. Nat)
+                              (λx. case x for x. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) x → Nat with
+                                      { inl u. λd. succ zero
+                                      ; inr n. caseNat2
+                                                  (λx. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) (inr x) → Nat)
+                                                  (λp. fst p)
+                                                  (λn p.
+                                                     caseNat2 (λx. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) (inr x) → Nat)
+                                                              (λq. add (fst p) (fst q))
+                                                              (λn q. add (fst p) (fst q))
                                                               n (snd p))
                                                   n
                                       });
 
 – another version using the projection functions, which seems easier (modulo problems with explicit annotations)
 P : sem NatDesc Nat → Set 2;
-P n = lift NatDesc Nat (λx → ciRec NatDesc (λx → Nat) x) n → Nat;
+P n = lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) n → Nat;
 
 fibonacci2 : Nat → Nat;
-fibonacci2 = completeInduction NatDesc (λx → Nat)
-                               (λx → case x for x. P x with
-			               { inl u → λd → succ zero
-                                       ; inr n → λp →
-                                           caseNat2 (λx → P (deconstruct'' NatDesc x))
-                                             (λq     → succ zero)
-                                             (λn' p' → add (project₁ NatDesc (λx → Nat) n p) (project₁ NatDesc (λx → Nat) n' p'))
+fibonacci2 = completeInduction NatDesc (λx. Nat)
+                               (λx. case x for x. P x with
+			               { inl u. λd. succ zero
+                                       ; inr n. λp.
+                                           caseNat2 (λx. P (deconstruct'' NatDesc x))
+                                             (λq. succ zero)
+                                             (λn' p'. add (project₁ NatDesc (λx. Nat) n p) (project₁ NatDesc (λx. Nat) n' p'))
                                              n
-                                             (project₂ NatDesc (λx → Nat) n p)
+                                             (project₂ NatDesc (λx. Nat) n p)
                                        });
 
 four : Nat;
