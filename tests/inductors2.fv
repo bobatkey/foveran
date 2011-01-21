@@ -262,8 +262,59 @@ comonadic-inductor A W AI d =
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– Given a inductive proof of some property Ψ, we can “fold“ it into an inductor.
-– This is the induction version of the primitive recursion scheme.
+– This is an attempt to define complete induction by making use of a
+– memoisation table. To build the type of the memoisation table I have
+– attempted to use the inductor itself, since it can generate values in ‘Set 2’.
+– However, because the inductor doesn't have any computational meaning (it
+– doesn't reduce), I can't get access to the computed type at any time, so I
+– wasn't able to define the counit and cojoin of the comonad. I think, unless
+– something else is going wrong. It might also be a consequence of the way that 
+– the inductor type is defined (without a “sub-structure” type).
+
+– ‘swizzle’ ignores the data stored in the argument φ, it is only using it for 
+– its structure. I'm fairly sure this is the right thing to do.
+swizzle : (A : Set) →
+          (H : IDesc A) →
+          (φ : semI A H (λa. IDesc A)) →
+          IDesc A;
+swizzle A =
+  elimID A (λD. semI A D (λa. IDesc A) → IDesc A)
+         (λa D. D)
+         (λA' a'. 'K A A')
+         (λD₁ D₂ rec₁ rec₂ p. 'Pair A (rec₁ (fst p)) (rec₂ (snd p)))
+         (λB D rec p. 'Sg A B (λb. rec (fst p) (snd p)))
+         (λB D rec f. 'Pi A B (λb. rec b (f b)));
+
+complete-carrier : (A  : Set) →
+                   (AI : inductor A) →
+                   A → IDesc A;
+complete-carrier A AI =
+  snd AI (λa. IDesc A)
+         (λa φ. 'Pair A ('Id A a) (swizzle A (fst AI a) φ));
+
+{-
+complete-counit :
+  (A  : Set) →
+  (AI : inductor A) →
+  (Φ  : A → Set 2) → (a : A) → semI' A A (complete-carrier A AI) Φ a → Φ a;
+complete-counit A AI Φ =
+  snd AI (λa. semI' A A (complete-carrier A AI) Φ a → Φ a)
+      (λa d. ());
+
+complete-comonad : (A  : Set) →
+                   (AI : inductor A) →
+                   comonad A;
+complete-comonad A AI =
+  « complete-carrier A AI ,
+  « () ,
+  « () ,
+    ⋄ »»»;
+-}
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Given a inductive proof of some property Ψ with respect to some inductor, we
+– can “fold” it into an inductor. This is the induction version of the primitive
+– recursion scheme.
 primitive-inductor : (A  : Set) →
                      (AI : inductor A) →
                      (Ψ  : A → Set) →
@@ -273,7 +324,7 @@ primitive-inductor A AI Ψ k =
   comonadic-inductor A
                      « λa. 'Pair A ('K A (Ψ a)) ('Id A a),
 		     « λΦ a p. snd p,
-                     « λΦ a p. « fst p, p», ⋄ »»»
+                     « λΦ a p. « fst p, p », ⋄ »»»
                      AI
                      (λΦ a φ.
                          « k a (map A (fst AI a) (λa. Ψ a × Φ a) (λa. Ψ a) (λa φ. fst φ) φ)
