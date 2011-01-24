@@ -1,11 +1,29 @@
-– refinements by fiddling with indexing
+– This file explores a way to do ornament or refinement-like things by
+– making use of the predicate lifting of a datatype description.
 
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
             (λX. X)
             (λF G semF semG X. semF X × semG X)
             (λF G semF semG X. semF X + semG X);
+
+lift : (D : Desc) →
+       (α : Set) →
+       (Φ : α → Set 2) →
+       sem D α →
+       Set 2 ;
+lift D α Φ = elimD (\D. sem D α → Set 2)
+                   (\A x. Unit)
+                   (\x. Φ x)
+                   (\F G f g x. f (fst x) × g (snd x))
+                   (\F G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
+                                   })
+                   D;
 
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
 semI I D X = elimID I (λD. Set 2)
@@ -30,6 +48,8 @@ lift2 D A = elimD (λD. sem D A → IDesc A)
 				    })
                   D;
 
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Need to actually implement these...
 liftI : (I : Set) →
         (D : IDesc I) →
         (A : I → Set 2) →
@@ -45,8 +65,6 @@ liftI I D A Φ =
          (λB D liftD f. (b : B) → liftD b (f b))
          D;
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– Need to actually implement these...
 assume muI        : (I : Set) → (I → IDesc I) → I → Set;
 assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi. muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
@@ -61,18 +79,53 @@ assume inductionI : (I : Set) →
                     Φ i x;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– The following two declarations define catamorphisms for indexed data.
+– This will be used to do the forgetful map out of a refinement.
+drop : (I : Set) →
+       (D : I → IDesc I) →
+       (A : I → Set) →
+       (i : I) →
+       (x : semI I (D i) (λi. muI I D i)) →
+       liftI I (D i) (λi. muI I D i) (λi x. A i) x →
+       semI I (D i) (λi. A i);
+drop I D A i =
+  elimID I
+    (λD'. (x : semI I D' (λi. muI I D i)) →
+          liftI I D' (λi. muI I D i) (λi x. A i) x →
+          semI I D' (λi. A i))
+    (λi x a. a)
+    (λX x u. x)
+    (λD₁ D₂ drop₁ drop₂ x a.
+      «drop₁ (fst x) (fst a), drop₂ (snd x) (snd a)»)
+    (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
+    (λX D drop f a. λx. drop x (f x) (a x))
+    (D i);
+
+icata : (I : Set) →
+        (D : I → IDesc I) →
+        (A : I → Set) →
+        ((i : I) → semI I (D i) (λi. A i) → A i) →
+        (i : I) → muI I D i → A i;
+icata I D A k =
+  inductionI I D
+    (λi x. A i)
+    (λi x φ. k i (drop I D A i x φ));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 
 refinement : Desc → Set → Set 1;
 refinement D A = A → (X : Set) × (X → sem D A);
-
-refinement2 : Desc → Set → Set 1;
-refinement2 D A = A → (X : Set) × (X → sem D A + Unit);
 
 apply-refinement : (D : Desc) →
                    (A : Set) →
                    refinement D A →
                    A → IDesc A;
-apply-refinement D A r a = 'Sg A (fst (r a)) (λx. lift2 D A (snd (r a) x));
+apply-refinement D A r =
+  λa. 'Sg A (fst (r a)) (λx. lift2 D A (snd (r a) x));
+
+{-
+refinement2 : Desc → Set → Set 1;
+refinement2 D A = A → (X : Set) × (X → sem D A + Unit);
 
 apply-refinement2 : (D : Desc) →
                     (A : Set) →
@@ -90,8 +143,12 @@ refinement-to-refinement2 : (D : Desc) →
                             refinement D A →
                             refinement2 D A;
 refinement-to-refinement2 D A r = λa. «fst (r a), λx. inl (snd (r a) x)»;
+-}
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– I think that “forget” can be better expressed as a catamorphism on the indexed
+– datatype. “recons” is a fusion of “drop” and the forgetful stuff for
+– refinements.
 recons : (A : Set) →
          (D : Desc) →
          (Ψ : A → Set 2) →
@@ -106,9 +163,10 @@ recons A D Ψ =
                sem D' (µ D))
         (λA x u u'. x)
         (λx y r. r)
-        (λD₁ D₂ r₁ r₂ x y p. « r₁ (fst x) (fst y) (fst p)
-                              , r₂ (snd x) (snd y) (snd p)
-                              »)
+        (λD₁ D₂ r₁ r₂ x y p.
+          « r₁ (fst x) (fst y) (fst p)
+          , r₂ (snd x) (snd y) (snd p)
+          »)
         (λD₁ D₂ r₁ r₂ x.
            case x for x. (y : semI A (lift2 (D₁ “+” D₂) A x) Ψ) →
                          liftI A (lift2 (D₁ “+” D₂) A x) Ψ (λi x. µ D) y →
@@ -132,78 +190,249 @@ forget D A r =
                           (recons A D (λi. muI A (apply-refinement D A r) i)
                                   (snd (r a) (fst x)) (snd x) φ));
 
-– a : A
-– x : semI A (apply-refinement  D A r a) (λa → muI A (apply-refinement D A r) a)
-–     = (x : fst (r a)) × semI A (lift2 D A (snd (r a) x)) (λi → muI A (apply-refinement D A r) i)
+– FIXME: is this basically the same as drop in the unindexed case?
+forget-algebra :
+  (D : Desc) →
+  (A : Set) →
+  (r : refinement D A) →
+  (a : A) →
+  semI A (apply-refinement D A r a) (λi. µ D) →
+  µ D;
+forget-algebra D A r =
+  λa p.
+    construct D
+      (elimD (λD'. (x : sem D' A) →
+                   semI A (lift2 D' A x) (λi. µ D) →
+                   sem D' (µ D))
+             (λX x u. x)
+             (λa x. x)
+             (λD₁ D₂ f₁ f₂ x y. «f₁ (fst x) (fst y), f₂ (snd x) (snd y)»)
+             (λD₁ D₂ f₁ f₂ x.
+                case x for x. semI A (lift2 (D₁ “+” D₂) A x) (λi. µ D) → sem (D₁ “+” D₂) (µ D) with
+                  { inl x₁. λy₁. inl (f₁ x₁ y₁)
+                  ; inr x₂. λy₂. inr (f₂ x₂ y₂)
+                  })
+             D
+             (snd (r a) (fst p))
+             (snd p));
 
-– snd (r a) (fst x) : sem D A
-– φ : liftI A (apply-refinement D A r a) (λi → muI A (apply-refinement D A r) i) (λi x → µ D) x
-–      = liftI A (lift2 D A (snd (r a) (fst x))) (muI ...) (λi x → µ D) (snd x)
-
-– want (x : sem D A) →
-–      (y : semI A (lift2 D A x) Ψ) →
-–      liftI A (lift2 D A x) Ψ (λi x → µ D) y → sem D (µ D)
-
-– use the first part to get a value of type sem D A
-– use the second part and the φ to fill in all the holes to get a value of type sem D (µ D)
-– apply “construct D”
+forget2 : (D : Desc) →
+          (A : Set) →
+          (r : refinement D A) →
+          (a : A) →
+          muI A (apply-refinement D A r) a →
+          µ D;
+forget2 D A r =
+  icata A (apply-refinement D A r) (λa. µ D) (forget-algebra D A r);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– natural numbers and lists as boring, make from scratch datatypes
 data Nat : Set :=
   | zero :
   | succ : Nat
   ;
 
 caseNat : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
-caseNat A a f = induction NatDesc A
-                          (λx p. case x for x. A (construct NatDesc x) with
-                                    { inl u. a
-                                    ; inr n. f n
-                                    });
+caseNat A a f =
+  induction NatDesc A
+    (λx p. case x for x. A (construct NatDesc x) with
+             { inl u. a
+             ; inr n. f n
+             });
 
 data List (A : Set) : Set :=
   | nil  :
   | cons : A List
   ;
 
-– go from lists to vectors
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– From lists to vectors, using pattern matching on the index to determine
+– the available constructors.
 vec-refinement : (A : Set) → refinement (ListDesc A) Nat;
 vec-refinement A = 
   caseNat (λn. (X : Set) × (X → sem (ListDesc A) Nat))
-          (     « Unit, λu. inl ⋄     »)
+          (    « Unit, λu. inl ⋄     »)
           (λn. « A,    λa. inr «a,n» »);
 
+VecDesc : Set → Nat → IDesc Nat;
+VecDesc A = apply-refinement (ListDesc A) Nat (vec-refinement A);
+
+Vec : (A : Set) → (n : Nat) → Set;
+Vec A = muI Nat (VecDesc A);
+
+vec-nil : (A : Set) → Vec A zero;
+vec-nil A =
+  constructI Nat (VecDesc A) zero « ⋄, ⋄ »;
+
+vec-cons : (A : Set) → (n : Nat) → A → Vec A n → Vec A (succ n);
+vec-cons A n a v =
+  constructI Nat (VecDesc A) (succ n) « a, « ⋄, v » »;
+
+vec-elim : (A : Set) →
+           (Φ : (n : Nat) → Vec A n → Set 2) →
+           (Φ zero (vec-nil A)) →
+           ((n : Nat) → (a : A) → (v : Vec A n) → Φ n v → Φ (succ n) (vec-cons A n a v)) →
+           (n : Nat) → (v : Vec A n) → Φ n v;
+vec-elim A Φ φnil φcons =
+  inductionI Nat (VecDesc A)
+             Φ
+             (caseNat (λn. (v : semI Nat (VecDesc A n) (λn. Vec A n)) →
+                           liftI Nat (VecDesc A n) (λn. Vec A n) Φ v →
+                           Φ n (constructI Nat (VecDesc A) n v))
+                 (λv φ. φnil)
+                 (λn v φ. φcons n (fst v) (snd (snd v)) (snd φ)));
+
+vec-to-list : (A : Set) →
+              (n : Nat) → Vec A n → List A;
+vec-to-list A =
+  forget (ListDesc A) Nat (vec-refinement A);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Lists, by refinement
 – go from natural numbers to lists
 list-refinement : (A : Set) → refinement NatDesc Unit;
 list-refinement A =
   λu. « Unit + A
-       , λx. case x for d. sem NatDesc Unit with
-                { inl u. inl ⋄
-                ; inr a. inr ⋄
-                }
-       »;
+      , λx. case x for d. sem NatDesc Unit with
+              { inl u. inl ⋄
+              ; inr a. inr ⋄
+              }
+      »;
 
-Vec : (A : Set) → (n : Nat) → Set;
-Vec A = muI Nat (apply-refinement (ListDesc A) Nat (vec-refinement A));
+List2Desc : (A : Set) → Unit → IDesc Unit;
+List2Desc A = apply-refinement NatDesc Unit (list-refinement A);
 
 List2 : (A : Set) → Set;
-List2 A = muI Unit (apply-refinement NatDesc Unit (list-refinement A)) ⋄;
+List2 A = muI Unit (List2Desc A) ⋄;
 
-vec-to-list : (A : Set) →
-              (n : Nat) → Vec A n → List A;
-vec-to-list A = forget (ListDesc A)
-                       Nat
-                       (vec-refinement A);
+nil2 : (A : Set) → List2 A;
+nil2 A =
+  constructI Unit (List2Desc A) ⋄ « inl ⋄, ⋄ »;
+
+cons2 : (A : Set) → A → List2 A → List2 A;
+cons2 A a l =
+  constructI Unit (List2Desc A) ⋄ « inr a, l »;
+
+list-elim : (A : Set) →
+            (Φ : List2 A → Set 2) →
+            (Φ (nil2 A)) →
+            ((a : A) → (l : List2 A) → Φ l → Φ (cons2 A a l)) →
+            (l : List2 A) → Φ l;
+list-elim A Φ φnil φcons = 
+  inductionI
+    Unit (List2Desc A)
+    (λi. Φ)
+    (λi x.
+      case fst x
+        for y. (z : semI Unit (lift2 NatDesc Unit (snd (list-refinement A ⋄) y)) (λu. List2 A)) →
+               liftI Unit (List2Desc A i) (λu. List2 A) (λi. Φ) «y, z» →
+               Φ (constructI Unit (List2Desc A) ⋄ «y, z») with
+        { inl u. λz u. φnil
+        ; inr a. λl φ. φcons a l φ
+        }
+        (snd x))
+    ⋄;
 
 – length:
 list-to-nat : (A : Set) → List2 A → Nat;
-list-to-nat A = forget NatDesc Unit (list-refinement A) ⋄;
-
-– can Nat→List be turned into List→Vec?
-
-– need to prove some semantic correctness properties
+list-to-nat A =
+    forget NatDesc Unit (list-refinement A) ⋄;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– questions:
-– generate from an algebra?
-– generic correctness proofs?
+– Both of the attempts below get stuck. I think this is due to the largeness of
+– equality in this system. If we restricted to datatypes that have computable
+– equality types, then the approach here might be made to work.
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Building a refinement from a relation
+relational-refinement :
+  (F : Desc) →
+  (A : Set) →
+  (R : sem F A → A → Set) →
+  refinement F A;
+relational-refinement F A R =
+  λa. « (fa : sem F A) × R fa a, λp. fst p »;
+
+
+sem1 : Desc → Set 1 → Set 1;
+sem1 = elimD (λx. Set 1 → Set 1)
+             (λA X. A)
+             (λX. X)
+             (λF G semF semG X. semF X × semG X)
+             (λF G semF semG X. semF X + semG X);
+
+drop1 : (D : Desc) →
+        (A : Set 1) →
+        (x : sem D (µ D)) →
+        lift D (µ D) (λx. A) x →
+        sem1 D A ;
+drop1 D A = elimD (λD'. (x : sem D' (µ D)) → lift D' (µ D) (λx. A) x → sem1 D' A)
+                  (λA x u. x)
+                  (λx a. a)
+                  (λF G f g x a. «f (fst x) (fst a), g (snd x) (snd a)»)
+                  (λF G f g x. case x for x. lift (F “+” G) (µ D) (λx. A) x → sem1 (F “+” G) A with
+                                  { inl y. λa. inl (f y a)
+                                  ; inr z. λa. inr (g z a)
+                                  })
+                  D;
+
+cata1 : (D : Desc) → (α : Set 1) → (sem1 D α → α) → µ D → α ;
+cata1 D α k = induction D (λx. α) (λx a. k (drop1 D α x a));
+
+equal : (A : Set) → A → A → Set 1;
+equal A a₁ a₂ = (F : A → Set) → F a₁ → F a₂;
+
+dist : (D : Desc) →
+       (A : Set) →
+       sem1 D (A → Set) →
+       sem D A → Set 1;
+dist D A = elimD (λD. sem1 D (A → Set) → sem D A → Set 1)
+                 (equal)
+                 (λP a. P a)
+                 (λD₁ D₂ dist₁ dist₂ p q.
+                     dist₁ (fst p) (fst q) × dist₂ (snd p) (snd q))
+                 (λD₁ D₂ dist₁ dist₂ p q.
+                     case p for p. Set 1 with
+                       { inl p. case q for q. Set 1 with
+                                  { inl q. dist₁ p q
+                                  ; inr q. Empty
+                                  }
+                       ; inr p. case q for q. Set 1 with
+                                  { inl q. Empty
+                                  ; inr q. dist₂ p q
+                                  }
+                       })
+                 D;
+
+– Building a predicate from a relation
+– This seems to have trouble with set levels, due to the presence of equality,
+– which forces everything up by a level.
+{-
+relational :
+  (D : Desc) →
+  (A : Set) →
+  (R : sem D A → A → Set) →
+  µ D → A → Set 1;
+relational D A R =
+  cata2 D (A → Set 1) (λx a. (y : sem D A) × R y a × dist D A x y);
+-}
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– another attempt
+{-
+relational-refinement :
+  (F : Desc) →
+  (A : Set) →
+  (R : sem1 F (A → Set) → A → Set) →
+  refinement F A;
+relational-refinement F A R =
+  λa. « 
+-}
+
+relational :
+  (D : Desc) →
+  (A : Set) →
+  (R : sem1 D (A → Set) → A → Set) →
+  µ D → A → Set;
+relational D A R =
+  cata1 D (A → Set) R;
