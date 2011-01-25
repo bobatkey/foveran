@@ -1,6 +1,15 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Language.Foveran.Syntax.Display where
+module Language.Foveran.Syntax.Display
+    ( Definition (..)
+    , Datatype (..)
+    , Constructor (..)
+    , Declaration (..)
+    , Term
+    , TermPos
+    , TermCon (..)
+    )
+    where
 
 import Language.Foveran.NameSupply (Ident)
 import Text.Position

@@ -1,11 +1,24 @@
 {-# LANGUAGE TypeSynonymInstances, DeriveFunctor #-}
 
-module Language.Foveran.Syntax.Checked where
+module Language.Foveran.Syntax.Checked
+    ( Term
+    , TermCon (..)
+    , tmApp
+    , tmFree
+    , tmBound
+    , tmFst
+    , tmSnd
+    , vbound
+      
+    , bindFree
+    , toDisplaySyntax
+    )
+    where
 
-import Control.Applicative
-import Data.Rec
+import           Control.Applicative
+import           Data.Rec
 import qualified Language.Foveran.Syntax.Display as DS
-import Language.Foveran.NameSupply
+import           Language.Foveran.NameSupply
 
 -- The only difference between this and InternalSyntax is the
 -- appearance of explicit types in the “Case” expression. This is
@@ -187,6 +200,9 @@ tmFree nm = \i -> In $ Free nm
 {------------------------------------------------------------------------------}
 -- FIXME: some of these things are irrelevant: so they needn't be
 -- checked for equality
+
+-- FIXME: Should reimplement this with (optional) set-level
+-- cummulativity checking
 instance Eq Term where
   In (Free nm1) == In (Free nm2)     = nm1 == nm2
   In (Bound i)  == In (Bound j)      = i == j

@@ -1,6 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Typing.Context where
+module Language.Foveran.Typing.Context
+    ( Context
+    , emptyContext
+    , ctxtExtend
+    , ctxtExtendFreshen
+    , evalIn
+    , evalInWithArg
+    , lookupType
+    , lookupDef
+    , contextNameSupply
+    )
+    where
 
 import           Data.Functor
 import           Data.Monoid
@@ -11,6 +22,7 @@ import           Language.Foveran.Syntax.Checked (Term)
 import           Language.Foveran.Typing.Conversion
 import           Language.Foveran.NameSupply
 
+-- FIXME: Make this abstract
 type Context = M.Map Ident (Value, Maybe Value)
 
 emptyContext :: Context

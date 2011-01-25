@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Typing.Errors where
+module Language.Foveran.Typing.Errors
+    ( TypeError (..)
+    , ppTypeError
+    )
+    where
 
 import           Text.PrettyPrint
 import           Text.PrettyPrint.IsString

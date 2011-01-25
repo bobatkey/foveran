@@ -1,6 +1,8 @@
 {-# LANGUAGE TupleSections #-}
 
-module Language.Foveran.Parsing.Parser where
+module Language.Foveran.Parsing.Parser
+    ( file )
+    where
 
 import           Control.Applicative
 import           Data.Maybe

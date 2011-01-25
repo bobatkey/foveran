@@ -1,18 +1,22 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Language.Foveran.Syntax.LocallyNameless where
+module Language.Foveran.Syntax.LocallyNameless
+    ( TermPos
+    , TermCon (..)
+    , toLocallyNameless
+    , close
+    )
+    where
 
 import           Data.List (elemIndex)
 import           Control.Applicative
-import           Data.Traversable
 import           Data.Rec
 import           Text.Position (Span)
 import           Data.FreeMonad
 import qualified Data.Text as T
 import qualified Language.Foveran.Syntax.Display as DS
-import           Language.Foveran.NameSupply
+import           Language.Foveran.NameSupply (Ident)
 
-type Term = Rec TermCon
 type TermPos = AnnotRec Span TermCon
 
 data TermCon tm

@@ -15,4 +15,4 @@ main = do
     Left err ->
         putStrLn $ render (ppInputError err)
     Right decls ->
-        runDeclCheckM $ mapM_ checkDecl decls
+        checkDeclarations decls

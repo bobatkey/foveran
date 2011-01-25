@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Parsing.PrettyPrinter where
+module Language.Foveran.Parsing.PrettyPrinter
+    ( ppAnnotTerm 
+    , ppPlain
+    )
+    where
 
 import           Data.String
 import           Data.Rec (foldAnnot, Rec, foldRec)

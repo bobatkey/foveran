@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 
-module Language.Foveran.Parsing.LexicalSpec where
+module Language.Foveran.Parsing.LexicalSpec
+    ( lexicalSpec )
+    where
 
 import Language.Forvie.Lexing.Spec
 import Language.Foveran.Parsing.Token

@@ -1,6 +1,10 @@
 -- | Some pretty printing utilities.
 
-module Language.Foveran.Util.PrettyPrinting where
+module Language.Foveran.Util.PrettyPrinting
+    ( ppPos
+    , ppSpan
+    )
+    where
 
 import Text.PrettyPrint
 import Text.Position

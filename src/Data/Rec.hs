@@ -1,6 +1,15 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Data.Rec where
+module Data.Rec
+    ( Rec (..)
+    , AnnotRec (..)
+    , translate
+    , translateStar
+    , translateRec
+    , foldRec
+    , foldAnnot
+    )
+    where
 
 import Data.Functor
 import Data.FreeMonad

@@ -1,6 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Typing.Checker where
+module Language.Foveran.Typing.Checker
+    ( TypingMonad (..)
+    , tyCheck
+    , setCheck
+    )
+    where
 
 import           Control.Monad (unless)
 import           Data.Maybe (fromMaybe)

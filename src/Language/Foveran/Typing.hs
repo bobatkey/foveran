@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Typing where
+module Language.Foveran.Typing
+    ( checkDeclarations )
+    where
 
 import Control.Monad (unless)
 
@@ -100,3 +102,7 @@ runDeclCheckM (DM f) =
              putStrLn $ render $ "Repeated binding" <+> "“" <> text (T.unpack nm) <> "”" <+> "at" <+> ppSpan p
          Left (p, MalformedDefn nm1 nm2) ->
              putStrLn $ "Malformed definition at " ++ show p
+
+checkDeclarations :: [Declaration] -> IO ()
+checkDeclarations decls =
+    runDeclCheckM $ mapM_ checkDecl decls
