@@ -6,7 +6,6 @@
 module Language.Foveran.Parsing
     ( readFoveranFile
     , ppInputError
-    , ppSpan -- FIXME: move this
     )
     where
 
@@ -24,6 +23,8 @@ import Control.StreamProcessor.IO
 import Text.ParserCombinators
 import Language.Forvie.Lexing.Spec
 import Language.Forvie.Lexing.Generator
+
+import Language.Foveran.Util.PrettyPrinting
 
 import Language.Foveran.Syntax.Display (Declaration)
 
@@ -48,12 +49,6 @@ instance ParsingError Token InputError where
     parseError = PE_ParsingError
 
 --------------------------------------------------------------------------------
-ppPos p =
-  text "line" <+> int (posLineNum p) <> comma <+> text "col" <+> int (posColumnNum p)
-
-ppSpan (Span l r) =
-  text "from" <+> ppPos l <+> text "to" <+> ppPos r
-
 ppToken Nothing  = "End of file"
 ppToken (Just t) = text $ show t
 
