@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Foveran.Parsing.Parser where
+module Language.Foveran.Parsing.Parser where
 
 import           Control.Applicative
 import           Data.Maybe
@@ -8,9 +8,9 @@ import           Data.Rec
 import           Text.ParserCombinators
 import           Text.Position
 import qualified Data.Text as T
-import qualified Foveran.Parsing.Token as Tok
-import           Foveran.Syntax.Display
-import           Foveran.NameSupply (Ident)
+import qualified Language.Foveran.Parsing.Token as Tok
+import           Language.Foveran.Syntax.Display
+import           Language.Foveran.NameSupply (Ident)
 
 {------------------------------------------------------------------------------}
 binary f t1 t2 = Annot (makeSpan t1 t2) (f t1 t2)

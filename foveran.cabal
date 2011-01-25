@@ -18,4 +18,7 @@ Executable foveran
                  array >= 0.3.0.0,
                  dlist >= 0.5,
                  mtl >= 1.1.0.2
-  Main-Is: Foveran.hs
+  Main-Is:       Language/Foveran/Main.hs
+
+  Hs-Source-Dirs:src
+

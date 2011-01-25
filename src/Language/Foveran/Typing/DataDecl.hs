@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Typing.DataDecl where
+module Language.Foveran.Typing.DataDecl where
 
 import Data.Functor
 import Data.Monoid
 import Data.Rec
-import Foveran.Syntax.Display
-import Foveran.Typing.Context
-import Foveran.Typing.Checker
+import Language.Foveran.Syntax.Display
+import Language.Foveran.Typing.Context
+import Language.Foveran.Typing.Checker
 import Text.Position (Span)
-import Foveran.NameSupply (Ident)
+import Language.Foveran.NameSupply (Ident)
 import qualified Data.Text as T
 
 -- step 1: create a description for the given declaration

@@ -2,7 +2,7 @@
              GeneralizedNewtypeDeriving,
              OverloadedStrings #-}
 
-module Foveran.NameSupply where
+module Language.Foveran.NameSupply where
 
 import           Control.Applicative
 import           Data.Monoid (mappend)

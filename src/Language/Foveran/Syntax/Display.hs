@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
-module Foveran.Syntax.Display where
+module Language.Foveran.Syntax.Display where
 
-import Foveran.NameSupply (Ident)
+import Language.Foveran.NameSupply (Ident)
 import Text.Position
 import Data.Rec
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, OverloadedStrings #-}
 
-module Foveran.Parsing.Lexer where
+module Language.Foveran.Parsing.Lexer where
 
 import Control.StreamProcessor
 import Control.StreamProcessor.Positions
@@ -8,7 +8,7 @@ import Data.BooleanAlgebra
 import Text.Regexp
 import Text.CharacterSet
 import Text.LexerGenerator
-import Foveran.Parsing.Token
+import Language.Foveran.Parsing.Token
 
 lexer :: LexingError e => SP e Char (Lexeme Token)
 lexer = addPositions >>> $(makeStaticLexer

@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Typing.Checker where
+module Language.Foveran.Typing.Checker where
 
 import           Control.Monad (unless)
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In))
-import           Foveran.Syntax.LocallyNameless
-import qualified Foveran.Syntax.Checked as CS
-import           Foveran.Typing.Conversion
-import           Foveran.Typing.Context
-import           Foveran.NameSupply (Ident)
-import           Foveran.Typing.Errors
+import           Language.Foveran.Syntax.LocallyNameless
+import qualified Language.Foveran.Syntax.Checked as CS
+import           Language.Foveran.Typing.Conversion
+import           Language.Foveran.Typing.Context
+import           Language.Foveran.NameSupply (Ident)
+import           Language.Foveran.Typing.Errors
 
 {------------------------------------------------------------------------------}
 -- This is a bit small at the moment, but it might get bigger

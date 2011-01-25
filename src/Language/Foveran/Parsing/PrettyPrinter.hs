@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Parsing.PrettyPrinter where
+module Language.Foveran.Parsing.PrettyPrinter where
 
 import           Data.String
 import           Data.Rec (foldAnnot, Rec, foldRec)
 import           Text.PrettyPrintPrec
 import qualified Text.PrettyPrint as PP
-import           Foveran.Syntax.Display
+import           Language.Foveran.Syntax.Display
 import qualified Data.Text as T
 
 name = fromString . T.unpack

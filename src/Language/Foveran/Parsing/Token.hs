@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Foveran.Parsing.Token where
+module Language.Foveran.Parsing.Token where
 
 import Language.Haskell.TH.Lift
 

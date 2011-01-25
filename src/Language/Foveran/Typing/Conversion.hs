@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Typing.Conversion
+module Language.Foveran.Typing.Conversion
        ( Value (..)
        , evaluate
        , reifyType0
@@ -17,9 +17,9 @@ module Foveran.Typing.Conversion
 import Control.Applicative
 import Text.Show.Functions
 import Data.Rec
-import Foveran.NameSupply (Ident)
+import Language.Foveran.NameSupply (Ident)
 import Data.Maybe (fromMaybe)
-import Foveran.Syntax.Checked
+import Language.Foveran.Syntax.Checked
 
 -- working from “Normalisation by Evaluation for Martin-Löf Type
 -- Theory with One Universe” by Abel, Aehlig and Dybjer.

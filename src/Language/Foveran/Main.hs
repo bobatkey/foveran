@@ -8,28 +8,28 @@ import Data.Rec (AnnotRec)
 import Control.Monad (unless)
 import System.IO (stdin)
 import Text.LexerGenerator (LexingError (..), Lexeme(..))
-import Foveran.Parsing.Lexer (lexer)
-import Foveran.Parsing.Parser (file)
+import Language.Foveran.Parsing.Lexer (lexer)
+import Language.Foveran.Parsing.Parser (file)
 import Text.ParserCombinators (parse, ParsingError (..))
 import Control.StreamProcessor ((>>>))
 import Control.StreamReader (SR, (>>|))
 import Control.StreamReader.IO (onHandle)
 import Control.StreamProcessor.DecodeUTF8 (decodeUTF8, UTF8DecodeError (..))
 import Control.StreamProcessor.ByteString (deChunk)
-import Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
-import Foveran.Syntax.LocallyNameless (toLocallyNameless)
-import qualified Foveran.Syntax.Checked as CS
-import Foveran.Parsing.PrettyPrinter
+import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
+import Language.Foveran.Syntax.LocallyNameless (toLocallyNameless)
+import qualified Language.Foveran.Syntax.Checked as CS
+import Language.Foveran.Parsing.PrettyPrinter
 import Text.Position
 import Text.PrettyPrint
 import Text.PrettyPrint.IsString ()
-import qualified Foveran.Parsing.Token as Tok
-import Foveran.Typing.Conversion (Value)
-import Foveran.Typing.Context
-import Foveran.Typing.Checker
-import Foveran.Typing.Errors
-import Foveran.NameSupply (Ident)
-import Foveran.Typing.DataDecl
+import qualified Language.Foveran.Parsing.Token as Tok
+import Language.Foveran.Typing.Conversion (Value)
+import Language.Foveran.Typing.Context
+import Language.Foveran.Typing.Checker
+import Language.Foveran.Typing.Errors
+import Language.Foveran.NameSupply (Ident)
+import Language.Foveran.Typing.DataDecl
 
 ppPos p =
   text "line" <+> int (posLineNum p) <> comma <+> text "col" <+> int (posColumnNum p)

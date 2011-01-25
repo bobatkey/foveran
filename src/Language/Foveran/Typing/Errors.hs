@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Typing.Errors where
+module Language.Foveran.Typing.Errors where
 
 import           Text.PrettyPrint
 import           Text.PrettyPrint.IsString
-import           Foveran.Typing.Context
-import           Foveran.Typing.Conversion (Value, reifyType0)
-import           Foveran.Syntax.Checked (toDisplaySyntax)
-import           Foveran.NameSupply (Ident)
-import           Foveran.Parsing.PrettyPrinter
+import           Language.Foveran.Typing.Context
+import           Language.Foveran.Typing.Conversion (Value, reifyType0)
+import           Language.Foveran.Syntax.Checked (toDisplaySyntax)
+import           Language.Foveran.NameSupply (Ident)
+import           Language.Foveran.Parsing.PrettyPrinter
 import qualified Data.Text as T
 
 data TypeError

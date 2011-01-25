@@ -1,15 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Foveran.Typing.Context where
+module Language.Foveran.Typing.Context where
 
 import           Data.Functor
 import           Data.Monoid
 import qualified Data.Text as T
 import qualified Data.Map as M
 import           Data.Rec (AnnotRec)
-import           Foveran.Syntax.Checked (Term)
-import           Foveran.Typing.Conversion
-import           Foveran.NameSupply
+import           Language.Foveran.Syntax.Checked (Term)
+import           Language.Foveran.Typing.Conversion
+import           Language.Foveran.NameSupply
 
 type Context = M.Map Ident (Value, Maybe Value)
 

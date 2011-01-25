@@ -1,11 +1,11 @@
 {-# LANGUAGE TypeSynonymInstances, DeriveFunctor #-}
 
-module Foveran.Syntax.Checked where
+module Language.Foveran.Syntax.Checked where
 
 import Control.Applicative
 import Data.Rec
-import qualified Foveran.Syntax.Display as DS
-import Foveran.NameSupply
+import qualified Language.Foveran.Syntax.Display as DS
+import Language.Foveran.NameSupply
 
 -- The only difference between this and InternalSyntax is the
 -- appearance of explicit types in the “Case” expression. This is
