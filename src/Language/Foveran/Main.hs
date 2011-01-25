@@ -2,69 +2,24 @@
 
 module Main where
 
-import qualified Data.Text as T
-import qualified Data.ByteString as B
-import Data.Rec (AnnotRec)
+import Data.Text as T
+import Text.Position
+
+import System.Environment
 import Control.Monad (unless)
-import System.IO (stdin)
-import Text.LexerGenerator (LexingError (..), Lexeme(..))
-import Language.Foveran.Parsing.Lexer (lexer)
-import Language.Foveran.Parsing.Parser (file)
-import Text.ParserCombinators (parse, ParsingError (..))
-import Control.StreamProcessor ((>>>))
-import Control.StreamReader (SR, (>>|))
-import Control.StreamReader.IO (onHandle)
-import Control.StreamProcessor.DecodeUTF8 (decodeUTF8, UTF8DecodeError (..))
-import Control.StreamProcessor.ByteString (deChunk)
+import Language.Foveran.Parsing
 import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
 import Language.Foveran.Syntax.LocallyNameless (toLocallyNameless)
 import qualified Language.Foveran.Syntax.Checked as CS
 import Language.Foveran.Parsing.PrettyPrinter
-import Text.Position
 import Text.PrettyPrint
 import Text.PrettyPrint.IsString ()
-import qualified Language.Foveran.Parsing.Token as Tok
 import Language.Foveran.Typing.Conversion (Value)
 import Language.Foveran.Typing.Context
 import Language.Foveran.Typing.Checker
 import Language.Foveran.Typing.Errors
 import Language.Foveran.NameSupply (Ident)
 import Language.Foveran.Typing.DataDecl
-
-ppPos p =
-  text "line" <+> int (posLineNum p) <> comma <+> text "col" <+> int (posColumnNum p)
-
-ppSpan (Span l r) =
-  text "from" <+> ppPos l <+> text "to" <+> ppPos r
-
-instance LexingError Doc where
-    lexingErrAtEOS = text "Lexing error at End of File"
-    lexingErrOnInput c p = text "Lexing error at" <+> ppPos p <+> text "on input" <+> char c
-
-ppToken Nothing  = "End of file"
-ppToken (Just t) = text $ show t
-
-ppExpecting [] =
-    "Expecting nothing"
-ppExpecting [x] =
-    "Expecting" <+> ppToken x
-ppExpecting l =
-    "Expecting one of" $$ nest 4 (hsep (map ppToken l))
-
-instance ParsingError Tok.Token Doc where
-    parseError Nothing               expecting =
-        text "Parse error at End of File" 
-        $$ ppExpecting expecting
-    
-    parseError (Just (Lexeme _ p s)) expecting =
-        text "Parse error" <+> ppSpan p <+> text "on input" <+> text (show s)
-        $$ ppExpecting expecting
-
-instance UTF8DecodeError Doc where
-    utf8DecodeError s = "UTF-8 Decoding error:" <+> text s
-
-parseFile :: SR Doc B.ByteString [Declaration]
-parseFile = deChunk >>> decodeUTF8 >>> lexer >>| parse file
 
 data Error
     = TypeError     TypeError
@@ -146,13 +101,12 @@ runDeclCheckM (DM f) =
 
 main :: IO ()
 main = do
-  result <- onHandle stdin 8192 parseFile
-  case result of
+  filename:_ <- getArgs
+  readResult <- readFoveranFile filename
+  case readResult of 
     Left err ->
-        putStrLn $ render err
+        putStrLn $ render (ppInputError err)
     Right decls ->
         runDeclCheckM $ mapM_ checkDecl decls
-{-      flip mapM_ decls
-        $ \d -> do putStrLn $ render $ ppDecl d
-                   putStrLn ""
--}
+
+      

@@ -3,13 +3,14 @@
 module Text.ParserCombinators where
 
 import           Control.Monad
+import           Control.Monad.Error
 import           Control.Applicative
 import qualified Data.DList as DL
 import           Data.DList
-import           Text.LexerGenerator (Lexeme (..))
+import           Text.Lexeme (Lexeme (..))
 import           Text.Position
 import qualified Data.Text as T
-import           Control.StreamReader
+import           Control.StreamProcessor hiding (EOS)
 
 {------------------------------------------------------------------------------}
 data Parser tok a
@@ -108,5 +109,5 @@ parse p = case parserToStateH p of
       processInput state t
           = case advance state t of
               Left result  -> Yield result
-              Right []     -> ReaderError (parseError t (expecting state))
+              Right []     -> ReadError (parseError t (expecting state))
               Right state' -> go state'

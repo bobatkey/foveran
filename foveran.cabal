@@ -14,10 +14,9 @@ Executable foveran
                  th-lift >= 0.3,
                  bytestring >= 0.9.1.5,
                  template-haskell,
-                 QuickCheck >= 2.1.0.3,
-                 array >= 0.3.0.0,
                  dlist >= 0.5,
-                 mtl >= 1.1.0.2
+                 mtl >= 1.1.0.2,
+                 forvie >= 0.1
   Main-Is:       Language/Foveran/Main.hs
 
   Hs-Source-Dirs:src

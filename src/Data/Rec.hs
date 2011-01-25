@@ -4,6 +4,7 @@ module Data.Rec where
 
 import Data.Functor
 import Data.FreeMonad
+import Text.Position
 
 data Rec f = In (f (Rec f))
 
@@ -23,6 +24,10 @@ translateRec :: (Functor m, Functor f) =>
 translateRec f (In x) = In <$> f (translateRec f <$> x)
 
 data AnnotRec a f = Annot a (f (AnnotRec a f))
+
+instance Regioned a => Regioned (AnnotRec a f) where
+    regionLeft (Annot a _) = regionLeft a
+    regionRight (Annot a _) = regionRight a
 
 foldAnnot :: Functor f => (f x -> x) -> AnnotRec a f -> x
 foldAnnot f (Annot _ x) = f (foldAnnot f <$> x)
