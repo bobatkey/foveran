@@ -11,6 +11,3 @@ available from [https://github.com/bobatkey/Forvie](https://github.com/bobatkey/
 
 * The universe cummulativity checker is broken (doesn't extend the
     subtyping to Pis and Sigmas)
-
-* The pretty printing of terms uses the wrong name at binders, but
-    freshens properly for the bound occurences.
