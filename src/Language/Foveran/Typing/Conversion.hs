@@ -288,7 +288,7 @@ reify (VSet _)         a = reifyType a
 
 reify (VPi _ tA tB)    (VLam nm f) = \i -> let d = reflect tA (vbound i)
                                            in In $ Lam nm $ reify (tB d) (f d) (i + 1)
-reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-blah should only by VLam"
+reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-blah should only be VLam"
 
 reify (VSigma _ tA tB) e = let v1 = vfst e
                                v2 = vsnd e
