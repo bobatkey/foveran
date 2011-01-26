@@ -14,7 +14,6 @@ import           Language.Foveran.Syntax.LocallyNameless
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.Conversion
 import           Language.Foveran.Typing.Context
-import           Language.Foveran.NameSupply (Ident)
 import           Language.Foveran.Typing.Errors
 
 {------------------------------------------------------------------------------}

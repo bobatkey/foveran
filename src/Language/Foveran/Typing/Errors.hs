@@ -10,8 +10,7 @@ import           Text.PrettyPrint
 import           Text.PrettyPrint.IsString
 import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Conversion (Value, reifyType0)
-import           Language.Foveran.Syntax.Checked (toDisplaySyntax)
-import           Language.Foveran.NameSupply (Ident)
+import           Language.Foveran.Syntax.Checked (Ident, toDisplaySyntax)
 import           Language.Foveran.Parsing.PrettyPrinter
 import qualified Data.Text as T
 

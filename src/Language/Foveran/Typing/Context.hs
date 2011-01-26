@@ -19,8 +19,8 @@ import qualified Data.Text as T
 import qualified Data.Map as M
 import           Data.Rec (AnnotRec)
 import           Language.Foveran.Syntax.Checked (Term)
+import           Language.Foveran.Syntax.Identifier
 import           Language.Foveran.Typing.Conversion
-import           Language.Foveran.NameSupply
 
 -- FIXME: Make this abstract
 type Context = M.Map Ident (Value, Maybe Value)
@@ -34,7 +34,7 @@ ctxtExtend ctxt nm ty defn
         Nothing -> Just $ M.insert nm (ty, defn) ctxt
         Just _  -> Nothing
 
--- FIXME: try to find better ways of freshening names
+-- FIXME: try to find better ways of freshening names, and unify with Identifier.hs
 ctxtExtendFreshen :: Context -> Ident -> Value -> Maybe Value -> (Ident, Context)
 ctxtExtendFreshen ctxt nm ty defn
     = case M.lookup nm ctxt of
@@ -56,5 +56,5 @@ lookupDef ctxt nm = case M.lookup nm ctxt of
                       Just (ty, def) -> (ty, def)
 
 -- FIXME: this is a little confused, probably a better way exists
-contextNameSupply :: Context -> NS a -> a
-contextNameSupply ctxt (NS f) = f (M.keysSet ctxt, [])
+contextNameSupply :: Context -> NameSupply a -> a
+contextNameSupply ctxt f = runNameSupply f (M.keysSet ctxt)

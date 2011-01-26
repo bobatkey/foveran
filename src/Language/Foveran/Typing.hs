@@ -15,14 +15,13 @@ import Text.PrettyPrint.IsString ()
 import Language.Foveran.Util.PrettyPrinting
 
 import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
-import Language.Foveran.Syntax.LocallyNameless (toLocallyNameless)
+import Language.Foveran.Syntax.LocallyNameless (Ident, toLocallyNameless)
 import qualified Language.Foveran.Syntax.Checked as CS
 import Language.Foveran.Parsing.PrettyPrinter
 import Language.Foveran.Typing.Conversion (Value)
 import Language.Foveran.Typing.Context
 import Language.Foveran.Typing.Checker
 import Language.Foveran.Typing.Errors
-import Language.Foveran.NameSupply (Ident)
 import Language.Foveran.Typing.DataDecl
 
 data Error

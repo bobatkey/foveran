@@ -1,0 +1,8 @@
+– test the pretty printer by forcing a type error
+
+assume X : Set;
+assume Y : (X → X → X) → Set;
+–assume Z : (x : X) → Y x → Set;
+
+f : Y (λx y. x) → Y (λx y. y);
+f y =  y;

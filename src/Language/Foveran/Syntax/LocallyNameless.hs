@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Language.Foveran.Syntax.LocallyNameless
-    ( TermPos
+    ( Ident
+    , TermPos
     , TermCon (..)
     , toLocallyNameless
     , close
@@ -15,7 +16,7 @@ import           Text.Position (Span)
 import           Data.FreeMonad
 import qualified Data.Text as T
 import qualified Language.Foveran.Syntax.Display as DS
-import           Language.Foveran.NameSupply (Ident)
+import           Language.Foveran.Syntax.Identifier (Ident)
 
 type TermPos = AnnotRec Span TermCon
 

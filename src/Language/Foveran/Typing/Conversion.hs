@@ -16,9 +16,8 @@ module Language.Foveran.Typing.Conversion
 
 import Control.Applicative
 import Text.Show.Functions
-import Data.Rec
-import Language.Foveran.NameSupply (Ident)
 import Data.Maybe (fromMaybe)
+import Data.Rec
 import Language.Foveran.Syntax.Checked
 
 -- working from “Normalisation by Evaluation for Martin-Löf Type

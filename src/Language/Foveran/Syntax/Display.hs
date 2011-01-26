@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 module Language.Foveran.Syntax.Display
-    ( Definition (..)
+    ( Ident
+    , Definition (..)
     , Datatype (..)
     , Constructor (..)
     , Declaration (..)
@@ -11,7 +12,7 @@ module Language.Foveran.Syntax.Display
     )
     where
 
-import Language.Foveran.NameSupply (Ident)
+import Language.Foveran.Syntax.Identifier (Ident)
 import Text.Position
 import Data.Rec
 

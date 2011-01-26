@@ -12,7 +12,6 @@ import           Text.Position
 import qualified Data.Text as T
 import qualified Language.Foveran.Parsing.Token as Tok
 import           Language.Foveran.Syntax.Display
-import           Language.Foveran.NameSupply (Ident)
 
 {------------------------------------------------------------------------------}
 binary f t1 t2 = Annot (makeSpan t1 t2) (f t1 t2)

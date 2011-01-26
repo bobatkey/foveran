@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeSynonymInstances, DeriveFunctor #-}
 
 module Language.Foveran.Syntax.Checked
-    ( Term
+    ( Ident
+    , Term
     , TermCon (..)
     , tmApp
     , tmFree
@@ -18,7 +19,7 @@ module Language.Foveran.Syntax.Checked
 import           Control.Applicative
 import           Data.Rec
 import qualified Language.Foveran.Syntax.Display as DS
-import           Language.Foveran.NameSupply
+import           Language.Foveran.Syntax.Identifier
 
 -- The only difference between this and InternalSyntax is the
 -- appearance of explicit types in the “Case” expression. This is
@@ -124,18 +125,16 @@ gatheringApp :: DS.Term -> DS.Term -> DS.TermCon DS.Term
 gatheringApp (In (DS.App t1 t2)) t3 = DS.App t1 (t2 ++ [t3])
 gatheringApp t1                  t2 = DS.App t1 [t2]
 
--- FIXME: this is wrong: should put the newly chosen name in at the
--- binders
-toDisplay :: NameSupply f => TermCon (f DS.Term) -> f (DS.TermCon DS.Term)
+toDisplay :: TermCon (NameSupply DS.Term) -> NameSupply (DS.TermCon DS.Term)
 toDisplay (Free nm)               = pure $ DS.Var nm
 toDisplay (Bound i)               = DS.Var <$> getBound i
-toDisplay (Lam nm body)           = gatheringLam nm <$> bind nm body
+toDisplay (Lam nm body)           = bindK nm body $ \nm body -> pure (gatheringLam nm body)
 toDisplay (App t t')              = gatheringApp <$> t <*> t'
 toDisplay (Set i)                 = pure $ DS.Set i
 toDisplay (Pi Nothing t1 t2)      = DS.Arr <$> t1 <*> bindDummy t2
-toDisplay (Pi (Just nm) t1 t2)    = DS.Pi [nm] <$> t1 <*> bind nm t2
+toDisplay (Pi (Just nm) t1 t2)    = bindK nm t2 $ \nm t2 -> DS.Pi [nm] <$> t1 <*> pure t2
 toDisplay (Sigma Nothing t1 t2)   = DS.Prod <$> t1 <*> bindDummy t2
-toDisplay (Sigma (Just nm) t1 t2) = DS.Sigma [nm] <$> t1 <*> bind nm t2
+toDisplay (Sigma (Just nm) t1 t2) = bindK nm t2 $ \nm t2 -> DS.Sigma [nm] <$> t1 <*> pure t2
 toDisplay (Pair t1 t2)            = DS.Pair <$> t1 <*> t2
 toDisplay (Proj1 t)               = DS.Proj1 <$> t
 toDisplay (Proj2 t)               = DS.Proj2 <$> t
@@ -143,10 +142,12 @@ toDisplay (Sum t1 t2)             = DS.Sum <$> t1 <*> t2
 toDisplay (Inl t)                 = DS.Inl <$> t
 toDisplay (Inr t)                 = DS.Inr <$> t
 toDisplay (Case t1 _ _ x t2 y t3 z t4)
-                                  = DS.Case <$> t1
-                                            <*> pure x <*> bind x t2
-                                            <*> pure y <*> bind y t3
-                                            <*> pure z <*> bind z t4
+    = bindK x t2 $ \x t2 ->
+      bindK y t3 $ \y t3 ->
+      bindK z t4 $ \z t4 -> DS.Case <$> t1
+                                    <*> pure x <*> pure t2
+                                    <*> pure y <*> pure t3
+                                    <*> pure z <*> pure t4
 toDisplay Unit                    = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty
@@ -169,7 +170,7 @@ toDisplay IDesc_Sg                = pure DS.IDesc_Sg
 toDisplay IDesc_Pi                = pure DS.IDesc_Pi
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 
-toDisplaySyntax :: NameSupply f => Term -> f DS.Term
+toDisplaySyntax :: Term -> NameSupply DS.Term
 toDisplaySyntax = translateRec toDisplay
 
 {------------------------------------------------------------------------------}
