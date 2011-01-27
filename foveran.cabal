@@ -16,7 +16,8 @@ Executable foveran
                  template-haskell,
                  dlist >= 0.5,
                  mtl >= 1.1.0.2,
-                 forvie >= 0.1
+                 forvie >= 0.1,
+                 blaze-html >= 0.3.2.0
   Main-Is:       Language/Foveran/Main.hs
 
   Hs-Source-Dirs:src

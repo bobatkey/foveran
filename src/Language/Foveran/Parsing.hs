@@ -1,10 +1,11 @@
 {-# LANGUAGE TemplateHaskell, MultiParamTypeClasses, OverloadedStrings #-}
 
 -- | Implementation of the Foveran parsing process, from bytes on disk
--- up to abstract syntax trees in "Foveran.Syntax.Checked" form.
+-- up to abstract syntax trees in "Foveran.Syntax.Display" form.
 
 module Language.Foveran.Parsing
     ( readFoveranFile
+    , lexer
     , ppInputError
     )
     where
@@ -74,11 +75,15 @@ ppInputError (PE_ParsingError (Just (Lexeme _ p s)) expecting) =
 
 --------------------------------------------------------------------------------
 
-parser :: SR InputError ByteString [Declaration]
-parser =
+lexer :: SP InputError ByteString (Lexeme (Action Token))
+lexer =
     deChunk >>>
     decodeUTF8 >>>
-    $(lexerSPStatic (compileLexicalSpecification lexicalSpec)) >>>
+    $(lexerSPStatic (compileLexicalSpecification lexicalSpec))
+
+parser :: SR InputError ByteString [Declaration]
+parser =
+    lexer >>>
     exceptIgnorable >>|
     parse file
 
