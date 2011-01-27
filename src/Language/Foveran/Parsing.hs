@@ -77,7 +77,7 @@ ppInputError (PE_ParsingError (Just (Lexeme _ p s)) expecting) =
 
 lexer :: SP InputError ByteString (Lexeme (Action Token))
 lexer =
-    deChunk >>>
+    toWord8 >>>
     decodeUTF8 >>>
     $(lexerSPStatic (compileLexicalSpecification lexicalSpec))
 
