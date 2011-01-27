@@ -1,3 +1,94 @@
+{-
+
+This file defines ‘inductors’: abstract induction principles.
+
+An inductor for a type ‘A’ consists of two parts:
+ 1. A (description of) a predicate transformer H : A → IDesc A
+ 2. An induction combinator of type
+   (Φ : A → Set) → ((x : A) → semI' A A H Φ x → Φ x) → (x : A) → Φ x
+
+The basic idea is that inductors describe well-founded ways that the
+datatype ‘A’ can be explored. The predicate transformer ‘H’ takes an
+‘A’-predicate ‘Φ’ and an ‘A’-value ‘a’ and provides access to ‘Φ a’
+for all the ‘a'’ that are accessible from ‘a’. For normal structural
+induction this will be all immediate subterms of ‘a’; for complete
+structural induction this will be all proper subterms of ‘a’. An
+inductor for ‘A’ implicitly describes a well-founded ordering of the
+type ‘A’.
+
+Inductors are generalisations of recursion schemes from functional
+programming. The generalisation comes from the ability to generate
+indexed data from a recursion, meaing that the type of the final
+result can depend on the starting ‘A’ value.
+
+This file presents several ways of building up inductors using
+combinators. This contrasts to the typical approaches of building
+non-standard (i.e. not structural) induction principles in type theory:
+
+ 1. Using separate ‘match’ and ‘fixpoint’ operators along with a
+    syntactic termination checker. This is the approach taken by Coq,
+    and, I think, by Agda.
+
+ 2. Allowing arbitrary well-founded induction and deriving all other
+    induction principles from this. This is the approach taken by
+    Paulson in “Constructing Recursion Operators in Intuitionistic
+    Type Theory”. It is also possible to take this approach in a
+    system with powerful enough structural induction (which includes
+    Coq and Agda).
+
+The approach taken here has several direct inspirations:
+
+ 1. Programming using eliminators, as advocated by McBride in his
+    thesis and along with McKinna in “The View from the Left”. McBride
+    also references Gimenez for a general way of constructing a
+    complete-induction elimination principle from basic structural
+    induction.
+
+ 2. The “Data.Induction” module in the Agda standard library, written
+    (I think) by Danielsson. There, the abstract induction principles
+    are called “recursors”.
+
+ 3. The approach of deriving recursion schemes from the basic
+    iteration scheme for initial algebras as in the “Algebra of
+    Programming” literature. See, for example, Vene's thesis for a
+    categorical account.
+
+The main change in this development with respect to previous work is
+to make the predicate transformer portion be an explicit (indexed)
+description of a datatype. This allows the construction of induction
+principles that require the predicate transformer portion to be a
+functor.
+
+As it stands, there are several known shortcomings of the present work:
+
+ 1. While each of the inductors described below has an intended
+    computational behaviour, it is not possible to easily state what
+    this is. Even if it were, I don't know how to express this
+    internally within the inductor type. A possible way around this is
+    given at the end of this file, but not yet developed.
+
+ 2. It is not possible to fully complete the complete induction
+    example, due to either: lack of knowledge of the computational
+    behaviour of inductors (which prohbits the computational
+    construction of the memoisation table); or the lack of nested
+    fixpoints (which prohbits the other possible construction
+    technique). It might be possible to overcome this by constructing
+    a generic generalised “subterm” relation and using that.
+
+ 3. Only induction on non-indexed data is handled. I believe that this
+    is a minor problem, and handling indexed data just requires more
+    indicies to be ferried around to the right places.
+
+ 4. Several times in the later parts of the development, the fact that
+    descriptions form a monad, and the semantic realisation of
+    descriptions is a monad morphism is used. It would be nice if
+    these facts held definitionally.
+
+-}
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– First some basic functions that we will need. First for non-indexed
+– descriptions of functors Set → Set.
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
@@ -19,6 +110,11 @@ lift D α Φ = elimD (λD. sem D α → Set 2)
                                   })
                    D;
 
+deconstruct : (D : Desc) → µ D → sem D (µ D);
+deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Some things for indexed descriptions.
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
 semI I D X = elimID I (λD. Set 2)
                     (λi. X i)
@@ -31,6 +127,10 @@ semI I D X = elimID I (λD. Set 2)
 semI' : (I J : Set) → (I → IDesc J) → (J → Set 2) → (I → Set 2);
 semI' I J D X i = semI J (D i) X;
 
+– Composition of descriptions of indexed functors. The type of this 
+– function is deliberately phrased to look like a monadic bind operator.
+– It would be nice in the future to build in the knowledge that IDesc
+– is a monad, and let the monad rules hold definitionally.
 compose : (A B : Set) → IDesc A → (A → IDesc B) → IDesc B;
 compose A B D f = elimID A (λD. IDesc B)
                          (λa. f a)
@@ -40,6 +140,9 @@ compose A B D f = elimID A (λD. IDesc B)
                          (λC D g. 'Pi B C g)
                          D;
 
+– The semI function is actually a monad morphism. This function
+– witnesses this fact. Again, it would be nice if this held
+– definitionally.
 commute : (I J : Set) →
           (D₁ : IDesc I) →
           (D₂ : I → IDesc J) →
@@ -55,7 +158,9 @@ commute I J D₁ D₂ Φ =
          (λA D g f. λa. g a (f a))
          D₁;
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Every indexed description defines a functor. This function provides
+– the map functionality. Again, it would be nice if the functor laws
+– held definitionally.
 map : (A : Set) →
       (D : IDesc A) →
       (Φ Ψ : A → Set 2) →
@@ -72,6 +177,8 @@ map A D Φ Ψ f =
         D;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– The definition of inductors, as described above. We assume that
+– elimination into ‘Set 2’ is allowed, for flexibility.
 inductor : Set → Set 3;
 inductor A = (H : A → IDesc A) ×
              ((Φ : A → Set 2) →
@@ -79,11 +186,11 @@ inductor A = (H : A → IDesc A) ×
               (x : A) → Φ x);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-deconstruct : (D : Desc) → µ D → sem D (µ D);
-deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– every unindexed inductive type has an inductor
+– Every unindexed inductive type ‘µ D’ has an inductor. We need to
+– first express the predicate transformer part of the built-in induction
+– principle for ‘µ D’ types as an IDesc, and then show that we can
+– convert from one to the other. It might be better to provide the
+– built-in induction principle using the IDesc formulation.
 lift2 : (D : Desc) →
         (A : Set) →
         sem D A →
@@ -117,11 +224,17 @@ lift-to-lift2 D A Φ =
         D;
 
 desc-inductor : (D : Desc) → inductor (µ D);
-desc-inductor D = « λx. lift2 D (µ D) (deconstruct D x)
-                  , λΦ k. induction D Φ (λx p. k (construct D x) (lift-to-lift2 D (µ D) Φ x p))
-                  »;
+desc-inductor D =
+  « λx. lift2 D (µ D) (deconstruct D x)
+  , λΦ k. induction D Φ (λx p. k (construct D x) (lift-to-lift2 D (µ D) Φ x p))
+  »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– This is an inductor which imposes a lexicographic ordering on a pair
+– of inductors. Given a pair «a,b», one can either move down on ‘b’, 
+– leaving ‘a’ as is; or move down on ‘a’, and move to arbitrary ‘b’.
+
+– Two helper functions for constructing little ‘IDesc’s.
 bleh : (A B : Set) → A → IDesc (A × B);
 bleh A B a = 'Pi (A × B) B (λb. 'Id (A × B) «a,b»);
 
@@ -143,14 +256,31 @@ lex-inductor A AI B BI =
                    (fst p)
                    (snd p)
   »;
+– Note the use of ‘commute’ in the above definition, if the equality 
+– partially witnessed by ‘commute’ held definitionally, these parts
+– would just disappear.
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– The following inductor works for any type ‘A’, but provides a 
+– trivial inductive hypothesis. I think of this as a set equipped with
+– the “flat” ordering. Combining this with the other combinators can
+– provide a more interesting order structure.
+
+– Maybe this should be called a “cenomorphism”?
 flat : (A : Set) → inductor A;
 flat A = « λx. 'K A Unit
          , λΦ k x. k x ⋄
          »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– The following combinator works on pairs, as the lexicographic one
+– above, but encodes a different strategy: Given an element «a,b», one
+– can either move down on ‘a’ or down on ‘b’.
+
+– This construction requires the knowledge that the predicate
+– transformer is actually a functor, which we can provide here because
+– we have an explicit description.
+
 floo : (A B : Set) → B → A → IDesc (A × B);
 floo A B b a = 'Id (A × B) «a,b»;
 
@@ -179,10 +309,19 @@ pair-inductor A AI B BI =
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– adding tops and bottoms
+– The following two combinators build new inductors from old by
+– adjoining new elements to the original type, conceptually at the “top”
+– and the “bottom”, when the well-founded order is thought of as
+– having “no infinite ascending chains”. The reason for this peverse
+– inversion is thought of possible applications in proving the
+– termination of abstract interpretation/data flow analysis programs.
+
 maybe : Set → Set;
 maybe A = Unit + A;
 
+– Generate a new inductor for ‘maybe A’ from one for ‘A’. When at the
+– bottom element (‘inl ⋄’), one can move to any ‘a’. When at any ‘a’,
+– exploration proceeds according to the original inductor.
 with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
   « λx. case x for x. IDesc (maybe A) with
@@ -201,6 +340,10 @@ with-bottom A AI =
               }
   »;
 
+– Generate a new inductor for ‘maybe A’ from one for ‘A’. When at the
+– top element (‘inl ⋄’), one cannot make any move. When at any ‘a’,
+– exploration can proceed according to the original inductor, or can go
+– directly to the top element.
 with-top : (A : Set) → inductor A → inductor (maybe A);
 with-top A AI =
   « λx. case x for x. IDesc (maybe A) with
@@ -221,21 +364,42 @@ with-top A AI =
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– comonadic induction
+– As observed by Vene (and Uustalu?), many recursion schemes in
+– functional programming can be expressed as instances of a general
+– comonadic recursion scheme. This includes the derivation of primitive
+– recursion, and of course-of-values recursion.
 
-– comonads, but without the laws
+– We develop this idea here for inductors.
+
+– Comonads on ‘A’-indexed sets, but without the laws. We use IDesc to
+– describe the functor part, which ensures that it is definitely a
+– functor.
 comonad : Set → Set 3;
 comonad A = (W      : A → IDesc A) ×
             (counit : (P : A → Set 2) → (a : A) → semI' A A W P a → P a) ×
 	    (cojoin : (P : A → Set 2) → (a : A) → semI' A A W P a → semI' A A W (semI' A A W P) a) ×
             Unit;
 
-counit : (A : Set) → (W : comonad A) → (P : A → Set 2) → (a : A) → semI' A A (fst W) P a → P a;
+– Projection functions for comonads. We’ll just use ‘fst W’ to get the
+– functor part of the comonad.
+counit : (A : Set) → (W : comonad A) →
+         (P : A → Set 2) →
+         (a : A) →
+         semI' A A (fst W) P a →
+         P a;
 counit A W = fst (snd W);
 
-cojoin : (A : Set) → (W : comonad A) → (P : A → Set 2) → (a : A) → semI' A A (fst W) P a → semI' A A (fst W) (semI' A A (fst W) P) a;
+cojoin : (A : Set) → (W : comonad A) →
+         (P : A → Set 2) →
+         (a : A) →
+         semI' A A (fst W) P a →
+         semI' A A (fst W) (semI' A A (fst W) P) a;
 cojoin A W = fst (snd (snd W));
 
+– Given a inductor some type ‘A’, a comonad on ‘A’-indexed sets, and a
+– distributive law relating the comonad to the predicate transformer of
+– the inductor, this function constructs an inductor for ‘A’ where the
+– inductive hypothesis has been augmented by the comonad.
 comonadic-inductor : (A  : Set) →
                      (W  : comonad A) →
                      (AI : inductor A) →
@@ -260,6 +424,27 @@ comonadic-inductor A W AI d =
                                                     φ)))
                                 a)
   »;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Given a inductive proof of some property Ψ with respect to some inductor, we
+– can “fold” it into an inductor. This is the induction version of the primitive
+– recursion scheme.
+primitive-inductor : (A  : Set) →
+                     (AI : inductor A) →
+                     (Ψ  : A → Set) →
+                     (k  : (x : A) → semI' A A (fst AI) (λa. Ψ a) x → Ψ x) →
+                     inductor A;
+primitive-inductor A AI Ψ k =
+  comonadic-inductor
+    A
+    « λa. 'Pair A ('K A (Ψ a)) ('Id A a),
+    « λΦ a p. snd p,
+    « λΦ a p. « fst p, p », ⋄ »»»
+    AI
+    (λΦ a φ.
+      « k a (map A (fst AI a) (λa. Ψ a × Φ a) (λa. Ψ a) (λa φ. fst φ) φ)
+      , map A (fst AI a) (λa. Ψ a × Φ a) (λa. Φ a) (λa φ. snd φ) φ
+      »);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – This is an attempt to define complete induction by making use of a
@@ -312,21 +497,20 @@ complete-comonad A AI =
 -}
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– Given a inductive proof of some property Ψ with respect to some inductor, we
-– can “fold” it into an inductor. This is the induction version of the primitive
-– recursion scheme.
-primitive-inductor : (A  : Set) →
-                     (AI : inductor A) →
-                     (Ψ  : A → Set) →
-                     (k  : (x : A) → semI' A A (fst AI) (λa. Ψ a) x → Ψ x) →
-                     inductor A;
-primitive-inductor A AI Ψ k =
-  comonadic-inductor A
-                     « λa. 'Pair A ('K A (Ψ a)) ('Id A a),
-		     « λΦ a p. snd p,
-                     « λΦ a p. « fst p, p », ⋄ »»»
-                     AI
-                     (λΦ a φ.
-                         « k a (map A (fst AI a) (λa. Ψ a × Φ a) (λa. Ψ a) (λa φ. fst φ) φ)
-                         , map A (fst AI a) (λa. Ψ a × Φ a) (λa. Φ a) (λa φ. snd φ) φ
-                         »);
+– Possible alternative formulation of inductors that works towards
+– statement of their computational behaviour.
+
+– The idea is a explicit type of “substructure” is pulled out. For
+– instance, for an inductor for the type ‘µ D’ the substructure type
+– would be ‘sem D (µ D)’. This makes the description of inductor more
+– like the abstract categorical formulation.
+inductor2 : Set → Set 3;
+inductor2 A = (B    : Set) ×
+              (cons : B → A) ×
+              (H    : B → IDesc A) ×
+              ((Φ : A → Set 2) →
+               ((x : B) → semI' B A H Φ x → Φ (cons x)) →
+               (x : A) → Φ x);
+
+– Now we can expect that attempting to reduce against (cons b) should
+– do something, computationally.
