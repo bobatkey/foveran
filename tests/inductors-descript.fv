@@ -3,18 +3,23 @@
 This file defines ‘inductors’: abstract induction principles.
 
 An inductor for a type ‘A’ consists of two parts:
- 1. A (description of) a predicate transformer H : A → IDesc A
+
+ 1. A predicate transformer ‘H : (A → Set) → (A → Set)’. This will
+    actually be a description of a predicate transformer, so it will
+    have type ’A → IDesc A’. The ‘semI'’ function (defined below)
+    realises descriptions as actual predicate transformers.
+
  2. An induction combinator of type
    (Φ : A → Set) → ((x : A) → semI' A A H Φ x → Φ x) → (x : A) → Φ x
 
-The basic idea is that inductors describe well-founded ways that the
-datatype ‘A’ can be explored. The predicate transformer ‘H’ takes an
-‘A’-predicate ‘Φ’ and an ‘A’-value ‘a’ and provides access to ‘Φ a’
-for all the ‘a'’ that are accessible from ‘a’. For normal structural
-induction this will be all immediate subterms of ‘a’; for complete
-structural induction this will be all proper subterms of ‘a’. An
-inductor for ‘A’ implicitly describes a well-founded ordering of the
-type ‘A’.
+The basic idea is that inductors describe and implement well-founded
+ways that the datatype ‘A’ can be explored. The predicate transformer
+‘H’ takes an ‘A’-predicate ‘Φ’ and an ‘A’-value ‘a’ and provides
+access to ‘Φ a₁’ for all the ‘a₁’ that are accessible from ‘a’. For
+normal structural induction this will be all immediate subterms of
+‘a’; for complete structural induction this will be all proper
+subterms of ‘a’. An inductor for ‘A’ implicitly describes a
+well-founded ordering of the type ‘A’.
 
 Inductors are generalisations of recursion schemes from functional
 programming. The generalisation comes from the ability to generate
@@ -110,8 +115,31 @@ lift D α Φ = elimD (λD. sem D α → Set 2)
                                   })
                    D;
 
+all : (D : Desc) →
+      (X : Set) →
+      (P : X → Set 2) →
+      (p : (x : X) → P x) →
+      (xs : sem D X) →
+      lift D X P xs ;
+all D X P p = elimD (\D. (xs : sem D X) → lift D X P xs)
+                    (\A x. ())
+                    (\x. p x)
+                    (\F G f g x. «f (fst x), g (snd x)»)
+                    (\F G f g x. case x for d. lift (F “+” G) X P d with
+                                    { inl y. f y
+                                    ; inr z. g z
+                                    }) 
+                   D;
+
 deconstruct : (D : Desc) → µ D → sem D (µ D);
 deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
+
+caseD : (D : Desc) →
+        (Φ : µ D → Set 2) →
+        ((x : sem D (µ D)) → Φ (construct D x)) →
+        (x : µ D) → Φ x;
+caseD D Φ k =
+  induction D Φ (λx φ. k x);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Some things for indexed descriptions.
@@ -223,6 +251,24 @@ lift-to-lift2 D A Φ =
               })
         D;
 
+lift2-to-lift : (D : Desc) →
+                (A : Set) →
+                (Φ : A → Set 2) →
+                (x : sem D A) →
+                semI' (sem D A) A (lift2 D A) Φ x →
+                lift D A Φ x;
+lift2-to-lift D A Φ =
+  elimD (λD'. (x : sem D' A) → semI' (sem D' A) A (lift2 D' A) Φ x → lift D' A Φ x)
+        (λA x u. ⋄)
+        (λx p. p)
+        (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
+        (λD₁ D₂ f₁ f₂ x.
+            case x for x. semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x → lift (D₁ “+” D₂) A Φ x with
+              { inl y. λa. f₁ y a
+              ; inr z. λb. f₂ z b
+              })
+        D;
+
 desc-inductor : (D : Desc) → inductor (µ D);
 desc-inductor D =
   « λx. lift2 D (µ D) (deconstruct D x)
@@ -325,18 +371,20 @@ maybe A = Unit + A;
 with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
   « λx. case x for x. IDesc (maybe A) with
-         { inl u. 'Pi (maybe A) A (λa. 'Id (maybe A) (inr a))
-         ; inr a. compose A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a))
-         }
+          { inl u. 'Pi (maybe A) A (λa. 'Id (maybe A) (inr a))
+          ; inr a. compose A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a))
+          }
   , λΦ k x. case x for x. Φ x with
-              { inl u. k (inl u)
-                          (snd AI (λa. Φ (inr a))
-                               (λa φ. k (inr a)
-                                        (commute A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a)) Φ φ)))
-              ; inr a. snd AI (λa. Φ (inr a))
+              { inl u.
+                  k (inl u)
+                    (snd AI (λa. Φ (inr a))
                             (λa φ. k (inr a)
-                                     (commute A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a)) Φ φ))
-                            a
+                                     (commute A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a)) Φ φ)))
+              ; inr a.
+                  snd AI (λa. Φ (inr a))
+                         (λa φ. k (inr a)
+                                  (commute A (maybe A) (fst AI a) (λa. 'Id (maybe A) (inr a)) Φ φ))
+                         a
               }
   »;
 
@@ -437,14 +485,41 @@ primitive-inductor : (A  : Set) →
 primitive-inductor A AI Ψ k =
   comonadic-inductor
     A
-    « λa. 'Pair A ('K A (Ψ a)) ('Id A a),
-    « λΦ a p. snd p,
-    « λΦ a p. « fst p, p », ⋄ »»»
+    « λa. 'Pair A ('K A (Ψ a)) ('Id A a), – the comonad's functor
+    « λΦ a p. snd p,                      – the counit
+    « λΦ a p. « fst p, p », ⋄ »»»         – the cojoin
     AI
     (λΦ a φ.
       « k a (map A (fst AI a) (λa. Ψ a × Φ a) (λa. Ψ a) (λa φ. fst φ) φ)
       , map A (fst AI a) (λa. Ψ a × Φ a) (λa. Φ a) (λa φ. snd φ) φ
       »);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Complete Induction
+
+– The main application of the comonadic induction rule is to complete
+– induction, where all of the ‘lower’ results of the computation are
+– available.
+
+– In the recursion schemes world, Uustalu and Vene showed that there
+– are two possible ways of defining something that looks like complete
+– recursion, using least and greatest fixpoints.
+
+– In the inductor world, we want to instantiate the comonadic
+– induction scheme with the comonad with the following carrier:
+– 
+–   W Φ = µ Y. (Φ × H Y)
+–
+
+– where H is the induction hypothesis builder of the inductor that we
+– are building on. Not that, because this type is indexed by A and the
+– use of H controls the amount of available unfolding, there would be no
+– difference between least and greatest fix points here.
+
+– Unfortunately, it is not possible to express this data structure in
+– this language as it stands because descriptions of types are not
+– closed under taking fix points. An alternative approach is to compute
+– the required description of a type. We explore this below.
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – This is an attempt to define complete induction by making use of a
@@ -456,13 +531,13 @@ primitive-inductor A AI Ψ k =
 – something else is going wrong. It might also be a consequence of the way that 
 – the inductor type is defined (without a “sub-structure” type).
 
-– ‘swizzle’ ignores the data stored in the argument φ, it is only using it for 
+– ‘collapse’ ignores the data stored in the argument φ, it is only using it for 
 – its structure. I'm fairly sure this is the right thing to do.
-swizzle : (A : Set) →
-          (H : IDesc A) →
-          (φ : semI A H (λa. IDesc A)) →
-          IDesc A;
-swizzle A =
+collapse : (A : Set) →
+           (H : IDesc A) →
+           (φ : semI A H (λa. IDesc A)) →
+           IDesc A;
+collapse A =
   elimID A (λD. semI A D (λa. IDesc A) → IDesc A)
          (λa D. D)
          (λA' a'. 'K A A')
@@ -475,7 +550,11 @@ complete-carrier : (A  : Set) →
                    A → IDesc A;
 complete-carrier A AI =
   snd AI (λa. IDesc A)
-         (λa φ. 'Pair A ('Id A a) (swizzle A (fst AI a) φ));
+         (λa φ. 'Pair A ('Id A a) (collapse A (fst AI a) φ));
+
+– The problem now is that, when we provide ‘complete-carrier’ with a
+– concrete ‘A’, the system does not know anything about how such a thing
+– will reduce. So we cannot define the counit.
 
 {-
 complete-counit :
@@ -485,16 +564,330 @@ complete-counit :
 complete-counit A AI Φ =
   snd AI (λa. semI' A A (complete-carrier A AI) Φ a → Φ a)
       (λa d. ());
-
-complete-comonad : (A  : Set) →
-                   (AI : inductor A) →
-                   comonad A;
-complete-comonad A AI =
-  « complete-carrier A AI ,
-  « () ,
-  « () ,
-    ⋄ »»»;
 -}
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– This is a successful attempt to construct the carrier for complete
+– induction, but this time specialising only to the case when the base
+– inductor is the one derived from an inductive type. In this case, we know
+– that the necessary reduction steps will take place and we will be able to
+– define the counit, cojoin and so on.
+
+– The function ‘collapse2’ takes something in ‘\hat{D} (λx. IDesc X)
+– x’ and returns a description of composing \hat{D} with all the
+– descriptions stored at the leaves of the arguments. This
+– circumlocution is required in order to define the type we want
+– recursively.
+–
+– The ‘step’ and ‘unstep’ functions below witness the conversions back
+– and forth.
+collapse2 : (D : Desc) →
+            (X : Set) →
+            (x : sem D X) →
+            (φ : lift D X (λx. IDesc X) x) →
+            IDesc X;
+collapse2 D X =
+  elimD (λD'. (x : sem D' X) → lift D' X (λx. IDesc X) x → IDesc X)
+        (λA x u. 'K X Unit)
+        (λx ID. ID)
+        (λD₁ D₂ f₁ f₂ x p. 'Pair X (f₁ (fst x) (fst p)) (f₂ (snd x) (snd p)))
+        (λD₁ D₂ f₁ f₂ x. case x for x. lift (D₁ “+” D₂) X (λx. IDesc X) x → IDesc X with
+                           { inl x₁. f₁ x₁
+                           ; inr x₂. f₂ x₂
+                           })
+        D;
+
+step :
+  (D : Desc) →
+  (Ψ : µ D → IDesc (µ D)) →
+  (Φ : µ D → Set 2) →
+  (x : sem D (µ D)) →
+  lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+  semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ;
+step D Ψ Φ =
+  elimD (λD'. (x : sem D' (µ D)) →
+              lift D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+              semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ)
+    (λA x u. ⋄)
+    (λx p. p)
+    (λD₁ D₂ step₁ step₂ x p.
+      « step₁ (fst x) (fst p)
+      , step₂ (snd x) (snd p)
+      »)
+    (λD₁ D₂ step₁ step₂ x.
+      case x for x. lift (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+                    semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ
+                    with
+        { inl x₁. step₁ x₁
+        ; inr x₂. step₂ x₂
+        })
+    D;
+
+unstep :
+  (D : Desc) →
+  (Ψ : µ D → IDesc (µ D)) →
+  (Φ : µ D → Set 2) →
+  (x : sem D (µ D)) →
+  semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
+  lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x;
+unstep D Ψ Φ =
+  elimD (λD'. (x : sem D' (µ D)) →
+              semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
+              lift D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x)
+    (λA x u. ⋄)
+    (λx p. p)
+    (λD₁ D₂ unstep₁ unstep₂ x p.
+      « unstep₁ (fst x) (fst p)
+      , unstep₂ (snd x) (snd p)
+      »)
+    (λD₁ D₂ unstep₁ unstep₂ x.
+      case x for x. semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
+                    lift (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x with
+        { inl x₁. unstep₁ x₁
+        ; inr x₂. unstep₂ x₂
+        })
+    D;
+
+– We can now define the carrier for complete induction on an inductive
+– type by recursion on the structure of the element that is currently
+– being observed.
+complete2-carrier : (D : Desc) → µ D → IDesc (µ D);
+complete2-carrier D =
+  induction D (λx. IDesc (µ D))
+    (λx φ. 'Pair (µ D) ('Id (µ D) (construct D x))
+                       (collapse2 D (µ D) x φ));
+
+– The counit is effectively just first projection.
+complete2-counit :
+  (D : Desc) →
+  (Φ : µ D → Set 2) → (x : µ D) → semI' (µ D) (µ D) (complete2-carrier D) Φ x → Φ x;
+complete2-counit D Φ =
+  caseD D (λx. semI' (µ D) (µ D) (complete2-carrier D) Φ x → Φ x)
+        (λx p. fst p);
+
+– The second projection will also be useful. It retrieves the
+– memoisation table below the current element. We use the ‘unstep’
+– function to make such that this definition is meaningful and usable.
+complete2-snd :
+  (D : Desc) →
+  (Φ : µ D → Set 2) →
+  (x : µ D) →
+  semI' (µ D) (µ D) (complete2-carrier D) Φ x →
+  lift D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x);
+complete2-snd D Φ =
+  caseD D (λx. semI' (µ D) (µ D) (complete2-carrier D) Φ x →
+               lift D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x))
+    (λx p. unstep D (complete2-carrier D) Φ x (snd p));
+
+– This other second projection goes an extra step to translate between
+– the computed lifting type and the of description the lifting.
+complete2-snd2 :
+  (D : Desc) →
+  (Φ : µ D → Set 2) →
+  (x : µ D) →
+  semI' (µ D) (µ D) (complete2-carrier D) Φ x →
+  semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x;
+complete2-snd2 D Φ x p =
+  lift-to-lift2 D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x) (complete2-snd D Φ x p);
+
+
+– The lifting ‘lift D’ has similar structure to an applicative
+– functor. This is used in the definitions of the cojoin and the
+– distributive law.
+apply :
+ (D : Desc) →
+ (A : Set) →
+ (Φ Ψ : A → Set 2) →
+ (x : sem D A) →
+ lift D A (λa. Φ a → Ψ a) x →
+ lift D A Φ x →
+ lift D A Ψ x;
+apply D A Φ Ψ =
+  elimD (λD. (x : sem D A) →
+             lift D A (λa. Φ a → Ψ a) x →
+             lift D A Φ x →
+             lift D A Ψ x)
+    (λA a u₁ u₂. ⋄)
+    (λx f. f)
+    (λD₁ D₂ ap₁ ap₂ x f φ. « ap₁ (fst x) (fst f) (fst φ), ap₂ (snd x) (snd f) (snd φ) »)
+    (λD₁ D₂ ap₁ ap₂ x.
+      case x for x. lift (D₁ “+” D₂) A (λa. Φ a → Ψ a) x →
+                    lift (D₁ “+” D₂) A Φ x →
+                    lift (D₁ “+” D₂) A Ψ x with
+        { inl x₁. ap₁ x₁
+        ; inr x₂. ap₂ x₂
+        })
+    D;
+
+– One direction of truth preservation gives the unit. This isn't
+– actually used below, but is here for completeness.
+unit : (A : Set) →
+       (D : Desc) →
+       (x : sem D A) →
+       lift D A (λx. Unit) x;
+unit A = elimD
+  (λD. (x : sem D A) → lift D A (λx. Unit) x)
+  (λA x. ⋄)
+  (λa. ⋄)
+  (λD₁ D₂ unit₁ unit₂ x.
+    « unit₁ (fst x), unit₂ (snd x) »)
+  (λD₁ D₂ unit₁ unit₂ x.
+    case x for x. lift (D₁ “+” D₂) A (λx. Unit) x with
+      { inl x₁. unit₁ x₁
+      ; inr x₂. unit₂ x₂
+      });
+
+– We can now define the cojoin of the complete-induction comonad.
+complete2-cojoin :
+  (D : Desc) →
+  (Φ : µ D → Set 2) →
+  (x : µ D) →
+  semI' (µ D) (µ D) (complete2-carrier D) Φ x →
+  semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x;
+complete2-cojoin D Φ =
+  induction D
+    (λx. semI' (µ D) (µ D) (complete2-carrier D) Φ x →
+         semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x)
+    (λx p q.
+      « q
+      , step D (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x
+          (apply D (µ D)
+            (semI' (µ D) (µ D) (complete2-carrier D) Φ)
+            (semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ))
+            x
+            p
+            (complete2-snd D Φ (construct D x) q))
+      »);
+
+– And the distributive law. Given the structure exposed above, this
+– isn't quite as scary as it looks. Quite a lot of the text is composed
+– of type annotations due to the lack of any kind of type reconstruction
+– in this system. Also, the ‘step’ and ‘lift2-to-lift’ are basically
+– just bureaucratic fluff.
+complete2-dist :
+  (D : Desc) →
+  (P : µ D → Set 2) →
+  (x : µ D) →
+  semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x →
+  semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P) x;
+complete2-dist D P =
+  induction D
+    (λx. semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x →
+         semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P) x)
+    (λx dist y.
+      « map (µ D) (fst (desc-inductor D) (construct D x))
+          (semI' (µ D) (µ D) (complete2-carrier D) P)
+          P
+          (complete2-counit D P)
+          y
+      , step D (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P)
+          x
+          (apply D (µ D)
+            (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
+            (semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P))
+            x
+            dist
+            (lift2-to-lift D (µ D)
+              (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
+              x
+              (map (µ D) (fst (desc-inductor D) (construct D x))
+                (semI' (µ D) (µ D) (complete2-carrier D) P)
+                (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
+                (complete2-snd2 D P)
+                y)))
+      »);
+
+– And now, after all that, a new induction principle for ‘µ D’:
+complete-inductor :
+  (D : Desc) →
+  inductor (µ D);
+complete-inductor D =
+  comonadic-inductor (µ D)
+    « complete2-carrier D, « complete2-counit D, « complete2-cojoin D, ⋄ »»»
+    (desc-inductor D)
+    (complete2-dist D);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Enough abstract nonsense. Let's try out all this theory on a proper
+– real world problem close to functional programmer's hearts: fibonacci.
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+– To keep with the theme of this file, these should be expressed as
+– inductors, but it is just easier to do it like this for now.
+caseNat :
+  (Φ : Nat → Set 2) →
+  (Φ zero) →
+  ((n : Nat) → Φ (succ n)) →
+  (n : Nat) → Φ n;
+caseNat Φ φzero φsucc =
+  induction NatDesc Φ
+    (λx p. case x for x. Φ (construct NatDesc x) with
+             { inl u. φzero
+             ; inr n. φsucc n
+             });
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
+                    });
+
+– Adding natural numbers.
+add : Nat → Nat → Nat;
+add n₁ n₂ = natInduction (λx. Nat) n₂ (λx. succ) n₁;
+
+one : Nat;
+one = succ zero;
+
+two : Nat;
+two = add one one;
+
+four : Nat;
+four = add two two;
+
+five : Nat;
+five = succ four;
+
+eight : Nat;
+eight = add four four;
+
+P : Nat → Set 2;
+P n = semI' Nat Nat (fst (complete-inductor NatDesc)) (λn. Nat) n → Nat;
+
+fibonacci : Nat → Nat;
+fibonacci =
+  snd (complete-inductor NatDesc) (λn. Nat)
+    (caseNat P
+       (λd. one) – fibonacci 0 = 1
+       (caseNat (λn. P (succ n))
+         (λd. one) – fibonacci 1 = 1
+         (λn p. add (fst p) (complete2-counit NatDesc (λn. Nat) n (snd p)))));
+
+– Note that we had to use the counit to get hold of next number in the
+– table below the one that was opened up by doing the case
+– analysis. This is a bit untidy.
+
+
+– A test, using Leibniz equality as the comparison.
+nat-equal : Nat → Nat → Set 1;
+nat-equal n₁ n₂ = (F : Nat → Set) → F n₁ → F n₂;
+
+– This will make the typechecker normalise both sides and compare
+– them. If this works, the implementation above will have computed
+– fibonacci 5 correctly.
+test : nat-equal (fibonacci five) eight;
+test = λF x. x;
+
+– Yay it works!
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Possible alternative formulation of inductors that works towards
@@ -514,3 +907,8 @@ inductor2 A = (B    : Set) ×
 
 – Now we can expect that attempting to reduce against (cons b) should
 – do something, computationally.
+
+– Given the difficulty with defining a carrier for complete induction,
+– I now think that the ‘inductor2’ formulation is more likely to be
+– the correct one. Also, we seemed to need ‘caseNat’ above to actually
+– get anywhere.
