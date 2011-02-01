@@ -109,6 +109,7 @@ c) MAppend must convert to function composition
 
 I guess that there should be a semantic function that takes in the
 lists of 'B' values and basically maps them to 'C -> C' values, using
-(semantic) composition.
+(semantic) composition. A neutral B value becomes a neutral (Lam (F
+x)) value.
 
 -}
