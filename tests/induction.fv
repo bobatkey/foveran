@@ -38,7 +38,7 @@ all D X P p = elimD (\D. (xs : sem D X) → lift D X P xs)
 
 --assume induction : (D : Desc) →
 --                   (P : µ D → Set 2) →
---                   (k : (x : sem D (µ D)) → lift D (µ D) P x → P (construct D x)) →
+--                   (k : (x : sem D (µ D)) → lift D (µ D) P x → P (construct x)) →
 --                   (x : µ D) →
 --                   P x;
 
@@ -53,7 +53,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
@@ -75,7 +75,7 @@ listInduction : (A : Set) →
                 (l : List A) → Φ l;
 listInduction A Φ pnil pcons =
   induction (ListDesc A) Φ
-    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct (ListDesc A) x) with
+    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct x) with
             { inl u. λu'. pnil
             ; inr p. λih. pcons (fst p) (snd p) (snd ih)
             });

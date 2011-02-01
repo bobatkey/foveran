@@ -136,7 +136,7 @@ deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
 
 caseD : (D : Desc) →
         (Φ : µ D → Set 2) →
-        ((x : sem D (µ D)) → Φ (construct D x)) →
+        ((x : sem D (µ D)) → Φ (construct x)) →
         (x : µ D) → Φ x;
 caseD D Φ k =
   induction D Φ (λx φ. k x);
@@ -272,7 +272,7 @@ lift2-to-lift D A Φ =
 desc-inductor : (D : Desc) → inductor (µ D);
 desc-inductor D =
   « λx. lift2 D (µ D) (deconstruct D x)
-  , λΦ k. induction D Φ (λx p. k (construct D x) (lift-to-lift2 D (µ D) Φ x p))
+  , λΦ k. induction D Φ (λx p. k (construct x) (lift-to-lift2 D (µ D) Φ x p))
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -654,7 +654,7 @@ unstep D Ψ Φ =
 complete2-carrier : (D : Desc) → µ D → IDesc (µ D);
 complete2-carrier D =
   induction D (λx. IDesc (µ D))
-    (λx φ. 'Pair (µ D) ('Id (µ D) (construct D x))
+    (λx φ. 'Pair (µ D) ('Id (µ D) (construct x))
                        (collapse2 D (µ D) x φ));
 
 – The counit is effectively just first projection.
@@ -756,7 +756,7 @@ complete2-cojoin D Φ =
             (semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ))
             x
             p
-            (complete2-snd D Φ (construct D x) q))
+            (complete2-snd D Φ (construct x) q))
       »);
 
 – And the distributive law. Given the structure exposed above, this
@@ -775,7 +775,7 @@ complete2-dist D P =
     (λx. semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x →
          semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P) x)
     (λx dist y.
-      « map (µ D) (fst (desc-inductor D) (construct D x))
+      « map (µ D) (fst (desc-inductor D) (construct x))
           (semI' (µ D) (µ D) (complete2-carrier D) P)
           P
           (complete2-counit D P)
@@ -790,7 +790,7 @@ complete2-dist D P =
             (lift2-to-lift D (µ D)
               (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
               x
-              (map (µ D) (fst (desc-inductor D) (construct D x))
+              (map (µ D) (fst (desc-inductor D) (construct x))
                 (semI' (µ D) (µ D) (complete2-carrier D) P)
                 (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
                 (complete2-snd2 D P)
@@ -825,7 +825,7 @@ caseNat :
   (n : Nat) → Φ n;
 caseNat Φ φzero φsucc =
   induction NatDesc Φ
-    (λx p. case x for x. Φ (construct NatDesc x) with
+    (λx p. case x for x. Φ (construct x) with
              { inl u. φzero
              ; inr n. φsucc n
              });
@@ -836,7 +836,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });

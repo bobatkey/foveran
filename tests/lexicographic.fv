@@ -32,7 +32,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φzero φsucc =
    induction NatDesc Φ
-             (λx. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+             (λx. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                      { inl u. λu'. φzero
                      ; inr n. λφn. φsucc n φn
                      });
@@ -55,12 +55,12 @@ lex : (D₁ D₂ : Desc) →
       (k : (x : sem D₁ (µ D₁)) →
            (y : sem D₂ (µ D₂)) →
            lift D₁ (µ D₁) (λx. (y : µ D₂) → Φ x y) x →
-           lift D₂ (µ D₂) (λy. Φ (construct D₁ x) y) y →
-           Φ (construct D₁ x) (construct D₂ y)) →
+           lift D₂ (µ D₂) (λy. Φ (construct x) y) y →
+           Φ (construct x) (construct y)) →
       (x : µ D₁) → (y : µ D₂) → Φ x y;
 lex D₁ D₂ Φ k =
   induction D₁ (λx. (y : µ D₂) → Φ x y)
-            (λx φx. induction D₂ (Φ (construct D₁ x))
+            (λx φx. induction D₂ (Φ (construct x))
                               (λy φy. k x y φx φy));
 
 --assume induction : (D : Desc) →
@@ -101,7 +101,7 @@ induct A I = snd (snd (snd I));
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – every description's µ has an inductor:
 desc-inductor : (D : Desc) → inductor (µ D);
-desc-inductor D = « sem D (µ D), « construct D, « lift D (µ D), induction D »»»;
+desc-inductor D = « sem D (µ D), « λx. construct x, « lift D (µ D), induction D »»»;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – combination by lexicographic induction
@@ -112,7 +112,7 @@ lexico-inductor A AI B BI =
   « subCarrier A AI × subCarrier B BI,
   « λp. «cons A AI (fst p), cons B BI (snd p)»,
   « λΦ p.   indHyp A AI (λa. (b : B) → Φ «a,b») (fst p)
-           × indHyp B BI (λb. Φ «cons A AI (fst p), b») (snd p),
+          × indHyp B BI (λb. Φ «cons A AI (fst p), b») (snd p),
   λΦ k p. induct A AI (λa. (b : B) → Φ «a,b»)
                   (λa φa. induct B BI (λb. Φ «cons A AI a, b»)
                                   (λb φb. k «a,b» «φa, φb»))

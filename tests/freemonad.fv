@@ -47,7 +47,7 @@ FM : Desc → Set → Set ;
 FM D A = µ (DescFM D A) ;
 
 return : (D : Desc) → (A : Set) → A → FM D A ;
-return D A a = construct (DescFM D A) (inl a) ;
+return D A a = construct (inl a) ;
 
 bind : (D : Desc) → (A B : Set) → FM D A → (A → FM D B) → FM D B ;
 bind D A B a f
@@ -55,7 +55,7 @@ bind D A B a f
          (FM D B)
          (λx. case x for d. FM D B with
                  { inl a. f a
-                 ; inr x. construct (DescFM D B) (inr x)
+                 ; inr x. construct (inr x)
                  })
          a;
 

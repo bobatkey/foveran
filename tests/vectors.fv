@@ -75,7 +75,7 @@ natInduction : (P : Nat → Set 2) →
                (n : Nat) → P n;
 natInduction P p0 pS =
   induction NatDesc P
-            (\x. case x for x. lift NatDesc Nat P x → P (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat P x → P (construct x) with
                     { inl u. \u'. p0
                     ; inr n. \pn. pS n pn
                     });

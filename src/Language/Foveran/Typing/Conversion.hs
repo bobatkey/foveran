@@ -42,7 +42,7 @@ data Value
     | VDesc_Prod Value Value
     | VDesc_Sum  Value Value
     | VMu        Value
-    | VConstruct Value  Value
+    | VConstruct Value
       
     | VIDesc      Value
     | VIDesc_K    Value Value
@@ -229,7 +229,7 @@ vall = VLam "D" $ \vF ->
 vinduction :: Value -> Value -> Value -> Value -> Value
 vinduction vF vP vK = loop
     where
-      loop (VConstruct _ x) = vK $$ x $$ (vall $$ vF $$ (VMu vF) $$ vP $$ (VLam "x" loop) $$ x)
+      loop (VConstruct x) = vK $$ x $$ (vall $$ vF $$ (VMu vF) $$ vP $$ (VLam "x" loop) $$ x)
       loop (VNeutral n) =
           reflect (vP $$ VNeutral n)
                   (pure (In Induction)
@@ -237,7 +237,7 @@ vinduction vF vP vK = loop
                    `tmApp` reify (VMu vF .->. VSet 2) vP
                    `tmApp` reify (VPi (Just "x") (vsem $$ vF $$ VMu vF) $ \x ->
                                   (vlift $$ vF $$ VMu vF $$ vP $$ x) .->.
-                                  vP $$ VConstruct vF x)
+                                  vP $$ VConstruct x)
                                  vK
                    `tmApp` n)
 
@@ -304,8 +304,7 @@ reify VDesc            (VDesc_K v)        = \i -> In $ Desc_K (reifyType v i)
 reify VDesc            VDesc_Id           = \i -> In $ Desc_Id
 reify VDesc            (VDesc_Prod v1 v2) = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
 reify VDesc            (VDesc_Sum v1 v2)  = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
-reify (VMu tA)         (VConstruct v1 v2) = pure (In Construct) `tmApp` reify VDesc v1
-                                                                `tmApp` reify (vsem $$ v1 $$ (VMu v1)) v2
+reify (VMu tA)         (VConstruct v)     = \i -> In $ Construct (reify (vsem $$ tA $$ (VMu tA)) v i)
 reify (VIDesc tI)      (VIDesc_Id i x)    = pure (In IDesc_Id) `tmApp` reifyType i
                                                                `tmApp` reify i x
 reify (VIDesc tI)      (VIDesc_K i a)     = pure (In IDesc_K) `tmApp` reifyType i
@@ -380,7 +379,7 @@ eval Desc_Elim          = pure (VLam "P" $ \p ->
                                 VLam "Tg" $ \tg ->
                                 vdesc_elim p k i pr su tg)
 eval (Mu t)             = VMu <$> t
-eval Construct          = pure (VLam "F" $ \f -> VLam "x" $ \x -> VConstruct f x)
+eval (Construct t)      = VConstruct <$> t
 eval Induction          = pure (VLam "F" $ \f ->
                                 VLam "P" $ \p ->
                                 VLam "k" $ \k ->

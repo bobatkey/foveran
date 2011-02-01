@@ -48,7 +48,7 @@ listInduction : (A : Set) →
                 (l : List A) → Φ l;
 listInduction A Φ pnil pcons =
   induction (ListDesc A) Φ
-    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct (ListDesc A) x) with
+    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct x) with
             { inl u. λu'. pnil
             ; inr p. λih. pcons (fst p) (snd p) (snd ih)
             });
@@ -128,4 +128,4 @@ plug : (F : Desc) → Ctx F → µ F → µ F ;
 plug F = listInduction (sem (∂ F) (µ F))
                        (λl. µ F → µ F)
                        (λx. x)
-                       (λc l f x. construct F (up F (µ F) (f x) c));
+                       (λc l f x. construct (up F (µ F) (f x) c));

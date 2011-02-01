@@ -30,7 +30,7 @@ Ty-induction : (Φ : Ty → Set 2) →
                ((t₁ t₂ : Ty) → Φ t₁ → Φ t₂ → Φ (arr t₁ t₂)) →
                (t : Ty) → Φ t;
 Ty-induction Φ φv φarr = induction TyDesc Φ
-                                   (λx. case x for x. lift TyDesc Ty Φ x → Φ (construct TyDesc x) with
+                                   (λx. case x for x. lift TyDesc Ty Φ x → Φ (construct x) with
                                            { inl u. λu'. φv
                                            ; inr t₁t₂. λih₁ih₂. φarr (fst t₁t₂) (snd t₁t₂) (fst ih₁ih₂) (snd ih₁ih₂)
                                            });
@@ -45,7 +45,7 @@ Ctxt-induction : (Φ : Ctxt → Set 2) →
                  ((τ : Ty) → (Γ : Ctxt) → Φ Γ → Φ (cons τ Γ)) →
                  (Γ : Ctxt) → Φ Γ;
 Ctxt-induction Φ φemp φcons = induction CtxtDesc Φ
-                                        (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct CtxtDesc x) with
+                                        (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct x) with
                                                 { inl u. λu'. φemp
                                                 ; inr Γτ. λih. φcons (fst Γτ) (snd Γτ) (snd ih)
                                                 });

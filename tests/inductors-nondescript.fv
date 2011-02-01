@@ -31,7 +31,7 @@ inductor A = (H : (A → Set 2) → A → Set 2) ×
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 desc-inductor : (D : Desc) → inductor (µ D);
 desc-inductor D = « λΦ x. lift D (µ D) Φ (deconstruct D x)
-                  , λΦ k. induction D Φ (λx p. k (construct D x) p)
+                  , λΦ k. induction D Φ (λx p. k (construct x) p)
                   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––

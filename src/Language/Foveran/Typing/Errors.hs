@@ -15,21 +15,22 @@ import           Language.Foveran.Parsing.PrettyPrinter
 import qualified Data.Text as T
 
 data TypeError
-    = ExpectingPiTypeForLambda  Context Value
-    | ExpectingSigmaTypeForPair Context Value
-    | ExpectingSumTypeForInl    Context Value
-    | ExpectingSumTypeForInr    Context Value
-    | ExpectingUnitTypeForUnit  Context Value
-    | ExpectingDescTypeForDesc  Context Value
-    | UnknownIdentifier         Ident
-    | ApplicationOfNonFunction  Context Value
-    | CaseOnNonSum              Context Value
+    = ExpectingPiTypeForLambda    Context Value
+    | ExpectingSigmaTypeForPair   Context Value
+    | ExpectingSumTypeForInl      Context Value
+    | ExpectingSumTypeForInr      Context Value
+    | ExpectingUnitTypeForUnit    Context Value
+    | ExpectingDescTypeForDesc    Context Value
+    | ExpectingMuTypeForConstruct Context Value
+    | UnknownIdentifier           Ident
+    | ApplicationOfNonFunction    Context Value
+    | CaseOnNonSum                Context Value
     | ExpectingSet
     | UnableToSynthesise
-    | Proj1FromNonSigma         Context Value
-    | Proj2FromNonSigma         Context Value
-    | LevelProblem              Int Int
-    | TypesNotEqual             Context Value Value
+    | Proj1FromNonSigma           Context Value
+    | Proj2FromNonSigma           Context Value
+    | LevelProblem                Int Int
+    | TypesNotEqual               Context Value Value
 
 ppType :: Context -> Value -> Doc
 ppType ctxt v =
@@ -56,6 +57,10 @@ ppTypeError (ExpectingUnitTypeForUnit ctxt ty)
       $$ "but this term has type 𝟙"
 ppTypeError (ExpectingDescTypeForDesc ctxt ty)
     = "Expecting Desc type for description"
+ppTypeError (ExpectingMuTypeForConstruct ctxt ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term is an inductive type constructor"
 ppTypeError (UnknownIdentifier nm)
     = "Unknown identifier" <+> "“" <> text (T.unpack nm) <> "”"
 ppTypeError (ApplicationOfNonFunction ctxt ty)

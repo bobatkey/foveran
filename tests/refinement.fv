@@ -40,7 +40,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });

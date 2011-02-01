@@ -37,7 +37,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
@@ -147,7 +147,7 @@ swizzle F X = elimD (λF'. (x : sem F' X) → lift F' X (λx. Set) x → Set)
 – other way would be to define an inductive family that describes the
 – same data.
 ciRec : (F : Desc) → (µ F → Set) → µ F → Set ;
-ciRec F P = induction F (λx. Set) (λx p. P (construct F x) × swizzle F (µ F) x p);
+ciRec F P = induction F (λx. Set) (λx p. P (construct x) × swizzle F (µ F) x p);
 
 step : (F : Desc) →
        (P : µ F → Set) →
@@ -189,7 +189,7 @@ unstep F P =
 
 – FIXME: prove that this is the inverse to ‘step’.
 
-genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct D x)) → (x : µ D) → P x ;
+genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct x)) → (x : µ D) → P x ;
 genericCase D P k = induction D P (λx p. k x);
 
 project₁ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → P x;
@@ -203,7 +203,7 @@ project₂ F P = genericCase F (λx. ciRec F P x → lift F (µ F) (λx. ciRec F
 
 completeInduction : (F : Desc) →
                     (P : µ F → Set) →
-                    ((x : sem F (µ F)) → lift F (µ F) (λx. ciRec F P x) x → P (construct F x)) →
+                    ((x : sem F (µ F)) → lift F (µ F) (λx. ciRec F P x) x → P (construct x)) →
                     (x : µ F) →
                     P x;
 completeInduction F P f x = project₁ F P x
@@ -213,7 +213,7 @@ completeInduction F P f x = project₁ F P x
 
 caseNat2 : (A : Nat → Set 2) → (A zero) → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 caseNat2 A a f = induction NatDesc A
-                           (λx p. case x for x. A (construct NatDesc x) with
+                           (λx p. case x for x. A (construct x) with
                                      { inl u. a
                                      ; inr n. f n
                                      });

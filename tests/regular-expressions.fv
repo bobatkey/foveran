@@ -94,23 +94,23 @@ regexpInduction : (Φ : regexp → Set 2) →
 regexpInduction Φ φeps φemp φalt φseq φstar φtok =
   induction regexpDesc Φ
   (λr. case r for r. lift regexpDesc regexp Φ r →
-                      Φ (construct regexpDesc r) with
+                      Φ (construct r) with
           { inl u. λu'. φeps
           ; inr r.
              case r for r. lift regexpDesc regexp Φ (inr r) →
-                           Φ (construct regexpDesc (inr r)) with
+                           Φ (construct (inr r)) with
                { inl u. λu'. φemp
                ; inr r.
                   case r for r. lift regexpDesc regexp Φ (inr (inr r)) →
-                                Φ (construct regexpDesc (inr (inr r))) with
+                                Φ (construct (inr (inr r))) with
                     { inl p. λφ. φalt (fst p) (snd p) (fst φ) (snd φ)
                     ; inr r.
                        case r for r. lift regexpDesc regexp Φ (inr (inr (inr r))) →
-                                     Φ (construct regexpDesc (inr (inr (inr r)))) with
+                                     Φ (construct (inr (inr (inr r)))) with
                          { inl p. λφ. φseq (fst p) (snd p) (fst φ) (snd φ)
                          ; inr r.
                             case r for r. lift regexpDesc regexp Φ (inr (inr (inr (inr r)))) →
-                                          Φ (construct regexpDesc (inr (inr (inr (inr r))))) with
+                                          Φ (construct (inr (inr (inr (inr r))))) with
                               { inl r. λφ. φstar r φ
                               ; inr s. λu. φtok s
                               }

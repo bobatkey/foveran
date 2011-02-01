@@ -63,7 +63,7 @@ deconstruct' F = fold F
 deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
 deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
 
-genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct D x)) → (x : µ D) → P x ;
+genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct x)) → (x : µ D) → P x ;
 genericCase D P k = induction D P (λx p. k x);
 
 caseNat2 : (A : Set 1) → A → (Nat → A) → Nat → A ;
@@ -85,7 +85,7 @@ natInduction : (P : Nat → Set 2) →
                (n : Nat) → P n;
 natInduction P p0 pS =
   induction NatDesc P
-            (\x. case x for x. lift NatDesc Nat P x → P (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat P x → P (construct x) with
                     { inl u. \u'. p0
                     ; inr n. \pn. pS n pn
                     });

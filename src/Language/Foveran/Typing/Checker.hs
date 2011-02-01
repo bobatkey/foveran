@@ -110,6 +110,13 @@ tyCheck (Annot p (Desc_Sum t1 t2)) ctxt VDesc =
 tyCheck (Annot p (Desc_Sum t1 t2)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
 
+tyCheck (Annot p (Construct t)) ctxt (VMu f) =
+    do tm <- tyCheck t ctxt (vsem $$ f $$ VMu f)
+       return ( In $ CS.Construct tm )
+
+tyCheck (Annot p (Construct t)) ctxt v =
+    Error p (ExpectingMuTypeForConstruct ctxt v)
+
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
@@ -207,18 +214,12 @@ tySynth (Annot p (Mu t)) ctxt =
     do tm <- tyCheck t ctxt VDesc
        return (VSet 0, In $ CS.Mu tm)
 
-tySynth (Annot p Construct) ctxt =
-    return ( forall "F" VDesc $ \f ->
-             (vsem $$ f $$ VMu f) .->.
-             VMu f
-           , In CS.Construct)
-
 tySynth (Annot p Induction) ctxt =
     return ( forall "F" VDesc               $ \f ->
              forall "P" (VMu f .->. VSet 2) $ \p ->
              (forall "x" (vsem $$ f $$ VMu f) $ \x ->
               (vlift $$ f $$ VMu f $$ p $$ x) .->.
-              p $$ (VConstruct f x)) .->.
+              p $$ (VConstruct x)) .->.
              (forall "x" (VMu f) $ \x -> p $$ x)
            , In CS.Induction)
 

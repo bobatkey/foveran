@@ -31,7 +31,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
@@ -72,9 +72,9 @@ termInduction : (Φ : Term → Set 2) →
                 (t : Term) → Φ t ;
 termInduction Φ φvar φapp φlam =
   induction TermDesc Φ
-    (λx. case x for x. lift TermDesc Term Φ x → Φ (construct TermDesc x) with
+    (λx. case x for x. lift TermDesc Term Φ x → Φ (construct x) with
             { inl n. λu. φvar n
-            ; inr x. case x for x. lift TermDesc Term Φ (inr x) → Φ (construct TermDesc (inr x)) with
+            ; inr x. case x for x. lift TermDesc Term Φ (inr x) → Φ (construct (inr x)) with
                         { inl t₁t₂. λφt₁t₂. φapp (fst t₁t₂) (snd t₁t₂) (fst φt₁t₂) (snd φt₁t₂)
                         ; inr t. λφt. φlam t φt
                         }

@@ -156,6 +156,8 @@ term01 =
     -- µ
     unary Mu <$> token Tok.Mu <*> term00
     <|>
+    unary Construct <$> token Tok.Construct <*> term00
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
@@ -166,8 +168,6 @@ term00 =
     unary Proj1 <$> token Tok.Fst <* commit <*> term00
     <|>
     unary Proj2 <$> token Tok.Snd <* commit <*> term00
-    <|>
-    keyword Construct <$> token Tok.Construct
     <|>
     keyword Induction <$> token Tok.Induction
     <|>

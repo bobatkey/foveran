@@ -76,7 +76,7 @@ deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
 
 inj-construct : (D : Desc) →
                 (x₁ x₂ : sem D (µ D)) →
-                leibniz (µ D) (construct D x₁) (construct D x₂) →
+                leibniz (µ D) (construct x₁) (construct x₂) →
                 leibniz (sem D (µ D)) x₁ x₂;
 inj-construct D x₁ x₂ eq =
   λF f₁. eq (λx. F (deconstruct D x)) f₁;
@@ -109,14 +109,14 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct NatDesc x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
 
 natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 natCase A a f = induction NatDesc A
-                          (λx p. case x for x. A (construct NatDesc x) with
+                          (λx p. case x for x. A (construct x) with
                                     { inl u. a
                                     ; inr n. f n
                                     });

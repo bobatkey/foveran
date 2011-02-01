@@ -200,8 +200,7 @@ forget D A r =
   inductionI A (apply-refinement D A r)
              (λa x. µ D)
              (λa x φ.
-                construct D
-                          (recons A D (λi. muI A (apply-refinement D A r) i)
+                construct (recons A D (λi. muI A (apply-refinement D A r) i)
                                   (snd (r a) (fst x)) (snd x) φ));
 
 – FIXME: is this basically the same as drop in the unindexed case?
@@ -214,7 +213,7 @@ forget-algebra :
   µ D;
 forget-algebra D A r =
   λa p.
-    construct D
+    construct
       (elimD (λD'. (x : sem D' A) →
                    semI A (lift2 D' A x) (λi. µ D) →
                    sem D' (µ D))
@@ -249,7 +248,7 @@ data Nat : Set :=
 caseNat : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 caseNat A a f =
   induction NatDesc A
-    (λx p. case x for x. A (construct NatDesc x) with
+    (λx p. case x for x. A (construct x) with
              { inl u. a
              ; inr n. f n
              });

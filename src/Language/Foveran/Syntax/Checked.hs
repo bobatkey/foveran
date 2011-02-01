@@ -53,7 +53,7 @@ data TermCon tm
     | Desc_Sum  tm tm
     | Desc_Elim
     | Mu        tm
-    | Construct
+    | Construct tm
     | Induction
       
     {- Descriptions of indexed types -}
@@ -102,7 +102,7 @@ bind' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
 bind' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
 bind' fnm Desc_Elim        = pure Desc_Elim
 bind' fnm (Mu t)           = Mu <$> t
-bind' fnm Construct        = pure Construct
+bind' fnm (Construct t)    = Construct <$> t
 bind' fnm Induction        = pure Induction
 
 bind' fnm IDesc            = pure IDesc
@@ -159,7 +159,7 @@ toDisplay (Desc_Prod t1 t2)       = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (Desc_Sum t1 t2)        = DS.Desc_Sum <$> t1 <*> t2
 toDisplay Desc_Elim               = pure DS.Desc_Elim
 toDisplay (Mu t)                  = DS.Mu <$> t
-toDisplay Construct               = pure DS.Construct
+toDisplay (Construct t)           = DS.Construct <$> t
 toDisplay Induction               = pure DS.Induction
 
 toDisplay IDesc                   = pure DS.IDesc
@@ -230,7 +230,7 @@ instance Eq Term where
   In (Desc_Sum t1 t2)  == In (Desc_Sum t1' t2')  = t1 == t1' && t2 == t2'
   In Desc_Elim  == In Desc_Elim      = True
   In (Mu t)     == In (Mu t')        = t == t'
-  In Construct  == In Construct      = True
+  In (Construct t) == In (Construct t') = t == t'
   In Induction  == In Induction      = True
   
   In IDesc      == In IDesc          = True

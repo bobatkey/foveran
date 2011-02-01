@@ -57,7 +57,7 @@ data TermCon tm
     | Desc_Sum  tm tm
     | Desc_Elim
     | Mu        tm
-    | Construct
+    | Construct tm
     | Induction
       
     {- Descriptions of indexed types -}

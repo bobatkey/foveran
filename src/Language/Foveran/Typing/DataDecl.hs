@@ -101,4 +101,4 @@ genConstructors (Datatype p nm params constructors) = genConsLoop id constructor
       consArg elems   = foldr1 (makePair p) $ map (Annot p . Var) $ elemVarNms elems 
 
       consTerm inject elems =
-        paramsLam p params $ consLam elems $ Annot p $ App (Annot p $ Construct) [ descTm, inject $ consArg elems ]
+        paramsLam p params $ consLam elems $ Annot p (Construct (inject $ consArg elems))

@@ -46,7 +46,7 @@ data TermCon tm
   | Desc_Sum  tm tm
   | Desc_Elim
   | Mu        tm
-  | Construct
+  | Construct tm
   | Induction
     
   | IDesc
@@ -101,7 +101,7 @@ toLN (DS.Desc_Prod t1 t2) bv = Layer $ Desc_Prod (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.Desc_Sum t1 t2)  bv = Layer $ Desc_Sum (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.Desc_Elim         bv = Layer $ Desc_Elim
 toLN (DS.Mu t)            bv = Layer $ Mu (Var $ t bv)
-toLN DS.Construct         bv = Layer $ Construct
+toLN (DS.Construct t)     bv = Layer $ Construct (Var $ t bv)
 toLN DS.Induction         bv = Layer $ Induction
 
 toLN DS.IDesc             bv = Layer $ IDesc
@@ -148,7 +148,7 @@ close' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
 close' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
 close' fnm Desc_Elim        = pure Desc_Elim
 close' fnm (Mu t)           = Mu <$> t
-close' fnm Construct        = pure Construct
+close' fnm (Construct t)    = Construct <$> t
 close' fnm Induction        = pure Induction
 
 close' fnm IDesc            = pure IDesc

@@ -56,7 +56,7 @@ pprint (Desc_Prod t1 t2)   = paren 08 (down t1 <+> "“×”" <+> t2)
 pprint (Desc_Sum t1 t2)    = paren 09 (down t1 <+> "“+”" <+> t2)
 pprint Desc_Elim           = "elimD"
 pprint (Mu t)              = paren 01 ("µ" <+> down t)
-pprint Construct           = "construct"
+pprint (Construct t)       = paren 01 ("construct" <+> down t)
 pprint Induction           = "induction"
 
 pprint IDesc               = "IDesc"
