@@ -65,6 +65,20 @@ liftI I D A Φ =
          (λB D liftD f. (b : B) → liftD b (f b))
          D;
 
+unitI : (I : Set) →
+        (D : IDesc I) →
+        (A : I → Set) →
+        (x : semI I D (λi. A i)) →
+        liftI I D (λi. A i) (λi a. Unit) x;
+unitI I D A =
+  elimID I (λD. (x : semI I D (λi. A i)) → liftI I D (λi. A i) (λi a. Unit) x)
+    (λi a. ⋄)
+    (λA' a'. ⋄)
+    (λD₁ D₂ unit₁ unit₂ x. « unit₁ (fst x), unit₂ (snd x) »)
+    (λB D unit x. unit (fst x) (snd x))
+    (λB D unit x. λb. unit b (x b))
+    D;
+
 assume muI        : (I : Set) → (I → IDesc I) → I → Set;
 assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi. muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
