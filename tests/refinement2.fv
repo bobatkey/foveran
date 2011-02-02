@@ -39,9 +39,9 @@ lift2 : (D : Desc) →
         sem D A →
         IDesc A;
 lift2 D A = elimD (λD. sem D A → IDesc A)
-                  (λA' x. 'K A Unit)
-                  (λx. 'Id A x)
-                  (λD₁ D₂ f g x. 'Pair A (f (fst x)) (g (snd x)))
+                  (λA' x. 'K Unit)
+                  (λx. 'Id x)
+                  (λD₁ D₂ f g x. 'Pair (f (fst x)) (g (snd x)))
  		  (λD₁ D₂ f g x. case x for d. IDesc A with
 		                    { inl y. f y
 		 		    ; inr z. g z
@@ -135,7 +135,7 @@ apply-refinement : (D : Desc) →
                    refinement D A →
                    A → IDesc A;
 apply-refinement D A r =
-  λa. 'Sg A (fst (r a)) (λx. lift2 D A (snd (r a) x));
+  λa. 'Sg (fst (r a)) (λx. lift2 D A (snd (r a) x));
 
 {-
 refinement2 : Desc → Set → Set 1;

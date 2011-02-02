@@ -19,6 +19,8 @@ binary f t1 t2 = Annot (makeSpan t1 t2) (f t1 t2)
 unary :: (TermPos -> TermCon TermPos) -> Span -> TermPos -> TermPos
 unary f p t = Annot (makeSpan p t) (f t)
 
+binaryPrefix f p t1 t2 = Annot (makeSpan p t2) (f t1 t2)
+
 keyword :: TermCon TermPos -> Span -> TermPos
 keyword c s = Annot s c
 
@@ -158,6 +160,16 @@ term01 =
     <|>
     unary Construct <$> token Tok.Construct <*> term00
     <|>
+    unary IDesc_K <$> token Tok.IDesc_K <*> term00
+    <|>
+    unary IDesc_Id <$> token Tok.IDesc_Id <*> term00
+    <|>
+    binaryPrefix IDesc_Pair <$> token Tok.IDesc_Pair <*> term00 <*> term00
+    <|>
+    binaryPrefix IDesc_Sg <$> token Tok.IDesc_Sg <*> term00 <*> term00
+    <|>
+    binaryPrefix IDesc_Pi <$> token Tok.IDesc_Pi <*> term00 <*> term00
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
@@ -204,16 +216,6 @@ term00 =
     keyword Desc <$> token Tok.Desc
     <|>
     keyword IDesc <$> token Tok.IDesc
-    <|>
-    keyword IDesc_K <$> token Tok.IDesc_K
-    <|>
-    keyword IDesc_Id <$> token Tok.IDesc_Id
-    <|>
-    keyword IDesc_Pair <$> token Tok.IDesc_Pair
-    <|>
-    keyword IDesc_Sg <$> token Tok.IDesc_Sg
-    <|>
-    keyword IDesc_Pi <$> token Tok.IDesc_Pi
     <|>
     keyword IDesc_Elim <$> token Tok.IDesc_Elim
     <|>

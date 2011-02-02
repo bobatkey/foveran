@@ -117,6 +117,44 @@ tyCheck (Annot p (Construct t)) ctxt (VMu f) =
 tyCheck (Annot p (Construct t)) ctxt v =
     Error p (ExpectingMuTypeForConstruct ctxt v)
 
+tyCheck (Annot p (IDesc_K t)) ctxt (VIDesc v) =
+    do tm <- tyCheck t ctxt (VSet 0)
+       return ( In $ CS.IDesc_K tm )
+
+tyCheck (Annot p (IDesc_K t)) ctxt v =
+    Error p (ExpectingDescTypeForDesc ctxt v) -- FIXME: might want a more specific error
+
+tyCheck (Annot p (IDesc_Id t)) ctxt (VIDesc v) =
+    do tm <- tyCheck t ctxt v
+       return ( In $ CS.IDesc_Id tm )
+
+tyCheck (Annot p (IDesc_Id t)) ctxt v =
+    Error p (ExpectingDescTypeForDesc ctxt v)
+
+tyCheck (Annot p (IDesc_Pair t1 t2)) ctxt (VIDesc v) =
+    do tm1 <- tyCheck t1 ctxt (VIDesc v)
+       tm2 <- tyCheck t2 ctxt (VIDesc v)
+       return ( In $ CS.IDesc_Pair tm1 tm2 )
+
+tyCheck (Annot p (IDesc_Pair t1 t2)) ctxt v =
+    Error p (ExpectingDescTypeForDesc ctxt v)
+
+tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt (VIDesc v) =
+    do tm1 <- tyCheck t1 ctxt (VSet 0)
+       tm2 <- tyCheck t2 ctxt (tm1 `evalIn` ctxt .->. VIDesc v)
+       return (In $ CS.IDesc_Sg tm1 tm2)
+
+tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt v =
+    Error p (ExpectingDescTypeForDesc ctxt v)
+
+tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt (VIDesc v) =
+    do tm1 <- tyCheck t1 ctxt (VSet 0)
+       tm2 <- tyCheck t2 ctxt (tm1 `evalIn` ctxt .->. VIDesc v)
+       return (In $ CS.IDesc_Pi tm1 tm2)
+
+tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt v =
+    Error p (ExpectingDescTypeForDesc ctxt v)
+
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
@@ -240,47 +278,24 @@ tySynth (Annot p (Proj2 t)) ctxt =
 tySynth (Annot p IDesc) ctxt =
     do return (VSet 0 .->. VSet 1, In $ CS.IDesc)
        
-tySynth (Annot p IDesc_K) ctxt =
-    do return ( forall "I" (VSet 0) $ \i -> VSet 0 .->. VIDesc i
-              , In CS.IDesc_K
-              )
-
-tySynth (Annot p IDesc_Id) ctxt =
-    do return ( forall "I" (VSet 0) $ \i -> i .->. VIDesc i
-              , In CS.IDesc_Id
-              )
-
-tySynth (Annot p IDesc_Pair) ctxt =
-    do return ( forall "I" (VSet 0) $ \i -> VIDesc i .->. VIDesc i .->. VIDesc i
-              , In CS.IDesc_Pair)
-
-tySynth (Annot p IDesc_Sg) ctxt =
-    do return ( forall "I" (VSet 0) $ \i -> forall "A" (VSet 0) $ \a -> (a .->. VIDesc i) .->. VIDesc i
-              , In CS.IDesc_Sg
-              )
-
-tySynth (Annot p IDesc_Pi) ctxt =
-    do return ( forall "I" (VSet 0) $ \i -> forall "A" (VSet 0) $ \a -> (a .->. VIDesc i) .->. VIDesc i
-              , In CS.IDesc_Pi)
-
 tySynth (Annot p IDesc_Elim) ctxt =
     do return ( forall "I" (VSet 0) $ \i ->
                 forall "P" (VIDesc i .->. VSet 10) $ \p ->
-                (forall "x" i $ \x -> p $$ VIDesc_Id i x) .->.
-                (forall "A" (VSet 0) $ \a -> p $$ VIDesc_K i a) .->.
+                (forall "x" i $ \x -> p $$ VIDesc_Id x) .->.
+                (forall "A" (VSet 0) $ \a -> p $$ VIDesc_K a) .->.
                 (forall "D1" (VIDesc i) $ \d1 ->
                  forall "D2" (VIDesc i) $ \d2 ->
                  (p $$ d1) .->.
                  (p $$ d2) .->.
-                 (p $$ (VIDesc_Pair i d1 d2))) .->.
+                 (p $$ (VIDesc_Pair d1 d2))) .->.
                 (forall "A" (VSet 0) $ \a ->
                  forall "D" (a .->. VIDesc i) $ \d ->
                  (forall "x" a $ \x -> p $$ (d $$ x)) .->.
-                 (p $$ (VIDesc_Sg i a d))) .->.
+                 (p $$ (VIDesc_Sg a d))) .->.
                 (forall "A" (VSet 0) $ \a ->
                  forall "D" (a .->. VIDesc i) $ \d ->
                  (forall "x" a $ \x -> p $$ (d $$ x)) .->.
-                 (p $$ (VIDesc_Pi i a d))) .->.
+                 (p $$ (VIDesc_Pi a d))) .->.
                 (forall "D" (VIDesc i) $ \d -> p $$ d)
               , In $ CS.IDesc_Elim
               )

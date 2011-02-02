@@ -58,11 +58,11 @@ data TermCon tm
       
     {- Descriptions of indexed types -}
     | IDesc
-    | IDesc_K
-    | IDesc_Id
-    | IDesc_Pair
-    | IDesc_Sg
-    | IDesc_Pi
+    | IDesc_K    tm
+    | IDesc_Id   tm
+    | IDesc_Pair tm tm
+    | IDesc_Sg   tm tm
+    | IDesc_Pi   tm tm
 
     | IDesc_Elim
     deriving (Show, Functor)
@@ -106,11 +106,11 @@ bind' fnm (Construct t)    = Construct <$> t
 bind' fnm Induction        = pure Induction
 
 bind' fnm IDesc            = pure IDesc
-bind' fnm IDesc_K          = pure IDesc_K
-bind' fnm IDesc_Id         = pure IDesc_Id
-bind' fnm IDesc_Pair       = pure IDesc_Pair
-bind' fnm IDesc_Sg         = pure IDesc_Sg
-bind' fnm IDesc_Pi         = pure IDesc_Pi
+bind' fnm (IDesc_K t)      = IDesc_K <$> t
+bind' fnm (IDesc_Id t)     = IDesc_Id <$> t
+bind' fnm (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
+bind' fnm (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
+bind' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 bind' fnm IDesc_Elim       = pure IDesc_Elim
 
 bindFree :: Ident -> Term -> Term
@@ -163,11 +163,11 @@ toDisplay (Construct t)           = DS.Construct <$> t
 toDisplay Induction               = pure DS.Induction
 
 toDisplay IDesc                   = pure DS.IDesc
-toDisplay IDesc_Id                = pure DS.IDesc_Id
-toDisplay IDesc_K                 = pure DS.IDesc_K
-toDisplay IDesc_Pair              = pure DS.IDesc_Pair
-toDisplay IDesc_Sg                = pure DS.IDesc_Sg
-toDisplay IDesc_Pi                = pure DS.IDesc_Pi
+toDisplay (IDesc_Id t)            = DS.IDesc_Id <$> t
+toDisplay (IDesc_K t)             = DS.IDesc_K <$> t
+toDisplay (IDesc_Pair t1 t2)      = DS.IDesc_Pair <$> t1 <*> t2
+toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
+toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 
 toDisplaySyntax :: Term -> NameSupply DS.Term
@@ -234,11 +234,11 @@ instance Eq Term where
   In Induction  == In Induction      = True
   
   In IDesc      == In IDesc          = True
-  In IDesc_K    == In IDesc_K        = True
-  In IDesc_Id   == In IDesc_Id       = True
-  In IDesc_Pair == In IDesc_Pair     = True
-  In IDesc_Sg   == In IDesc_Sg       = True
-  In IDesc_Pi   == In IDesc_Pi       = True
+  In (IDesc_K t)   == In (IDesc_K t')              = t == t'
+  In (IDesc_Id t)  == In (IDesc_Id t')             = t == t'
+  In (IDesc_Pair t1 t2) == In (IDesc_Pair t1' t2') = t1 == t1' && t2 == t2'
+  In (IDesc_Sg t1 t2)   == In (IDesc_Sg t1' t2')   = t1 == t1' && t2 == t2'
+  In (IDesc_Pi t1 t2)   == In (IDesc_Pi t1' t2')   = t1 == t1' && t2 == t2'
   In IDesc_Elim == In IDesc_Elim     = True
   
   _             == _                 = False

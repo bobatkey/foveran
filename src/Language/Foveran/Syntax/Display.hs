@@ -62,11 +62,11 @@ data TermCon tm
       
     {- Descriptions of indexed types -}
     | IDesc
-    | IDesc_K
-    | IDesc_Id
-    | IDesc_Pair
-    | IDesc_Sg
-    | IDesc_Pi
+    | IDesc_K    tm
+    | IDesc_Id   tm
+    | IDesc_Pair tm tm
+    | IDesc_Sg   tm tm
+    | IDesc_Pi   tm tm
 
     | IDesc_Elim
     deriving (Show, Functor)
