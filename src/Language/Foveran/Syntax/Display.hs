@@ -62,9 +62,7 @@ data TermCon tm
       
     {- Descriptions of indexed types -}
     | IDesc
-    | IDesc_K    tm
     | IDesc_Id   tm
-    | IDesc_Pair tm tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
 

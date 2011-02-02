@@ -160,15 +160,11 @@ term01 =
     <|>
     unary Construct <$> token Tok.Construct <*> term00
     <|>
-    unary IDesc_K <$> token Tok.IDesc_K <*> term00
+    unary IDesc_Id <$> token Tok.Quote_IId <*> term00
     <|>
-    unary IDesc_Id <$> token Tok.IDesc_Id <*> term00
+    binaryPrefix IDesc_Sg <$> token Tok.Quote_Sg <*> term00 <*> term00
     <|>
-    binaryPrefix IDesc_Pair <$> token Tok.IDesc_Pair <*> term00 <*> term00
-    <|>
-    binaryPrefix IDesc_Sg <$> token Tok.IDesc_Sg <*> term00 <*> term00
-    <|>
-    binaryPrefix IDesc_Pi <$> token Tok.IDesc_Pi <*> term00 <*> term00
+    binaryPrefix IDesc_Pi <$> token Tok.Quote_Pi <*> term00 <*> term00
     <|>
     -- function application
     -- left associative

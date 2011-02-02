@@ -85,6 +85,10 @@ tyCheck (Annot p (Desc_K t)) ctxt VDesc =
     do tm <- tyCheck t ctxt (VSet 0)
        return (In $ CS.Desc_K tm)
 
+tyCheck (Annot p (Desc_K t)) ctxt (VIDesc v) =
+    do tm <- tyCheck t ctxt (VSet 0)
+       return (In $ CS.IDesc_K tm)
+
 tyCheck (Annot p (Desc_K t)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
 
@@ -98,6 +102,11 @@ tyCheck (Annot p (Desc_Prod t1 t2)) ctxt VDesc =
     do tm1 <- tyCheck t1 ctxt VDesc
        tm2 <- tyCheck t2 ctxt VDesc
        return (In $ CS.Desc_Prod tm1 tm2)
+
+tyCheck (Annot p (Desc_Prod t1 t2)) ctxt (VIDesc v) =
+    do tm1 <- tyCheck t1 ctxt (VIDesc v)
+       tm2 <- tyCheck t2 ctxt (VIDesc v)
+       return (In $ CS.IDesc_Pair tm1 tm2)
 
 tyCheck (Annot p (Desc_Prod t1 t2)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
@@ -117,26 +126,11 @@ tyCheck (Annot p (Construct t)) ctxt (VMu f) =
 tyCheck (Annot p (Construct t)) ctxt v =
     Error p (ExpectingMuTypeForConstruct ctxt v)
 
-tyCheck (Annot p (IDesc_K t)) ctxt (VIDesc v) =
-    do tm <- tyCheck t ctxt (VSet 0)
-       return ( In $ CS.IDesc_K tm )
-
-tyCheck (Annot p (IDesc_K t)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v) -- FIXME: might want a more specific error
-
 tyCheck (Annot p (IDesc_Id t)) ctxt (VIDesc v) =
     do tm <- tyCheck t ctxt v
        return ( In $ CS.IDesc_Id tm )
 
 tyCheck (Annot p (IDesc_Id t)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (IDesc_Pair t1 t2)) ctxt (VIDesc v) =
-    do tm1 <- tyCheck t1 ctxt (VIDesc v)
-       tm2 <- tyCheck t2 ctxt (VIDesc v)
-       return ( In $ CS.IDesc_Pair tm1 tm2 )
-
-tyCheck (Annot p (IDesc_Pair t1 t2)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt (VIDesc v) =

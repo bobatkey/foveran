@@ -54,20 +54,18 @@ data Token
     | Data
       
     | IDesc
-    | IDesc_K
-    | IDesc_Id
-    | IDesc_Pair
-    | IDesc_Sg
-    | IDesc_Pi
+    | Quote_IId
+    | Quote_Sg
+    | Quote_Pi
     | IDesc_Elim
       deriving (Eq,Ord)
 
 deriveLift ''Token
 
 instance SyntaxHighlight Token where
-    lexicalClass Assume = Keyword
-    lexicalClass Ident  = Identifier
-    lexicalClass Colon  = Operator
+    lexicalClass Assume      = Keyword
+    lexicalClass Ident       = Identifier
+    lexicalClass Colon       = Operator
     lexicalClass ColonEquals = Operator
     lexicalClass Semicolon   = Punctuation
     lexicalClass Equals      = Operator
@@ -75,24 +73,24 @@ instance SyntaxHighlight Token where
     lexicalClass Arrow       = Operator
     lexicalClass LParen      = Punctuation
     lexicalClass RParen      = Punctuation
-    lexicalClass QuoteArrow  = Operator
+    lexicalClass QuoteArrow  = Constructor
     lexicalClass Times       = Operator
-    lexicalClass QuoteTimes  = Operator
+    lexicalClass QuoteTimes  = Constructor
     lexicalClass Plus        = Operator
-    lexicalClass QuotePlus   = Operator
+    lexicalClass QuotePlus   = Constructor
     lexicalClass Fst         = Keyword
     lexicalClass Snd         = Keyword
-    lexicalClass Inl         = Keyword
-    lexicalClass Inr         = Keyword
-    lexicalClass QuoteK      = Operator
+    lexicalClass Inl         = Constructor
+    lexicalClass Inr         = Constructor
+    lexicalClass QuoteK      = Constructor
     lexicalClass Mu          = Keyword
     lexicalClass Construct   = Keyword
     lexicalClass Induction   = Keyword
     lexicalClass ElimD       = Keyword
     lexicalClass UnitValue   = Keyword
-    lexicalClass LDoubleAngle= Punctuation
-    lexicalClass RDoubleAngle= Punctuation
-    lexicalClass Comma       = Punctuation
+    lexicalClass LDoubleAngle= Constructor
+    lexicalClass RDoubleAngle= Constructor
+    lexicalClass Comma       = Constructor
     lexicalClass Case        = Keyword
     lexicalClass For         = Keyword
     lexicalClass FullStop    = Punctuation
@@ -103,17 +101,15 @@ instance SyntaxHighlight Token where
     lexicalClass EmptyType   = Keyword
     lexicalClass ElimEmpty   = Keyword
     lexicalClass UnitType    = Keyword
-    lexicalClass QuoteId     = Keyword
+    lexicalClass QuoteId     = Constructor
     lexicalClass Desc        = Keyword
     lexicalClass Number      = Constant
     lexicalClass Pipe        = Punctuation
     lexicalClass Data        = Keyword
     lexicalClass IDesc       = Keyword
-    lexicalClass IDesc_K     = Keyword
-    lexicalClass IDesc_Id    = Keyword
-    lexicalClass IDesc_Pair  = Keyword
-    lexicalClass IDesc_Sg    = Keyword
-    lexicalClass IDesc_Pi    = Keyword
+    lexicalClass Quote_IId   = Constructor
+    lexicalClass Quote_Sg    = Constructor
+    lexicalClass Quote_Pi    = Constructor
     lexicalClass IDesc_Elim  = Keyword
 
 instance Show Token where
@@ -161,9 +157,7 @@ instance Show Token where
   show Pipe        = "|"
   show Data        = "data"
   show IDesc       = "IDesc"
-  show IDesc_K     = "'K"
-  show IDesc_Id    = "'Id"
-  show IDesc_Pair  = "'Pair"
-  show IDesc_Sg    = "'Sg"
-  show IDesc_Pi    = "'Pi"
+  show Quote_IId   = "“IId”"
+  show Quote_Sg    = "“Σ”"
+  show Quote_Pi    = "“Π”"
   show IDesc_Elim  = "elimID"

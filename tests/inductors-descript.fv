@@ -162,10 +162,10 @@ semI' I J D X i = semI J (D i) X;
 compose : (A B : Set) → IDesc A → (A → IDesc B) → IDesc B;
 compose A B D f = elimID A (λD. IDesc B)
                          (λa. f a)
-                         (λA. 'K A)
-                         (λD₁ D₂ d₁ d₂. 'Pair d₁ d₂)
-                         (λC D g. 'Σ C g)
-                         (λC D g. 'Π C g)
+                         (λA. “K” A)
+                         (λD₁ D₂ d₁ d₂. d₁ “×” d₂)
+                         (λC D g. “Σ” C g)
+                         (λC D g. “Π” C g)
                          D;
 
 – The semI function is actually a monad morphism. This function
@@ -224,9 +224,9 @@ lift2 : (D : Desc) →
         sem D A →
         IDesc A;
 lift2 D A = elimD (λD. sem D A → IDesc A)
-                  (λA' x. 'K Unit)
-                  (λx. 'Id x)
-                  (λD₁ D₂ f g x. 'Pair (f (fst x)) (g (snd x)))
+                  (λA' x. “K” Unit)
+                  (λx. “IId” x)
+                  (λD₁ D₂ f g x. f (fst x) “×” g (snd x))
  		  (λD₁ D₂ f g x. case x for d. IDesc A with
 		                   { inl y. f y
 		 		   ; inr z. g z
@@ -282,17 +282,17 @@ desc-inductor D =
 
 – Two helper functions for constructing little ‘IDesc’s.
 bleh : (A B : Set) → A → IDesc (A × B);
-bleh A B a = 'Π B (λb. 'Id «a,b»);
+bleh A B a = “Π” B (λb. “IId” «a,b»);
 
 bloo : (A B : Set) → A → B → IDesc (A × B);
-bloo A B a b = 'Id «a,b»;
+bloo A B a b = “IId” «a,b»;
 
 lex-inductor : (A : Set) → inductor A →
                (B : Set) → inductor B →
                inductor (A × B);
 lex-inductor A AI B BI =
-  « λp. 'Pair (compose A (A × B) (fst AI (fst p)) (bleh A B))
-              (compose B (A × B) (fst BI (snd p)) (bloo A B (fst p)))
+  « λp.     compose A (A × B) (fst AI (fst p)) (bleh A B)
+        “×” compose B (A × B) (fst BI (snd p)) (bloo A B (fst p))
   , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
                    (λa φa. snd BI (λb. Φ «a,b»)
                                   (λb φb. k «a,b»
@@ -314,7 +314,7 @@ lex-inductor A AI B BI =
 
 – Maybe this should be called a “cenomorphism”?
 flat : (A : Set) → inductor A;
-flat A = « λx. 'K Unit
+flat A = « λx. “K” Unit
          , λΦ k x. k x ⋄
          »;
 
@@ -328,14 +328,14 @@ flat A = « λx. 'K Unit
 – we have an explicit description.
 
 floo : (A B : Set) → B → A → IDesc (A × B);
-floo A B b a = 'Id «a,b»;
+floo A B b a = “IId” «a,b»;
 
 pair-inductor : (A : Set) → inductor A →
                 (B : Set) → inductor B →
                 inductor (A × B);
 pair-inductor A AI B BI =
-  « λp. 'Pair (compose A (A × B) (fst AI (fst p)) (floo A B (snd p)))
-              (compose B (A × B) (fst BI (snd p)) (bloo A B (fst p)))
+  « λp.     compose A (A × B) (fst AI (fst p)) (floo A B (snd p))
+        “×” compose B (A × B) (fst BI (snd p)) (bloo A B (fst p))
   , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
                    (λa φa. snd BI (λb. Φ «a,b»)
                                   (λb φb. k «a,b»
@@ -371,19 +371,19 @@ maybe A = Unit + A;
 with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
   « λx. case x for x. IDesc (maybe A) with
-          { inl u. 'Π A (λa. 'Id (inr a))
-          ; inr a. compose A (maybe A) (fst AI a) (λa. 'Id (inr a))
+          { inl u. “Π” A (λa. “IId” (inr a))
+          ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a))
           }
   , λΦ k x. case x for x. Φ x with
               { inl u.
                   k (inl u)
                     (snd AI (λa. Φ (inr a))
                             (λa φ. k (inr a)
-                                     (commute A (maybe A) (fst AI a) (λa. 'Id (inr a)) Φ φ)))
+                                     (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ)))
               ; inr a.
                   snd AI (λa. Φ (inr a))
                          (λa φ. k (inr a)
-                                  (commute A (maybe A) (fst AI a) (λa. 'Id (inr a)) Φ φ))
+                                  (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ))
                          a
               }
   »;
@@ -395,15 +395,14 @@ with-bottom A AI =
 with-top : (A : Set) → inductor A → inductor (maybe A);
 with-top A AI =
   « λx. case x for x. IDesc (maybe A) with
-          { inl u. 'K Unit
-          ; inr a. 'Pair (compose A (maybe A) (fst AI a) (λa. 'Id (inr a)))
-                         ('Id (inl ⋄))
+          { inl u. “K” Unit
+          ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a)) “×” “IId” (inl ⋄)
           }
   , λΦ k x. case x for x. Φ x with
               { inl u. k (inl u) ⋄
               ; inr a. snd AI (λa. Φ (inr a))
                         (λa φ. k (inr a)
-                                 « commute A (maybe A) (fst AI a) (λa. 'Id (inr a)) Φ φ
+                                 « commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ
                                  , k (inl ⋄) ⋄
                                  »)
                         a
@@ -484,7 +483,7 @@ primitive-inductor : (A  : Set) →
 primitive-inductor A AI Ψ k =
   comonadic-inductor
     A
-    « λa. 'Pair ('K (Ψ a)) ('Id a), – the comonad's functor
+    « λa. “K” (Ψ a) “×” “IId” a, – the comonad's functor
     « λΦ a p. snd p,                      – the counit
     « λΦ a p. « fst p, p », ⋄ »»»         – the cojoin
     AI
@@ -539,17 +538,17 @@ collapse : (A : Set) →
 collapse A =
   elimID A (λD. semI A D (λa. IDesc A) → IDesc A)
          (λa D. D)
-         (λA' a'. 'K A')
-         (λD₁ D₂ rec₁ rec₂ p. 'Pair (rec₁ (fst p)) (rec₂ (snd p)))
-         (λB D rec p. 'Σ B (λb. rec (fst p) (snd p)))
-         (λB D rec f. 'Π B (λb. rec b (f b)));
+         (λA' a'. “K” A')
+         (λD₁ D₂ rec₁ rec₂ p. rec₁ (fst p) “×” rec₂ (snd p))
+         (λB D rec p. “Σ” B (λb. rec (fst p) (snd p)))
+         (λB D rec f. “Π” B (λb. rec b (f b)));
 
 complete-carrier : (A  : Set) →
                    (AI : inductor A) →
                    A → IDesc A;
 complete-carrier A AI =
   snd AI (λa. IDesc A)
-         (λa φ. 'Pair ('Id a) (collapse A (fst AI a) φ));
+         (λa φ. “IId” a “×” collapse A (fst AI a) φ);
 
 – The problem now is that, when we provide ‘complete-carrier’ with a
 – concrete ‘A’, the system does not know anything about how such a thing
@@ -587,9 +586,9 @@ collapse2 : (D : Desc) →
             IDesc X;
 collapse2 D X =
   elimD (λD'. (x : sem D' X) → lift D' X (λx. IDesc X) x → IDesc X)
-        (λA x u. 'K Unit)
+        (λA x u. “K” Unit)
         (λx ID. ID)
-        (λD₁ D₂ f₁ f₂ x p. 'Pair (f₁ (fst x) (fst p)) (f₂ (snd x) (snd p)))
+        (λD₁ D₂ f₁ f₂ x p. f₁ (fst x) (fst p) “×” f₂ (snd x) (snd p))
         (λD₁ D₂ f₁ f₂ x. case x for x. lift (D₁ “+” D₂) X (λx. IDesc X) x → IDesc X with
                            { inl x₁. f₁ x₁
                            ; inr x₂. f₂ x₂
@@ -653,8 +652,7 @@ unstep D Ψ Φ =
 complete2-carrier : (D : Desc) → µ D → IDesc (µ D);
 complete2-carrier D =
   induction D (λx. IDesc (µ D))
-    (λx φ. 'Pair ('Id (construct x))
-                 (collapse2 D (µ D) x φ));
+    (λx φ. “IId” (construct x) “×” collapse2 D (µ D) x φ);
 
 – The counit is effectively just first projection.
 complete2-counit :

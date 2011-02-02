@@ -50,9 +50,7 @@ data TermCon tm
   | Induction
     
   | IDesc
-  | IDesc_K    tm
   | IDesc_Id   tm
-  | IDesc_Pair tm tm
   | IDesc_Sg   tm tm
   | IDesc_Pi   tm tm
   | IDesc_Elim
@@ -105,9 +103,7 @@ toLN (DS.Construct t)     bv = Layer $ Construct (Var $ t bv)
 toLN DS.Induction         bv = Layer $ Induction
 
 toLN DS.IDesc             bv = Layer $ IDesc
-toLN (DS.IDesc_K t)       bv = Layer $ IDesc_K (Var $ t bv)
 toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (Var $ t bv)
-toLN (DS.IDesc_Pair t1 t2) bv = Layer $ IDesc_Pair (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
@@ -152,9 +148,7 @@ close' fnm (Construct t)    = Construct <$> t
 close' fnm Induction        = pure Induction
 
 close' fnm IDesc            = pure IDesc
-close' fnm (IDesc_K t)        = IDesc_K <$> t
 close' fnm (IDesc_Id t)       = IDesc_Id <$> t
-close' fnm (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
 close' fnm (IDesc_Sg t1 t2)   = IDesc_Sg <$> t1 <*> t2
 close' fnm (IDesc_Pi t1 t2)   = IDesc_Pi <$> t1 <*> t2
 close' fnm IDesc_Elim       = pure IDesc_Elim

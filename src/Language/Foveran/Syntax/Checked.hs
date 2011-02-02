@@ -164,8 +164,8 @@ toDisplay Induction               = pure DS.Induction
 
 toDisplay IDesc                   = pure DS.IDesc
 toDisplay (IDesc_Id t)            = DS.IDesc_Id <$> t
-toDisplay (IDesc_K t)             = DS.IDesc_K <$> t
-toDisplay (IDesc_Pair t1 t2)      = DS.IDesc_Pair <$> t1 <*> t2
+toDisplay (IDesc_K t)             = DS.Desc_K <$> t
+toDisplay (IDesc_Pair t1 t2)      = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
