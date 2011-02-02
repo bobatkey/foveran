@@ -54,8 +54,8 @@ lexicalSpec =
     , ("'K",              Emit IDesc_K)
     , ("'Id",             Emit IDesc_Id)
     , ("'Pair",           Emit IDesc_Pair)
-    , ("'Sg",             Emit IDesc_Sg)
-    , ("'Pi",             Emit IDesc_Pi)
+    , ("'Σ",              Emit IDesc_Sg)
+    , ("'Π",              Emit IDesc_Pi)
     , ("elimID",          Emit IDesc_Elim)
     , (tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar),
                            Emit Ident)

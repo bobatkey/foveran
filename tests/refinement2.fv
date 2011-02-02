@@ -135,7 +135,7 @@ apply-refinement : (D : Desc) →
                    refinement D A →
                    A → IDesc A;
 apply-refinement D A r =
-  λa. 'Sg (fst (r a)) (λx. lift2 D A (snd (r a) x));
+  λa. 'Σ (fst (r a)) (λx. lift2 D A (snd (r a) x));
 
 {-
 refinement2 : Desc → Set → Set 1;
@@ -146,11 +146,11 @@ apply-refinement2 : (D : Desc) →
                     refinement2 D A →
                     A → IDesc A;
 apply-refinement2 D A r =
-  λa. 'Sg A (fst (r a))
-           (λx. case snd (r a) x for d. IDesc A with
-                   { inl y. lift2 D A y
-                   ; inr u. 'K A Empty
-                   });
+  λa. 'Σ (fst (r a))
+         (λx. case snd (r a) x for d. IDesc A with
+                { inl y. lift2 D A y
+                ; inr u. 'K Empty
+                });
 
 refinement-to-refinement2 : (D : Desc) →
                             (A : Set) →

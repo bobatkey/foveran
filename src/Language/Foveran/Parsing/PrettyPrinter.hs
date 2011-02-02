@@ -63,8 +63,8 @@ pprint IDesc               = "IDesc"
 pprint (IDesc_Id t)        = paren 01 ("'Id" <+> down t)
 pprint (IDesc_K t)         = paren 01 ("'K" <+> down t)
 pprint (IDesc_Pair t1 t2)  = paren 01 ("'Pair" <+> down t1 <+> down t2)
-pprint (IDesc_Sg t1 t2)    = paren 01 ("'Sg" <+> down t1 <+> down t2)
-pprint (IDesc_Pi t1 t2)    = paren 01 ("'Pi" <+> down t1 <+> down t2)
+pprint (IDesc_Sg t1 t2)    = paren 01 ("'Σ" <+> down t1 <+> down t2)
+pprint (IDesc_Pi t1 t2)    = paren 01 ("'Π" <+> down t1 <+> down t2)
 pprint IDesc_Elim          = "elimID"
 
 pp :: TermPos -> PrecDoc

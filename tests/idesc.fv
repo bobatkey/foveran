@@ -3,10 +3,10 @@ toI = elimD (λx. IDesc Unit)
             (λA. 'K A)
             ('Id ⋄)
 	    (λD₁ D₂ ID₁ ID₂. 'Pair ID₁ ID₂)
-            (λD₁ D₂ ID₁ ID₂. 'Sg (Unit + Unit) (λb. case b for d. IDesc Unit with
-                                                      { inl u. ID₁
-					              ; inr u. ID₂
-						      }));
+            (λD₁ D₂ ID₁ ID₂. 'Σ (Unit + Unit) (λb. case b for d. IDesc Unit with
+                                                     { inl u. ID₁
+					             ; inr u. ID₂
+					             }));
 
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
@@ -63,7 +63,7 @@ lift3 I D A = elimID I (λD. semI I D (λi. A i) → IDesc ((i : I) × A i))
                      (λA' a. 'K Unit)
                      (λD₁ D₂ lift₁ lift₂ p. 'Pair (lift₁ (fst p)) (lift₂ (snd p)))
                      (λB D liftD p. liftD (fst p) (snd p))
-                     (λB D liftD f. 'Pi B (λb. liftD b (f b)))
+                     (λB D liftD f. 'Π B (λb. liftD b (f b)))
                      D;
 
 lift4 : (I : Set) →

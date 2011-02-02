@@ -164,8 +164,8 @@ compose A B D f = elimID A (λD. IDesc B)
                          (λa. f a)
                          (λA. 'K A)
                          (λD₁ D₂ d₁ d₂. 'Pair d₁ d₂)
-                         (λC D g. 'Sg C g)
-                         (λC D g. 'Pi C g)
+                         (λC D g. 'Σ C g)
+                         (λC D g. 'Π C g)
                          D;
 
 – The semI function is actually a monad morphism. This function
@@ -282,7 +282,7 @@ desc-inductor D =
 
 – Two helper functions for constructing little ‘IDesc’s.
 bleh : (A B : Set) → A → IDesc (A × B);
-bleh A B a = 'Pi B (λb. 'Id «a,b»);
+bleh A B a = 'Π B (λb. 'Id «a,b»);
 
 bloo : (A B : Set) → A → B → IDesc (A × B);
 bloo A B a b = 'Id «a,b»;
@@ -371,7 +371,7 @@ maybe A = Unit + A;
 with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
   « λx. case x for x. IDesc (maybe A) with
-          { inl u. 'Pi A (λa. 'Id (inr a))
+          { inl u. 'Π A (λa. 'Id (inr a))
           ; inr a. compose A (maybe A) (fst AI a) (λa. 'Id (inr a))
           }
   , λΦ k x. case x for x. Φ x with
@@ -541,8 +541,8 @@ collapse A =
          (λa D. D)
          (λA' a'. 'K A')
          (λD₁ D₂ rec₁ rec₂ p. 'Pair (rec₁ (fst p)) (rec₂ (snd p)))
-         (λB D rec p. 'Sg B (λb. rec (fst p) (snd p)))
-         (λB D rec f. 'Pi B (λb. rec b (f b)));
+         (λB D rec p. 'Σ B (λb. rec (fst p) (snd p)))
+         (λB D rec f. 'Π B (λb. rec b (f b)));
 
 complete-carrier : (A  : Set) →
                    (AI : inductor A) →
