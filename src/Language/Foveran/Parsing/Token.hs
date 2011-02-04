@@ -84,7 +84,7 @@ instance SyntaxHighlight Token where
     lexicalClass Inr         = Constructor
     lexicalClass QuoteK      = Constructor
     lexicalClass Mu          = Keyword
-    lexicalClass Construct   = Keyword
+    lexicalClass Construct   = Constructor
     lexicalClass Induction   = Keyword
     lexicalClass ElimD       = Keyword
     lexicalClass UnitValue   = Keyword
