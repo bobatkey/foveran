@@ -9,14 +9,17 @@ import           Text.PrettyPrint
 import qualified Language.Foveran.Parsing as P
 import qualified Language.Foveran.Typing  as T
 import qualified Language.Foveran.Util.Html as H
+import qualified Language.Foveran.Util.Emacs as E
 
 data Action
     = GenerateHtml FilePath (Maybe FilePath)
     | TypeCheck    FilePath
+    | GenerateEmacsMode
 
 parseArgs :: IO Action
 parseArgs = getArgs >>= parse
     where
+      parse [ "emacs" ]           = return $ GenerateEmacsMode
       parse [ "html", fnm ]       = return $ GenerateHtml fnm Nothing
       parse [ "html", fnm, ofnm ] = return $ GenerateHtml fnm (Just ofnm)
       parse [ fnm ]               = return $ TypeCheck fnm
@@ -32,6 +35,8 @@ main = do
   case action of
     GenerateHtml fnm ofnm ->
        H.writeHtmlDocument fnm ofnm
+    GenerateEmacsMode ->
+       E.genEmacsMode
     TypeCheck filename ->
         do readResult <- P.readFoveranFile filename
            case readResult of 
