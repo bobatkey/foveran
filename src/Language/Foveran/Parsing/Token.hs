@@ -87,7 +87,7 @@ instance SyntaxHighlight Token where
     lexicalClass Construct   = Constructor
     lexicalClass Induction   = Keyword
     lexicalClass ElimD       = Keyword
-    lexicalClass UnitValue   = Keyword
+    lexicalClass UnitValue   = Constructor
     lexicalClass LDoubleAngle= Constructor
     lexicalClass RDoubleAngle= Constructor
     lexicalClass Comma       = Constructor
