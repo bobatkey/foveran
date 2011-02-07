@@ -10,7 +10,6 @@ module Language.Foveran.Parsing
     )
     where
 
-import Control.Category ((>>>))
 import Data.ByteString (ByteString)
 import qualified Data.Text as T
 import Text.PrettyPrint
