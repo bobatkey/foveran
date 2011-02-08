@@ -55,6 +55,7 @@ lexicalSpec =
     , ("“Σ”",             Emit Quote_Sg)
     , ("“Π”",             Emit Quote_Pi)
     , ("elimID",          Emit IDesc_Elim)
+    , ("µI",              Emit MuI)
     , (tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar),
                            Emit Ident)
     , (oneOrMore (tok digit),

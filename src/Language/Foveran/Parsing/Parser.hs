@@ -177,6 +177,8 @@ term00 =
     <|>
     unary Proj2 <$> token Tok.Snd <* commit <*> term00
     <|>
+    binaryPrefix MuI <$> token Tok.MuI <*> term00 <*> term00
+    <|>
     keyword Induction <$> token Tok.Induction
     <|>
     keyword Desc_Elim <$> token Tok.ElimD

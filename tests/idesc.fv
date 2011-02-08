@@ -90,18 +90,58 @@ allI I D A P p = elimID I (λD. (xs : semI I D (λi. A i)) → lift4 I D A P xs)
                         (λB D all x. λb. all b (x b))
                         D;
 
-assume muI        : (I : Set) → (I → IDesc I) → I → Set;
-assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi. muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
                     (D : I → IDesc I) →
-                    (P : (i : I) → muI I D i → Set 2) →
+                    (P : (i : I) → µI I D i → Set 2) →
                     (k : (i : I) →
-                         (x : semI I (D i) (λi. muI I D i)) →
-                         lift4 I (D i) (muI I D) P x →
-                         P i (constructI I D i x)) →
+                         (x : semI I (D i) (λi. µI I D i)) →
+                         lift4 I (D i) (µI I D) P x →
+                         P i (construct x)) →
                     (i : I) →
-                    (x : muI I D i) →
+                    (x : µI I D i) →
                     P i x;
 
 – this is all the bits I need to do induction on indexed data types!
 – what about higher-Set universes? Do I need to beef up semI?
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+caseNat :
+  (Φ : Nat → Set 2) →
+  (Φ zero) →
+  ((n : Nat) → Φ (succ n)) →
+  (n : Nat) → Φ n;
+caseNat Φ φzero φsucc =
+  induction NatDesc Φ
+    (λx p. case x for x. Φ (construct x) with
+             { inl u. φzero
+             ; inr n. φsucc n
+             });
+
+vectorDesc : Nat → IDesc Nat;
+vectorDesc = caseNat (λn. IDesc Nat)
+                     (    “K” Unit)
+                     (λn. “K” Nat “×” “IId” n);
+
+vector : Nat → Set;
+vector n = µI Nat vectorDesc n;
+
+vnil : vector zero;
+vnil = construct ⋄;
+
+vcons : (n : Nat) → Nat → vector n → vector (succ n);
+vcons n a t = construct « a, t »;
+
+velim :
+  (Φ : (n : Nat) → vector n → Set 2) →
+  (Φ zero vnil) →
+  ((n : Nat) → (a : Nat) → (t : vector n) → Φ n t → Φ (succ n) (vcons n a t)) →
+  (n : Nat) → (v : vector n) → Φ n v;
+velim Φ φnil φcons =
+  inductionI Nat vectorDesc Φ
+    (caseNat (λn. (x : semI Nat (vectorDesc n) (λn. vector n)) → lift4 Nat (vectorDesc n) vector Φ x → Φ n (construct x))
+             (λx u. φnil)
+             (λn x p. φcons n (fst x) (snd x) (snd p)));

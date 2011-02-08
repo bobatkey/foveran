@@ -54,6 +54,7 @@ data TermCon tm
   | IDesc_Sg   tm tm
   | IDesc_Pi   tm tm
   | IDesc_Elim
+  | MuI        tm tm
   deriving (Show, Functor)
 
 toLN :: DS.TermCon ([Ident] -> a) -> [Ident] -> FM TermCon a
@@ -107,6 +108,7 @@ toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (Var $ t bv)
 toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
+toLN (DS.MuI t1 t2)       bv = Layer $ MuI (Var $ t1 bv) (Var $ t2 bv)
 
 toLocallyNameless :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
 toLocallyNameless t = translateStar toLN t []
@@ -148,10 +150,11 @@ close' fnm (Construct t)    = Construct <$> t
 close' fnm Induction        = pure Induction
 
 close' fnm IDesc            = pure IDesc
-close' fnm (IDesc_Id t)       = IDesc_Id <$> t
-close' fnm (IDesc_Sg t1 t2)   = IDesc_Sg <$> t1 <*> t2
-close' fnm (IDesc_Pi t1 t2)   = IDesc_Pi <$> t1 <*> t2
+close' fnm (IDesc_Id t)     = IDesc_Id <$> t
+close' fnm (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
+close' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 close' fnm IDesc_Elim       = pure IDesc_Elim
+close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 
 close :: Ident -> AnnotRec a TermCon -> AnnotRec a TermCon
 close fnm x = translate (close' fnm) x 0

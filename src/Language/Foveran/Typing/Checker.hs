@@ -123,6 +123,10 @@ tyCheck (Annot p (Construct t)) ctxt (VMu f) =
     do tm <- tyCheck t ctxt (vsem $$ f $$ VMu f)
        return ( In $ CS.Construct tm )
 
+tyCheck (Annot p (Construct t)) ctxt (VMuI a d i) =
+    do tm <- tyCheck t ctxt (vsemI $$ a $$ (d $$ i) $$ vmuI a d)
+       return ( In $ CS.Construct tm )
+
 tyCheck (Annot p (Construct t)) ctxt v =
     Error p (ExpectingMuTypeForConstruct ctxt v)
 
@@ -245,6 +249,12 @@ tySynth (Annot p Desc_Elim) ctxt =
 tySynth (Annot p (Mu t)) ctxt =
     do tm <- tyCheck t ctxt VDesc
        return (VSet 0, In $ CS.Mu tm)
+
+tySynth (Annot p (MuI t1 t2)) ctxt =
+    do tm1 <- tyCheck t1 ctxt (VSet 0)
+       let v = tm1 `evalIn` ctxt
+       tm2 <- tyCheck t2 ctxt (v .->. VIDesc v)
+       return (v .->. VSet 0, In $ CS.MuI tm1 tm2)
 
 tySynth (Annot p Induction) ctxt =
     return ( forall "F" VDesc               $ \f ->

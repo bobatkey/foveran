@@ -79,17 +79,15 @@ unitI I D A =
     (λB D unit x. λb. unit b (x b))
     D;
 
-assume muI        : (I : Set) → (I → IDesc I) → I → Set;
-assume constructI : (I : Set) → (D : I → IDesc I) → (i : I) → semI I (D i) (λi. muI I D i) → muI I D i;
 assume inductionI : (I : Set) →
                     (D : I → IDesc I) →
-                    (Φ : (i : I) → muI I D i → Set 2) →
+                    (Φ : (i : I) → µI I D i → Set 2) →
                     (k : (i : I) →
-                         (x : semI I (D i) (λi. muI I D i)) →
-                         liftI I (D i) (λi. muI I D i) Φ x →
-                         Φ i (constructI I D i x)) →
+                         (x : semI I (D i) (λi. µI I D i)) →
+                         liftI I (D i) (λi. µI I D i) Φ x →
+                         Φ i (construct x)) →
                     (i : I) →
-                    (x : muI I D i) →
+                    (x : µI I D i) →
                     Φ i x;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -99,13 +97,13 @@ drop : (I : Set) →
        (D : I → IDesc I) →
        (A : I → Set) →
        (i : I) →
-       (x : semI I (D i) (λi. muI I D i)) →
-       liftI I (D i) (λi. muI I D i) (λi x. A i) x →
+       (x : semI I (D i) (λi. µI I D i)) →
+       liftI I (D i) (λi. µI I D i) (λi x. A i) x →
        semI I (D i) (λi. A i);
 drop I D A i =
   elimID I
-    (λD'. (x : semI I D' (λi. muI I D i)) →
-          liftI I D' (λi. muI I D i) (λi x. A i) x →
+    (λD'. (x : semI I D' (λi. µI I D i)) →
+          liftI I D' (λi. µI I D i) (λi x. A i) x →
           semI I D' (λi. A i))
     (λi x a. a)
     (λX x u. x)
@@ -119,7 +117,7 @@ icata : (I : Set) →
         (D : I → IDesc I) →
         (A : I → Set) →
         ((i : I) → semI I (D i) (λi. A i) → A i) →
-        (i : I) → muI I D i → A i;
+        (i : I) → µI I D i → A i;
 icata I D A k =
   inductionI I D
     (λi x. A i)
@@ -194,49 +192,46 @@ forget : (D : Desc) →
          (A : Set) →
          (r : refinement D A) →
          (a : A) →
-         muI A (apply-refinement D A r) a →
+         µI A (apply-refinement D A r) a →
          µ D;
 forget D A r =
   inductionI A (apply-refinement D A r)
              (λa x. µ D)
              (λa x φ.
-                construct (recons A D (λi. muI A (apply-refinement D A r) i)
+                construct (recons A D (λi. µI A (apply-refinement D A r) i)
                                   (snd (r a) (fst x)) (snd x) φ));
 
-– FIXME: is this basically the same as drop in the unindexed case?
-forget-algebra :
+zip :
+  (A B : Set) →
   (D : Desc) →
-  (A : Set) →
-  (r : refinement D A) →
-  (a : A) →
-  semI A (apply-refinement D A r a) (λi. µ D) →
-  µ D;
-forget-algebra D A r =
-  λa p.
-    construct
-      (elimD (λD'. (x : sem D' A) →
-                   semI A (lift2 D' A x) (λi. µ D) →
-                   sem D' (µ D))
-             (λX x u. x)
-             (λa x. x)
-             (λD₁ D₂ f₁ f₂ x y. «f₁ (fst x) (fst y), f₂ (snd x) (snd y)»)
-             (λD₁ D₂ f₁ f₂ x.
-                case x for x. semI A (lift2 (D₁ “+” D₂) A x) (λi. µ D) → sem (D₁ “+” D₂) (µ D) with
-                  { inl x₁. λy₁. inl (f₁ x₁ y₁)
-                  ; inr x₂. λy₂. inr (f₂ x₂ y₂)
-                  })
-             D
-             (snd (r a) (fst p))
-             (snd p));
+  (x : sem D A) →
+  semI A (lift2 D A x) (λi. B) →
+  sem D B;
+zip A B =
+  elimD (λD'. (x : sem D' A) →
+              semI A (lift2 D' A x) (λi. B) →
+              sem D' B)
+    (λA' x u. x)
+    (λx b. b)
+    (λD₁ D₂ zip₁ zip₂ x y.
+      « zip₁ (fst x) (fst y)
+      , zip₂ (snd x) (snd y)
+      »)
+    (λD₁ D₂ zip₁ zip₂ x.
+      case x for x. semI A (lift2 (D₁ “+” D₂) A x) (λi. B) → sem (D₁ “+” D₂) B with
+        { inl x. λy. inl (zip₁ x y)
+        ; inr x. λy. inr (zip₂ x y)
+        });
 
 forget2 : (D : Desc) →
           (A : Set) →
           (r : refinement D A) →
           (a : A) →
-          muI A (apply-refinement D A r) a →
+          µI A (apply-refinement D A r) a →
           µ D;
 forget2 D A r =
-  icata A (apply-refinement D A r) (λa. µ D) (forget-algebra D A r);
+  icata A (apply-refinement D A r) (λa. µ D)
+    (λa p. construct (zip A (µ D) D (snd (r a) (fst p)) (snd p)));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – natural numbers and lists as boring, make from scratch datatypes
@@ -259,6 +254,48 @@ data List (A : Set) : Set :=
   ;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Fin
+fin-refinement : refinement NatDesc Nat;
+fin-refinement =
+  caseNat (λn. (X : Set) × (X → sem NatDesc Nat))
+    (    « Empty,       λe. elimEmpty (sem NatDesc Nat) e »)
+    (λn. « Unit + Unit, λs. case s for s. sem NatDesc Nat with
+                              { inl u. inl ⋄
+                              ; inr u. inr n
+                              } »);
+
+finDesc : Nat → IDesc Nat;
+finDesc = apply-refinement NatDesc Nat fin-refinement;
+
+fin : (n : Nat) → Set;
+fin = µI Nat finDesc;
+
+fz : (n : Nat) → fin (succ n);
+fz n = construct « inl ⋄, ⋄ »;
+
+fs : (n : Nat) → fin n → fin (succ n);
+fs n f = construct « inr ⋄, f »;
+
+fog : (n : Nat) → fin n → Nat;
+fog = forget2 NatDesc Nat fin-refinement;
+
+finElim : (Φ : (n : Nat) → fin n → Set 2) →
+          ((n : Nat) → Φ (succ n) (fz n)) →
+          ((n : Nat) → (x : fin n) → Φ n x → Φ (succ n) (fs n x)) →
+          (n : Nat) → (x : fin n) → Φ n x;
+finElim Φ φz φs =
+  inductionI Nat finDesc Φ
+    (caseNat (λn. (x : semI Nat (finDesc n) (λn. fin n)) → liftI Nat (finDesc n) (λn. fin n) Φ x → Φ n (construct x))
+       (λx φ. elimEmpty (Φ zero (construct x)) (fst x))
+       (λn x. case fst x for y. (z : semI Nat (lift2 NatDesc Nat (snd (fin-refinement (succ n)) y)) (λn. fin n)) →
+                                liftI Nat (finDesc (succ n)) (λn. fin n) Φ «y,z» →
+                                Φ (succ n) (construct «y,z») with
+                { inl u. λu' u''. φz n
+                ; inr u. λz p. φs n z p
+                }
+                (snd x)));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – From lists to vectors, using pattern matching on the index to determine
 – the available constructors.
 vec-refinement : (A : Set) → refinement (ListDesc A) Nat;
@@ -271,15 +308,13 @@ VecDesc : Set → Nat → IDesc Nat;
 VecDesc A = apply-refinement (ListDesc A) Nat (vec-refinement A);
 
 Vec : (A : Set) → (n : Nat) → Set;
-Vec A = muI Nat (VecDesc A);
+Vec A = µI Nat (VecDesc A);
 
 vec-nil : (A : Set) → Vec A zero;
-vec-nil A =
-  constructI Nat (VecDesc A) zero « ⋄, ⋄ »;
+vec-nil A = construct « ⋄, ⋄ »;
 
 vec-cons : (A : Set) → (n : Nat) → A → Vec A n → Vec A (succ n);
-vec-cons A n a v =
-  constructI Nat (VecDesc A) (succ n) « a, « ⋄, v » »;
+vec-cons A n a v = construct « a, « ⋄, v » »;
 
 vec-elim : (A : Set) →
            (Φ : (n : Nat) → Vec A n → Set 2) →
@@ -287,18 +322,17 @@ vec-elim : (A : Set) →
            ((n : Nat) → (a : A) → (v : Vec A n) → Φ n v → Φ (succ n) (vec-cons A n a v)) →
            (n : Nat) → (v : Vec A n) → Φ n v;
 vec-elim A Φ φnil φcons =
-  inductionI Nat (VecDesc A)
-             Φ
-             (caseNat (λn. (v : semI Nat (VecDesc A n) (λn. Vec A n)) →
-                           liftI Nat (VecDesc A n) (λn. Vec A n) Φ v →
-                           Φ n (constructI Nat (VecDesc A) n v))
-                 (λv φ. φnil)
-                 (λn v φ. φcons n (fst v) (snd (snd v)) (snd φ)));
+  inductionI Nat (VecDesc A) Φ
+    (caseNat (λn. (v : semI Nat (VecDesc A n) (λn. Vec A n)) →
+                  liftI Nat (VecDesc A n) (λn. Vec A n) Φ v →
+                  Φ n (construct v))
+       (λv φ. φnil)
+       (λn v φ. φcons n (fst v) (snd (snd v)) (snd φ)));
 
 vec-to-list : (A : Set) →
               (n : Nat) → Vec A n → List A;
 vec-to-list A =
-  forget (ListDesc A) Nat (vec-refinement A);
+  forget2 (ListDesc A) Nat (vec-refinement A);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Lists, by refinement
@@ -316,15 +350,15 @@ List2Desc : (A : Set) → Unit → IDesc Unit;
 List2Desc A = apply-refinement NatDesc Unit (list-refinement A);
 
 List2 : (A : Set) → Set;
-List2 A = muI Unit (List2Desc A) ⋄;
+List2 A = µI Unit (List2Desc A) ⋄;
 
 nil2 : (A : Set) → List2 A;
 nil2 A =
-  constructI Unit (List2Desc A) ⋄ « inl ⋄, ⋄ »;
+  construct « inl ⋄, ⋄ »;
 
 cons2 : (A : Set) → A → List2 A → List2 A;
 cons2 A a l =
-  constructI Unit (List2Desc A) ⋄ « inr a, l »;
+  construct « inr a, l »;
 
 list-elim : (A : Set) →
             (Φ : List2 A → Set 2) →
@@ -339,7 +373,7 @@ list-elim A Φ φnil φcons =
       case fst x
         for y. (z : semI Unit (lift2 NatDesc Unit (snd (list-refinement A ⋄) y)) (λu. List2 A)) →
                liftI Unit (List2Desc A i) (λu. List2 A) (λi. Φ) «y, z» →
-               Φ (constructI Unit (List2Desc A) ⋄ «y, z») with
+               Φ (construct «y, z») with
         { inl u. λz u. φnil
         ; inr a. λl φ. φcons a l φ
         }
@@ -349,7 +383,7 @@ list-elim A Φ φnil φcons =
 – length:
 list-to-nat : (A : Set) → List2 A → Nat;
 list-to-nat A =
-    forget NatDesc Unit (list-refinement A) ⋄;
+    forget2 NatDesc Unit (list-refinement A) ⋄;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Both of the attempts below get stuck. I think this is due to the largeness of

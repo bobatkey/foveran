@@ -9,8 +9,10 @@ module Language.Foveran.Typing.Conversion
        , forall
        , reflect
        , vsem
+       , vsemI
        , vfst
        , vlift
+       , vmuI
        )
        where
 
@@ -50,6 +52,7 @@ data Value
     | VIDesc_Pair Value Value
     | VIDesc_Sg   Value Value
     | VIDesc_Pi   Value Value
+    | VMuI        Value Value Value
     | VNeutral   (Int -> Term)
     deriving Show
 
@@ -79,6 +82,29 @@ vsem = VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
                               VLam "F" $ \f -> VLam "G" $ \g -> 
                               VLam "X" $ \x -> (f $$ x) .+. (g $$ x))
 
+vsemI :: Value
+vsemI = VLam "I" $ \i ->
+        VLam "D" $ \d ->
+        VLam "X" $ \x ->
+        videsc_elim i (VLam "D2" $ \d -> VSet 2)
+          (VLam "i" $ \i -> x $$ i)
+          (VLam "A" $ \a -> a)
+          (VLam "D₁" $ \d1 ->
+           VLam "D₂" $ \d2 ->
+           VLam "semD₁" $ \semd1 ->
+           VLam "semD₂" $ \semd2 ->
+           semd1 .*. semd2)
+          (VLam "A" $ \a ->
+           VLam "D" $ \d ->
+           VLam "semD" $ \semD ->
+           VSigma (Just "a") a (\a -> semD $$ a))
+          (VLam "A" $ \a ->
+           VLam "D" $ \d ->
+           VLam "semD" $ \semD ->
+           VPi (Just "a") a (\a -> semD $$ a))
+          d
+
+{-
 vmap :: Value
 vmap = VLam "F" $ \f ->
        VLam "A" $ \a ->
@@ -103,6 +129,7 @@ vmap = VLam "F" $ \f ->
                                           "x" (\x -> VInl (g $$ x))
                                           "x" (\x -> VInr (h $$ x)))
                   f
+-}
 
 vlift :: Value
 vlift = VLam "D" $ \d ->
@@ -258,6 +285,10 @@ vsnd :: Value -> Value
 vsnd (VPair _ v) = v
 vsnd v           = error $ "internal: vsnd given non-pair: " ++ show v
 
+vmuI :: Value -> Value -> Value
+vmuI a b = VLam "i" $ VMuI a b
+
+
 {------------------------------------------------------------------------------}
 reflect :: Value -> (Int -> Term) -> Value
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
@@ -268,17 +299,18 @@ reflect VUnit            tm = VUnitI
 reflect _                tm = VNeutral tm
 
 reifyType :: Value -> (Int -> Term)
-reifyType (VPi x v f)    = \i -> In $ Pi x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSigma x v f) = \i -> In $ Sigma x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSum v1 v2)   = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
-reifyType (VSet l)       = \i -> In $ Set l
-reifyType VUnit          = \i -> In $ Unit
-reifyType VEmpty         = \i -> In $ Empty
-reifyType VDesc          = \i -> In $ Desc
-reifyType (VMu v)        = \i -> In $ Mu (reify VDesc v i)
-reifyType (VIDesc s)     = pure (In IDesc) `tmApp` reifyType s
-reifyType (VNeutral t)   = \i -> t i
-reifyType v              = error ("internal: reifyType given non-type: " ++ show v)
+reifyType (VPi x v f)     = \i -> In $ Pi x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
+reifyType (VSigma x v f)  = \i -> In $ Sigma x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
+reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
+reifyType (VSet l)        = \i -> In $ Set l
+reifyType VUnit           = \i -> In $ Unit
+reifyType VEmpty          = \i -> In $ Empty
+reifyType VDesc           = \i -> In $ Desc
+reifyType (VMu v)         = \i -> In $ Mu (reify VDesc v i)
+reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VIDesc v1) v2 i)) `tmApp` reify v1 v3
+reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
+reifyType (VNeutral t)    = \i -> t i
+reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
 
 
@@ -305,6 +337,7 @@ reify VDesc            VDesc_Id           = \i -> In $ Desc_Id
 reify VDesc            (VDesc_Prod v1 v2) = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
 reify VDesc            (VDesc_Sum v1 v2)  = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
 reify (VMu tA)         (VConstruct v)     = \i -> In $ Construct (reify (vsem $$ tA $$ (VMu tA)) v i)
+reify (VMuI tI tD ti)  (VConstruct v)     = \i -> In $ Construct (reify (vsemI $$ tI $$ (tD $$ ti) $$ (vmuI tI tD)) v i)
 reify (VIDesc tI)      (VIDesc_Id x)      = \i -> In $ IDesc_Id (reify tI x i)
 reify (VIDesc tI)      (VIDesc_K a)       = \i -> In $ IDesc_K (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)
@@ -393,6 +426,7 @@ eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 VLam "pPi" $ \pPi ->
                                 VLam "d" $ \d ->
                                 videsc_elim i p pId pK pPair pSg pPi d)
+eval (MuI t1 t2)        = vmuI <$> t1 <*> t2
 
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value

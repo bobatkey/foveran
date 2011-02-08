@@ -58,6 +58,7 @@ data Token
     | Quote_Sg
     | Quote_Pi
     | IDesc_Elim
+    | MuI
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -111,6 +112,7 @@ instance SyntaxHighlight Token where
     lexicalClass Quote_Sg    = Constructor
     lexicalClass Quote_Pi    = Constructor
     lexicalClass IDesc_Elim  = Keyword
+    lexicalClass MuI         = Keyword
 
 instance Show Token where
   show Assume = "assume"
@@ -161,3 +163,4 @@ instance Show Token where
   show Quote_Sg    = "“Σ”"
   show Quote_Pi    = "“Π”"
   show IDesc_Elim  = "elimID"
+  show MuI         = "µI"

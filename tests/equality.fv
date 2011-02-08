@@ -28,6 +28,11 @@ subst A F a₁ a₂ e = e F;
 –fext A B f g eq = λF p₁ → ();
 – where do we get an 'A' from to apply to eq?
 
+– p₁ : F (λa. f a)
+
+
+– Somehow, we could get out one of the ‘a’s that “F” is going to use?
+
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – injectivity of sums
 inj-inl : (A B : Set) → (a₁ a₂ : A) →

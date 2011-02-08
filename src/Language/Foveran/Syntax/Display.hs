@@ -65,8 +65,8 @@ data TermCon tm
     | IDesc_Id   tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
-
     | IDesc_Elim
+    | MuI        tm tm
     deriving (Show, Functor)
 
 data Constructor
