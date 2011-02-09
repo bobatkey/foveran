@@ -2,6 +2,11 @@
 
 This file defines ‘inductors’: abstract induction principles.
 
+Changes:
+ 20110209 : Added GCD example
+
+
+
 An inductor for a type ‘A’ consists of two parts:
 
  1. A predicate transformer ‘H : (A → Set) → (A → Set)’. This will
@@ -103,7 +108,7 @@ sem = elimD (λx. Set → Set)
 
 lift : (D : Desc) →
        (α : Set) →
-       (Φ : α → Set 2) →
+       (Φ : α → Set 1) →
        sem D α → Set 2 ;
 lift D α Φ = elimD (λD. sem D α → Set 2)
                    (λA x. Unit)
@@ -115,9 +120,23 @@ lift D α Φ = elimD (λD. sem D α → Set 2)
                                   })
                    D;
 
+lift' : (D : Desc) →
+        (α : Set) →
+        (Φ : α → Set 2) →
+        sem D α → Set 2 ;
+lift' D α Φ = elimD (λD. sem D α → Set 2)
+                    (λA x. Unit)
+                    (λx. Φ x)
+                    (λF G f g x. f (fst x) × g (snd x))
+                    (λF G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
+                                   })
+                    D;
+
 all : (D : Desc) →
       (X : Set) →
-      (P : X → Set 2) →
+      (P : X → Set 1) →
       (p : (x : X) → P x) →
       (xs : sem D X) →
       lift D X P xs ;
@@ -139,12 +158,12 @@ caseD : (D : Desc) →
         ((x : sem D (µ D)) → Φ (construct x)) →
         (x : µ D) → Φ x;
 caseD D Φ k =
-  induction D Φ (λx φ. k x);
+  induction D (λx. Φ x) (λx φ. k x);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Some things for indexed descriptions.
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
+semI : (I : Set) → IDesc I → (I → Set 1) → Set 1;
+semI I D X = elimID I (λD. Set 1)
                     (λi. X i)
                     (λA. A)
                     (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
@@ -152,7 +171,7 @@ semI I D X = elimID I (λD. Set 2)
                     (λA D semD. (a : A) → semD a)
                     D;
 
-semI' : (I J : Set) → (I → IDesc J) → (J → Set 2) → (I → Set 2);
+semI' : (I J : Set) → (I → IDesc J) → (J → Set 1) → (I → Set 1);
 semI' I J D X i = semI J (D i) X;
 
 – Composition of descriptions of indexed functors. The type of this 
@@ -174,11 +193,26 @@ compose A B D f = elimID A (λD. IDesc B)
 commute : (I J : Set) →
           (D₁ : IDesc I) →
           (D₂ : I → IDesc J) →
-          (Φ  : J → Set 2) →
+          (Φ  : J → Set 1) →
           semI I D₁ (λa. semI J (D₂ a) Φ) →
           semI J (compose I J D₁ D₂) Φ;
 commute I J D₁ D₂ Φ =
   elimID I (λD₁. semI I D₁ (λa. semI J (D₂ a) Φ) → semI J (compose I J D₁ D₂) Φ)
+         (λi x. x)
+         (λA a. a)
+         (λD₁ D₂ c₁ c₂ p. «c₁ (fst p), c₂ (snd p)»)
+         (λA D g p. «fst p, g (fst p) (snd p)»)
+         (λA D g f. λa. g a (f a))
+         D₁;
+
+commute2 : (I J : Set) →
+           (D₁ : IDesc I) →
+           (D₂ : I → IDesc J) →
+           (Φ  : J → Set 1) →
+           semI J (compose I J D₁ D₂) Φ →
+           semI I D₁ (λa. semI J (D₂ a) Φ);
+commute2 I J D₁ D₂ Φ =
+  elimID I (λD₁. semI J (compose I J D₁ D₂) Φ → semI I D₁ (λa. semI J (D₂ a) Φ))
          (λi x. x)
          (λA a. a)
          (λD₁ D₂ c₁ c₂ p. «c₁ (fst p), c₂ (snd p)»)
@@ -191,7 +225,7 @@ commute I J D₁ D₂ Φ =
 – held definitionally.
 map : (A : Set) →
       (D : IDesc A) →
-      (Φ Ψ : A → Set 2) →
+      (Φ Ψ : A → Set 1) →
       (f : (a : A) → Φ a → Ψ a) →
       semI A D Φ →
       semI A D Ψ;
@@ -206,10 +240,10 @@ map A D Φ Ψ f =
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – The definition of inductors, as described above. We assume that
-– elimination into ‘Set 2’ is allowed, for flexibility.
-inductor : Set → Set 3;
+– elimination into ‘Set 1’ is allowed, for flexibility.
+inductor : Set → Set 2;
 inductor A = (H : A → IDesc A) ×
-             ((Φ : A → Set 2) →
+             ((Φ : A → Set 1) →
               ((x : A) → semI' A A H Φ x → Φ x) →
               (x : A) → Φ x);
 
@@ -235,7 +269,7 @@ lift2 D A = elimD (λD. sem D A → IDesc A)
 
 lift-to-lift2 : (D : Desc) →
                 (A : Set) →
-                (Φ : A → Set 2) →
+                (Φ : A → Set 1) →
                 (x : sem D A) →
                 lift D A Φ x →
                 semI' (sem D A) A (lift2 D A) Φ x;
@@ -253,7 +287,7 @@ lift-to-lift2 D A Φ =
 
 lift2-to-lift : (D : Desc) →
                 (A : Set) →
-                (Φ : A → Set 2) →
+                (Φ : A → Set 1) →
                 (x : sem D A) →
                 semI' (sem D A) A (lift2 D A) Φ x →
                 lift D A Φ x;
@@ -272,7 +306,7 @@ lift2-to-lift D A Φ =
 desc-inductor : (D : Desc) → inductor (µ D);
 desc-inductor D =
   « λx. lift2 D (µ D) (deconstruct D x)
-  , λΦ k. induction D Φ (λx p. k (construct x) (lift-to-lift2 D (µ D) Φ x p))
+  , λΦ k. induction D (λx. Φ x) (λx p. k (construct x) (lift-to-lift2 D (µ D) Φ x p))
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -422,21 +456,21 @@ with-top A AI =
 – functor.
 comonad : Set → Set 3;
 comonad A = (W      : A → IDesc A) ×
-            (counit : (P : A → Set 2) → (a : A) → semI' A A W P a → P a) ×
-	    (cojoin : (P : A → Set 2) → (a : A) → semI' A A W P a → semI' A A W (semI' A A W P) a) ×
+            (counit : (P : A → Set 1) → (a : A) → semI' A A W P a → P a) ×
+	    (cojoin : (P : A → Set 1) → (a : A) → semI' A A W P a → semI' A A W (semI' A A W P) a) ×
             Unit;
 
 – Projection functions for comonads. We’ll just use ‘fst W’ to get the
 – functor part of the comonad.
 counit : (A : Set) → (W : comonad A) →
-         (P : A → Set 2) →
+         (P : A → Set 1) →
          (a : A) →
          semI' A A (fst W) P a →
          P a;
 counit A W = fst (snd W);
 
 cojoin : (A : Set) → (W : comonad A) →
-         (P : A → Set 2) →
+         (P : A → Set 1) →
          (a : A) →
          semI' A A (fst W) P a →
          semI' A A (fst W) (semI' A A (fst W) P) a;
@@ -449,7 +483,7 @@ cojoin A W = fst (snd (snd W));
 comonadic-inductor : (A  : Set) →
                      (W  : comonad A) →
                      (AI : inductor A) →
-                     (d  : (P : A → Set 2) →
+                     (d  : (P : A → Set 1) →
                            (a : A) →
                            semI' A A (fst AI) (semI' A A (fst W) P) a →
                            semI' A A (fst W) (semI' A A (fst AI) P) a) →
@@ -522,7 +556,7 @@ primitive-inductor A AI Ψ k =
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – This is an attempt to define complete induction by making use of a
 – memoisation table. To build the type of the memoisation table I have
-– attempted to use the inductor itself, since it can generate values in ‘Set 2’.
+– attempted to use the inductor itself, since it can generate values in ‘Set 1’.
 – However, because the inductor doesn't have any computational meaning (it
 – doesn't reduce), I can't get access to the computed type at any time, so I
 – wasn't able to define the counit and cojoin of the comonad. I think, unless
@@ -558,7 +592,7 @@ complete-carrier A AI =
 complete-counit :
   (A  : Set) →
   (AI : inductor A) →
-  (Φ  : A → Set 2) → (a : A) → semI' A A (complete-carrier A AI) Φ a → Φ a;
+  (Φ  : A → Set 1) → (a : A) → semI' A A (complete-carrier A AI) Φ a → Φ a;
 complete-counit A AI Φ =
   snd AI (λa. semI' A A (complete-carrier A AI) Φ a → Φ a)
       (λa d. ());
@@ -598,7 +632,7 @@ collapse2 D X =
 step :
   (D : Desc) →
   (Ψ : µ D → IDesc (µ D)) →
-  (Φ : µ D → Set 2) →
+  (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
   lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
   semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ;
@@ -624,7 +658,7 @@ step D Ψ Φ =
 unstep :
   (D : Desc) →
   (Ψ : µ D → IDesc (µ D)) →
-  (Φ : µ D → Set 2) →
+  (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
   semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
   lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x;
@@ -657,7 +691,7 @@ complete2-carrier D =
 – The counit is effectively just first projection.
 complete2-counit :
   (D : Desc) →
-  (Φ : µ D → Set 2) → (x : µ D) → semI' (µ D) (µ D) (complete2-carrier D) Φ x → Φ x;
+  (Φ : µ D → Set 1) → (x : µ D) → semI' (µ D) (µ D) (complete2-carrier D) Φ x → Φ x;
 complete2-counit D Φ =
   caseD D (λx. semI' (µ D) (µ D) (complete2-carrier D) Φ x → Φ x)
         (λx p. fst p);
@@ -667,7 +701,7 @@ complete2-counit D Φ =
 – function to make such that this definition is meaningful and usable.
 complete2-snd :
   (D : Desc) →
-  (Φ : µ D → Set 2) →
+  (Φ : µ D → Set 1) →
   (x : µ D) →
   semI' (µ D) (µ D) (complete2-carrier D) Φ x →
   lift D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x);
@@ -680,7 +714,7 @@ complete2-snd D Φ =
 – the computed lifting type and the of description the lifting.
 complete2-snd2 :
   (D : Desc) →
-  (Φ : µ D → Set 2) →
+  (Φ : µ D → Set 1) →
   (x : µ D) →
   semI' (µ D) (µ D) (complete2-carrier D) Φ x →
   semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x;
@@ -694,7 +728,7 @@ complete2-snd2 D Φ x p =
 apply :
  (D : Desc) →
  (A : Set) →
- (Φ Ψ : A → Set 2) →
+ (Φ Ψ : A → Set 1) →
  (x : sem D A) →
  lift D A (λa. Φ a → Ψ a) x →
  lift D A Φ x →
@@ -737,7 +771,7 @@ unit A = elimD
 – We can now define the cojoin of the complete-induction comonad.
 complete2-cojoin :
   (D : Desc) →
-  (Φ : µ D → Set 2) →
+  (Φ : µ D → Set 1) →
   (x : µ D) →
   semI' (µ D) (µ D) (complete2-carrier D) Φ x →
   semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) x;
@@ -763,7 +797,7 @@ complete2-cojoin D Φ =
 – just bureaucratic fluff.
 complete2-dist :
   (D : Desc) →
-  (P : µ D → Set 2) →
+  (P : µ D → Set 1) →
   (x : µ D) →
   semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x →
   semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P) x;
@@ -821,7 +855,7 @@ caseNat :
   ((n : Nat) → Φ (succ n)) →
   (n : Nat) → Φ n;
 caseNat Φ φzero φsucc =
-  induction NatDesc Φ
+  induction NatDesc (λn. Φ n)
     (λx p. case x for x. Φ (construct x) with
              { inl u. φzero
              ; inr n. φsucc n
@@ -832,8 +866,8 @@ natInduction : (Φ : Nat → Set 2) →
                ((n : Nat) → Φ n → Φ (succ n)) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
-  induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+  induction NatDesc (λn. Φ n)
+            (\x. case x for x. lift' NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
@@ -875,8 +909,11 @@ fibonacci =
 
 
 – A test, using Leibniz equality as the comparison.
-nat-equal : Nat → Nat → Set 1;
-nat-equal n₁ n₂ = (F : Nat → Set) → F n₁ → F n₂;
+nat-equal : Nat → Nat → Set 2;
+nat-equal n₁ n₂ = (F : Nat → Set 1) → F n₁ → F n₂;
+
+refl : (a : Nat) → nat-equal a a;
+refl a = λF x. x;
 
 – This will make the typechecker normalise both sides and compare
 – them. If this works, the implementation above will have computed
@@ -885,6 +922,162 @@ test : nat-equal (fibonacci five) eight;
 test = λF x. x;
 
 – Yay it works!
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– GCD, another example. Suggested by Ben and Pierre.
+equalNat : Nat → Nat → Set;
+equalNat = natInduction (λx. Nat → Set)
+                        (caseNat (λx. Set) Unit (λn. Empty))
+                        (λn f. caseNat (λx. Set) Empty f);
+
+equalNat-refl : (n : Nat) → equalNat n n;
+equalNat-refl = natInduction (λn. equalNat n n) ⋄ (λn p. p);
+
+equal-to-leibniz : (n₁ n₂ : Nat) → equalNat n₁ n₂ → nat-equal n₁ n₂;
+equal-to-leibniz =
+  natInduction (λn₁. (n₂ : Nat) → equalNat n₁ n₂ → nat-equal n₁ n₂)
+               (caseNat (λn₂. equalNat zero n₂ → nat-equal zero n₂)
+                        (λu. refl zero)
+                        (λn₂ e. elimEmpty (nat-equal zero (succ n₂)) e))
+               (λn₁ ih. caseNat (λn₂. equalNat (succ n₁) n₂ → nat-equal (succ n₁) n₂)
+                                (λe. elimEmpty (nat-equal (succ n₁) zero) e)
+                                (λn₂ eq. λF f₁. ih n₂ eq (λn. F (succ n)) f₁));
+
+compareView : Nat → Nat → Set;
+compareView n₁ n₂ =
+    equalNat n₁ n₂
+  + ((k : Nat) × equalNat (succ (add n₁ k)) n₂)
+  + ((k : Nat) × equalNat (succ (add n₂ k)) n₁);
+
+compare : (n₁ n₂ : Nat) → compareView n₁ n₂;
+compare =
+  natInduction (λn₁. (n₂ : Nat) → compareView n₁ n₂)
+    (caseNat (λn₂. compareView zero n₂)
+       (inl ⋄)
+       (λn₂. inr (inl «n₂, equalNat-refl n₂»)))
+    (λn₁ compare.
+     caseNat (λn₂. compareView (succ n₁) n₂)
+       (inr (inr «n₁, equalNat-refl n₁»))
+       compare);
+
+project :
+  (Φ : Nat → Set) →
+  (n : Nat) →
+  semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
+  Φ n;
+project Φ =
+  caseNat (λn. semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) → Φ n)
+  (λx. fst x)
+  (λn x. fst x);
+
+stepDown :
+  (Φ : Nat → Set) →
+  (n : Nat) →
+  semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
+  semI Nat (fst (complete-inductor NatDesc) n) (λn. Φ n);
+stepDown Φ =
+  caseNat (λn. semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
+               semI Nat (fst (complete-inductor NatDesc) n) (λn. Φ n))
+  (λx. ⋄)
+  (λn x. snd x);
+
+descend : (Φ : Nat → Set) →
+          (k n₁ n₂ : Nat) →
+          equalNat (succ (add n₁ k)) n₂ →
+          semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+          Φ k;
+descend Φ k =
+  natInduction
+    (λn₁. (n₂ : Nat) →
+          equalNat (succ (add n₁ k)) n₂ →
+          semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+          Φ k)
+    (λn₂ eq.
+       equal-to-leibniz (succ k) n₂ eq
+         (λn₂. semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) → Φ k)
+         (project Φ k))
+    (λn₁ ih n₂ eq.
+       equal-to-leibniz (succ (succ (add n₁ k))) n₂ eq
+        (λn₂. semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) → Φ k)
+        (λφ. ih (succ (add n₁ k)) (equalNat-refl (succ (add n₁ k))) (stepDown Φ (succ (add n₁ k)) φ)));
+
+switch :
+  (n₁ n₂ : Nat) →
+  equalNat (add (succ n₁) n₂) (add n₁ (succ n₂));
+switch =
+  natInduction (λn₁. (n₂ : Nat) → equalNat (add (succ n₁) n₂) (add n₁ (succ n₂)))
+    (λn₂. equalNat-refl n₂)
+    (λn₁ ih. ih);
+
+descend-gcd :
+  (Φ : Nat → Set) →
+  (k n₁ n₂ : Nat) →
+  equalNat (succ (add (succ n₁) k)) n₂ →
+  semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+  Φ (succ k);
+descend-gcd Φ k n₁ n₂ eq =
+  descend Φ (succ k) n₁ n₂
+    (equal-to-leibniz
+      (succ (add (succ n₁) k))
+      (succ (add n₁ (succ k)))
+      (switch n₁ k)
+      (λn. equalNat n n₂)
+      eq);
+
+caseNatPair :
+  (Φ : Nat → Nat → Set 2) →
+  (Φ zero zero) →
+  ((n : Nat) → Φ zero (succ n)) →
+  ((n : Nat) → Φ (succ n) zero) →
+  ((n₁ n₂ : Nat) → Φ (succ n₁) (succ n₂)) →
+  (p : Nat × Nat) → Φ (fst p) (snd p);
+caseNatPair Φ φzz φzs φsz φss p =
+  caseNat (λn₁. (n₂ : Nat) → Φ n₁ n₂)
+    (caseNat (λn₂. Φ zero n₂) φzz φzs)
+    (λn₁. caseNat (λn₂. Φ (succ n₁) n₂) (φsz n₁) (φss n₁))
+    (fst p) (snd p);
+
+GCD-inductor : inductor (Nat × Nat);
+GCD-inductor =
+  pair-inductor Nat (complete-inductor NatDesc)
+                Nat (complete-inductor NatDesc);
+
+gcd : Nat → Nat → Nat;
+gcd n₁ n₂ =
+  snd GCD-inductor (λp. Nat)
+    (caseNatPair
+       (λn₁ n₂. semI (Nat × Nat) (fst GCD-inductor «n₁,n₂») (λn. Nat) → Nat)
+       (λφ. zero)
+       (λn φ. n)
+       (λn φ. n)
+       (λn₁ n₂ φ.
+          case compare (succ n₁) (succ n₂) for x. Nat with
+            { inl e. succ n₁
+            ; inr s. case s for x. Nat with
+               { inl lt. descend-gcd (λn. Nat) (fst lt) n₁ (succ n₂) (snd lt)
+                         (commute2 Nat (Nat × Nat)
+                                   (fst (complete-inductor NatDesc) (succ n₂))
+                                   (bloo Nat Nat (succ n₁)) (λn. Nat) (snd φ))
+               ; inr gt. descend-gcd (λn. Nat) (fst gt) n₂ (succ n₁) (snd gt)
+                         (commute2 Nat (Nat × Nat)
+                                   (fst (complete-inductor NatDesc) (succ n₁))
+                                   (floo Nat Nat (succ n₂)) (λn. Nat) (fst φ))
+               }
+            }))
+    « n₁, n₂ »;
+
+– a test:
+nine : Nat;
+nine = succ eight;
+
+six : Nat;
+six = add four two;
+
+three : Nat;
+three = succ two;
+
+test-gcd : nat-equal (gcd nine six) three;
+test-gcd F x = x;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Possible alternative formulation of inductors that works towards
@@ -898,7 +1091,7 @@ inductor2 : Set → Set 3;
 inductor2 A = (B    : Set) ×
               (cons : B → A) ×
               (H    : B → IDesc A) ×
-              ((Φ : A → Set 2) →
+              ((Φ : A → Set 1) →
                ((x : B) → semI' B A H Φ x → Φ (cons x)) →
                (x : A) → Φ x);
 
