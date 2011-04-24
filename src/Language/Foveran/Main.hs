@@ -27,6 +27,7 @@ parseArgs = getArgs >>= parse
         hPutStrLn stderr "Usage: "
         hPutStrLn stderr "  foveran <filename>.fv"
         hPutStrLn stderr "  foveran html <filename>.fv [<filename>.html]"
+        hPutStrLn stderr "  foveran emacs"
         exitFailure
 
 main :: IO ()
