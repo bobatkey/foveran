@@ -33,9 +33,9 @@ writeHtmlDocument fnm ofnm = do
                           H.docTypeHtml ! A.lang "en-GB" $ do
                                              H.head $ do
                                                H.meta ! A.httpEquiv "Content-Type" ! A.content "text/html; charset=utf-8"
-                                               H.title $ H.string fnm
+                                               H.title $ H.toHtml fnm
                                                H.link ! A.rel "stylesheet" ! A.href "style.css" ! A.type_ "text/css"
                                              H.body $ do
-                                                H.h1 $ H.string fnm
+                                                H.h1 $ H.toHtml fnm
                                                 html
            exitSuccess
