@@ -10,28 +10,7 @@ commutes with everything:
 
 so the normal form puts them all at the end (and ands them?)
 
-  guard M >> guard N == guard (M && N)
-
-  don't normalise boolean expressions.
--}
-
-{-
-Recursion:
-- Add a letrec, don't normalise
-- (Also add a let)
--}
-
-{-
-Negation
-- An operator negate : T B -> T B
-- Bubble negates up to the top? What about unions?
-negate M `mplus` negate N == 
-
-(not A) or (not B) = not ((not (not A)) and (not (not B))) = not (A and B)
-
-- implement 'and' by 
-
-- or only negate let-bound variables?
+  guard M >> guard N == guard (M && N)  ??
 -}
 
 -- FIXME: What about the IF-RECORD rule in Ezra's paper? This is
@@ -61,6 +40,7 @@ data Term
     | Bind   Term Term
     | MZero
     | MPlus  Term Term
+    | Guard  Term             -- t : Bool ==> Guard t : T U
     deriving (Eq, Show)
 
 type TermFam = Int -> Term
@@ -70,7 +50,7 @@ data Value
     | VUnit
     | VPair    Value Value
     | VNeutral TermFam
-    | VMonad   (VAdditiveMonad Value)
+    | VMonad   (VAdditiveMonad ([Value], Value))
     deriving Show
 
 data VMonad a
@@ -113,11 +93,15 @@ vsnd :: Value -> Value
 vsnd (VPair _ v) = v
 
 vreturn :: Value -> Value
-vreturn = VMonad . return
+vreturn v = VMonad $ return ([], v)
 
 unVMonad (VMonad vm) = vm
 
-vbind v f = VMonad $ unVMonad v >>= unVMonad . f
+vbind v f = VMonad $ do (guards1, a) <- unVMonad v
+                        (guards2, b) <- unVMonad (f a)
+                        return (guards1 ++ guards2, b)
+
+vguard v = VMonad $ return ([v],VUnit)
 
 --------------------------------------------------------------------------------
 eval :: Term -> [Value] -> Value
@@ -131,6 +115,7 @@ eval (Fst t)       = vfst    <$> eval t
 eval (Snd t)       = vsnd    <$> eval t
 eval (Return t)    = vreturn <$> eval t
 eval (Bind t1 t2)  = vbind   <$> eval t1 <*> (\env v -> eval t2 (v:env))
+eval (Guard t)     = vguard  <$> eval t
 eval MZero         = pure (VMonad mzero)
 eval (MPlus t1 t2) = VMonad <$> (mplus <$> (unVMonad <$> eval t1) <*> (unVMonad <$> eval t2))
 
@@ -144,13 +129,17 @@ reify (a :=> b) (VLam f)         = \i -> let d = reflect a (vbound i)
                                          in Lam a (reify b (f d) (i+1))
 reify (a :*: b) (VPair v1 v2)    = Pair <$> reify a v1 <*> reify b v2
 reify (T a)     (VMonad (VAM m)) = reifyVAM a m
+reify Bool      (VNeutral t)     = t
+reify ty        v                = error $ "Bad reify: ty=" ++ show ty ++ ", v=" ++ show v ++ ", probably due to ill-typed input"
 
-reifyVAM :: Type -> [VMonad Value] -> TermFam
-reifyVAM a []    = \i -> MZero
+reifyVAM :: Type -> [VMonad ([Value], Value)] -> TermFam
+reifyVAM a []    = pure MZero
+reifyVAM a [m]   = reifyVMonad a m
 reifyVAM a (m:l) = MPlus <$> reifyVMonad a m <*> reifyVAM a l
 
-reifyVMonad :: Type -> VMonad Value -> TermFam
-reifyVMonad a (VReturn v)   = Return <$> reify a v
+reifyVMonad :: Type -> VMonad ([Value], Value) -> TermFam
+reifyVMonad a (VReturn (guards, v)) =
+    foldr (\guard t -> Bind <$> (Guard <$> reify Bool guard) <*> t) (Return <$> reify a v) guards
 reifyVMonad a (VBind t e k) = \i -> let d = reflect t (vbound i)
                                     in Bind (e i) (reifyVMonad a (k d) (i+1))
 
@@ -159,7 +148,8 @@ reflect B         t = VNeutral t
 reflect U         t = VUnit
 reflect (a :=> b) t = VLam $ \v -> reflect b (App <$> t <*> reify a v)
 reflect (a :*: b) t = VPair (reflect a (Fst <$> t)) (reflect b (Snd <$> t))
-reflect (T a)     t = VMonad (VAM [VBind a t VReturn])
+reflect (T a)     t = VMonad (VAM [VBind a t $ \v -> VReturn ([],v)])
+reflect Bool      t = VNeutral t
 
 normalise :: Term -> Type -> Term
 normalise tm ty = reify ty (eval tm []) 0
@@ -180,3 +170,14 @@ ty4 = T B :=> T B
 tm5 = Lam (T B) (Bind (Var 0) (MPlus (Bind (Var 1) (Return (Var 0)))
                                      (Return (Var 0))))
 ty5 = T B :=> T B
+
+tm6 = Lam B (Return (Var 0))
+ty6 = B :=> T B
+
+tm7 = Lam (T Bool) $
+      Lam (T B) $
+      Bind (Var 1) $
+      Bind (Guard (Var 0)) $
+      Bind (Var 2) $
+      Return (Var 0 `Pair` Var 2)
+ty7 = T Bool :=> T B :=> T (B :*: Bool)
