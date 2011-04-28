@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.Foveran.Util.Emacs where
 
 import System.Exit
@@ -11,5 +13,6 @@ import Language.Foveran.Parsing.LexicalSpec (lexicalSpec)
 
 genEmacsMode :: IO a
 genEmacsMode = do
-  putStrLn $ render $ pprint $ generateElisp $ compileLexicalSpecification $ lexicalSpec
+  generateEmacsMode (compileLexicalSpecification lexicalSpec) "foveran" "\\\\.fv\\\\'"
+  --putStrLn $ render $ pprint $ generateElisp $ compileLexicalSpecification $ lexicalSpec
   exitSuccess
