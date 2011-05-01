@@ -389,6 +389,26 @@ pair-inductor A AI B BI =
   »;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+fleh : (A B : Set) → B → IDesc (A × B);
+fleh A B b = “Π” A (λa. “IId” «a,b»);
+
+– I don't think this one works...
+
+{-
+pair2-inductor : (A : Set) → inductor A →
+                 (B : Set) → inductor B →
+                 inductor (A × B);
+pair2-inductor A AI B BI =
+  « λp.     compose A (A × B) (fst AI (fst p)) (bleh A B)
+        “×” compose B (A × B) (fst BI (snd p)) (fleh A B)
+  , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
+                   (λa φa. snd BI (λb. (a : A) → Φ «a,b»)
+                                  (λb φb a'. k «a',b» « (), () »))
+                   (fst p)
+                   (snd p)
+  »;
+-}
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – The following two combinators build new inductors from old by
 – adjoining new elements to the original type, conceptually at the “top”
 – and the “bottom”, when the well-founded order is thought of as
