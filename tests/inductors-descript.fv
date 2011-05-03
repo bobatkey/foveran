@@ -408,6 +408,23 @@ pair2-inductor A AI B BI =
                    (snd p)
   »;
 -}
+
+{-
+– this would work if inductors included the truth preservation witness
+
+pair3-inductor : (A : Set) → inductor A →
+                 (B : Set) → inductor B →
+                 inductor (A × B);
+pair3-inductor A AI B BI =
+  « λp. compose A (A × B) (fst AI (fst p)) (λa. compose B (A × B) (fst BI (snd p)) (λb. “IId” «a,b»))
+  , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
+                   (λa φ. snd BI (λb. Φ «a,b»)
+                                 (λb ψ. k «a,b» ψ)) – this bit (‘ψ’) is wrong
+                   (fst p)
+                   (snd p)
+  »;
+-}
+
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – The following two combinators build new inductors from old by
 – adjoining new elements to the original type, conceptually at the “top”
