@@ -99,12 +99,14 @@ As it stands, there are several known shortcomings of the present work:
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – First some basic functions that we will need. First for non-indexed
 – descriptions of functors Set → Set.
+{-
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
             (λX. X)
             (λF G semF semG X. semF X × semG X)
             (λF G semF semG X. semF X + semG X);
+-}
 
 lift : (D : Desc) →
        (α : Set) →

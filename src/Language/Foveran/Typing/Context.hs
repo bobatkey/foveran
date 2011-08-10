@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Foveran.Typing.Context
-    ( Context
+    ( Context ()
     , emptyContext
     , ctxtExtend
     , ctxtExtendFreshen
@@ -22,7 +22,7 @@ import           Language.Foveran.Syntax.Checked (Term)
 import           Language.Foveran.Syntax.Identifier
 import           Language.Foveran.Typing.Conversion
 
--- FIXME: Make this abstract
+-- FIXME: keep track of the order?
 type Context = M.Map Ident (Value, Maybe Value)
 
 emptyContext :: Context
@@ -34,12 +34,11 @@ ctxtExtend ctxt nm ty defn
         Nothing -> Just $ M.insert nm (ty, defn) ctxt
         Just _  -> Nothing
 
--- FIXME: try to find better ways of freshening names, and unify with Identifier.hs
 ctxtExtendFreshen :: Context -> Ident -> Value -> Maybe Value -> (Ident, Context)
-ctxtExtendFreshen ctxt nm ty defn
-    = case M.lookup nm ctxt of
-        Nothing -> (nm, M.insert nm (ty, defn) ctxt)
-        Just _  -> ctxtExtendFreshen ctxt (nm `mappend` "'") ty defn
+ctxtExtendFreshen ctxt nm ty defn =
+    (freshNm, M.insert freshNm (ty, defn) ctxt)
+    where
+      (_, freshNm) = freshen (M.keysSet ctxt) nm
 
 evalIn :: Term -> Context -> Value
 evalIn t ctxt = evaluate t [] (lookupDef ctxt)

@@ -10,6 +10,7 @@ module Language.Foveran.Syntax.Identifier
     , bindDummy
     , bindK
     , runNameSupply
+    , freshen
     )
     where
 
@@ -23,6 +24,7 @@ type Ident = T.Text
 newtype NameSupply a = NS { unNS :: (S.Set Ident, [Ident]) -> a }
     deriving (Functor, Applicative, Monad)
 
+-- FIXME: find a better way of freshening names
 freshen used nm = if S.member nm used then freshen used (nm `mappend` "'") else (S.insert nm used, nm)
 
 getBound :: Int -> NameSupply Ident

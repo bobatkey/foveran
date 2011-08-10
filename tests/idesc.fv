@@ -7,14 +7,14 @@ toI = elimD (λx. IDesc Unit)
                                                       { inl u. ID₁
 				  	              ; inr u. ID₂
 					              }));
-
+{-
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
             (λX. X)
             (λF G semF semG X. semF X × semG X)
             (λF G semF semG X. semF X + semG X);
-
+-}
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →

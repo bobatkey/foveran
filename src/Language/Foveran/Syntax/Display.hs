@@ -50,6 +50,8 @@ data TermCon tm
     | UnitI
     | Empty
     | ElimEmpty
+
+    {- Descriptions of non-indexed types -}
     | Desc
     | Desc_K    tm
     | Desc_Id
