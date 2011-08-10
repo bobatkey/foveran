@@ -201,6 +201,8 @@ forget D A r =
                 construct (recons A D (λi. µI A (apply-refinement D A r) i)
                                   (snd (r a) (fst x)) (snd x) φ));
 
+– lift D A (λa. B) x → D B
+– such that D ! x = D ! (f a), where ! : {A : Set} → A → 1
 zip :
   (A B : Set) →
   (D : Desc) →
@@ -386,12 +388,45 @@ list-to-nat A =
     forget2 NatDesc Unit (list-refinement A) ⋄;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– If you have a “refinement D A” is there a derived D A × A functor?
+assume eq : (A : Set) → A → A → Set;
+
+deriv : (D : Desc) →
+        (A : Set) →
+ 	refinement D A →
+	sem D A → A → Set;
+deriv D A r x a =
+  (y : fst (r a)) × eq (sem D A) (snd (r a) y) x;
+
+– From this I can define a relational refinement, which ought to be
+– isomorphic to the original
+{-
+deriv2 : (D : Desc) →
+         (A : Set) →
+	 refinement D A →
+         (µ D × A) → IDesc (µ D × A);
+deriv2 D A r p =
+  “Σ” (fst (r (snd p))) (λx. );
+-}
+– p₁ : µ D
+– p₂ : A
+–
+– have f : X → sem D A
+
+– want to ensure that   p₁ has exactly the same shape as f x
+
+– lift2 D (µ D × A) : sem D (µ D × A) → IDesc (µ D × A)
+– so need a value of type “sem D (µ D × A)”
+– need to zip together 
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Both of the attempts below get stuck. I think this is due to the largeness of
 – equality in this system. If we restricted to datatypes that have computable
 – equality types, then the approach here might be made to work.
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Building a refinement from a relation
+{-
 relational-refinement :
   (F : Desc) →
   (A : Set) →
@@ -476,6 +511,7 @@ relational-refinement F A R =
   λa. « 
 -}
 
+{-
 relational :
   (D : Desc) →
   (A : Set) →
@@ -483,3 +519,4 @@ relational :
   µ D → A → Set;
 relational D A R =
   cata1 D (A → Set) R;
+-}
