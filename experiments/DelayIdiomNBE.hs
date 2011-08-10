@@ -166,8 +166,25 @@ replaceTm =
          (Pair (Pure fstFunc `Ap` (Var 1 `Ap` Pure (Var 0)))
                (Pure fstFunc `Ap` (Var 1 `Ap` Pure (Var 0))))
 
+-- \f p. (min (fst p) (snd p), ( fst <$> (f <*> pure y)
+--                             , fst <$> (f <*> pure y)))
+
+fix f = f (fix f)
+
+letrec :: ((a,s) -> (b,s)) -> a -> b
+letrec f a = let (b,s) = f (a,s) in b
+
+letrec' :: ((a,s) -> (b,s)) -> a -> b
+letrec' f a = fst (fix (\h a -> f (a, snd $ h a)) a)
+
+f ((x,y), s) = ((s,s), min x y)
+
 replaceMinTm = Lam (B :*: B) (Snd (Fix replaceTm `App` Var 0))
 replaceMinTy = (B :*: B) :=> (De B :*: De B)
 
-xTm = Lam (B :*: B) (Force B (Fst (replaceMinTm `App` Var 0)))
-xTy = (B :*: B) :=> B
+xTm = Lam (B :*: B)
+          (Let (De B :*: De B)
+               (replaceMinTm `App` Var 0)
+               (Pair (Force B (Fst (Var 0)))
+                     (Force B (Snd (Var 0)))))
+xTy = (B :*: B) :=> (B :*: B)
