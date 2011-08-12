@@ -8,9 +8,7 @@ module Language.Foveran.Typing.Conversion.Value
     , (.+.)
 
     , ($$)
-    , vsemTy
-    , vsem
-    , vsemI
+
     , vfst
     , vsnd
     , vcase
@@ -18,6 +16,14 @@ module Language.Foveran.Typing.Conversion.Value
 
     , vdesc_elim
     , videsc_elim
+
+    , vsemTy
+    , vsem
+    , vsemI
+
+    , vliftTy
+    , vlift
+    , vinduction
     , vmuI
 
     , reflect
@@ -222,6 +228,98 @@ videsc_elim vI vP vId vK vPair vSg vPi = loop
                                                          (vP $$ VIDesc_Pi a d)) vPi
                                           `tmApp` n)
       loop x                   = error $ "internal: type error in the evaluator: videsc_elim"
+
+{------------------------------------------------------------------------------}
+-- FIXME: is this the right level? why not Set_1, or Set_0? Some kind
+-- of level-shifting thing?
+vliftTy :: Value
+vliftTy = forall "D" VDesc $ \vD ->
+          forall "A" (VSet 0) $ \vA ->
+          forall "P" (vA .->. VSet 2) $ \vP ->
+          (vsem $$ vD $$ vA) .->. VSet 2
+
+vlift :: Value
+vlift = VLam "D" $ \d ->
+        VLam "X" $ \vA ->
+        VLam "P" $ \p ->
+        VLam "x" $ \v ->
+        vdesc_elim (VLam "D" $ \d ->
+                    (vsem $$ d $$ vA) .->. VSet 2)
+                   (VLam "A" $ \a ->
+                    VLam "x" $ \x ->
+                    VUnit)
+                   (VLam "x" $ \x ->
+                    p $$ x)
+                   (VLam "F" $ \fd ->
+                    VLam "G" $ \gd ->
+                    VLam "f" $ \f ->
+                    VLam "g" $ \g ->
+                    VLam "x" $ \x ->
+                    VSigma Nothing (f $$ vfst x) (\_ -> g $$ vsnd x))
+                   (VLam "F" $ \fd ->
+                    VLam "G" $ \gd ->
+                    VLam "f" $ \f ->
+                    VLam "g" $ \g ->
+                    VLam "x" $ \x ->
+                    vcase x
+                          (vsem $$ fd $$ vA)
+                          (vsem $$ gd $$ vA)
+                          "x" (\_ -> VSet 2)
+                          "x" (\x -> f $$ x)
+                          "x" (\x -> g $$ x))
+                   d
+                   $$ v
+
+{------------------------------------------------------------------------------}
+vall :: Value
+vall = VLam "D" $ \vF ->
+       VLam "X" $ \vX ->
+       VLam "P" $ \vP ->
+       VLam "p" $ \vp ->
+       vdesc_elim (VLam "D" $ \vD ->
+                   forall "xs" (vsem $$ vD $$ vX) $ \xs ->
+                   vlift $$ vD $$ vX $$ vP $$ xs)
+                  (VLam "A" $ \a ->
+                   VLam "x" $ \x ->
+                   VUnitI)
+                  (VLam "x" $ \x ->
+                   vp $$ x)
+                  (VLam "F" $ \vF ->
+                   VLam "G" $ \vG ->
+                   VLam "f" $ \vf ->
+                   VLam "g" $ \vg ->
+                   VLam "x" $ \x ->
+                   VPair (vf $$ vfst x) (vg $$ vsnd x))
+                  (VLam "F" $ \vF ->
+                   VLam "G" $ \vG ->
+                   VLam "f" $ \vf ->
+                   VLam "g" $ \vg ->
+                   VLam "x" $ \x ->
+                   vcase x
+                         (vsem $$ vF $$ vX)
+                         (vsem $$ vG $$ vX)
+                         "d" (\d -> vlift $$ VDesc_Sum vF vG $$ vX $$ vP $$ d)
+                         "y" (\y -> vf $$ y)
+                         "z" (\z -> vg $$ z))
+                  vF
+
+{------------------------------------------------------------------------------}
+vinduction :: Value -> Value -> Value -> Value -> Value
+vinduction vF vP vK = loop
+    where
+      loop (VConstruct x) =
+          vK $$ x $$ (vall $$ vF $$ (VMu vF) $$ vP $$ (VLam "x" loop) $$ x)
+      loop (VNeutral n) =
+          reflect (vP $$ VNeutral n)
+                  (pure (In Induction)
+                   `tmApp` reify VDesc vF
+                   `tmApp` reify (VMu vF .->. VSet 2) vP
+                   `tmApp` reify (VPi (Just "x") (vsem $$ vF $$ VMu vF) $ \x ->
+                                  (vlift $$ vF $$ VMu vF $$ vP $$ x) .->.
+                                  vP $$ VConstruct x)
+                                 vK
+                   `tmApp` n)
+
 
 {------------------------------------------------------------------------------}
 reflect :: Value -> (Int -> Term) -> Value

@@ -11,7 +11,7 @@ sem = elimD (λx. Set → Set)
             (λF G semF semG X. semF X × semG X)
             (λF G semF semG X. semF X + semG X);
 -}
-
+{-
 lift : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 2) →
@@ -26,7 +26,7 @@ lift D α Φ = elimD (\D. sem D α → Set 2)
                                    ; inr z. g z
                                    })
                    D;
-
+-}
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
 semI I D X = elimID I (λD. Set 2)
                     (λi. X i)

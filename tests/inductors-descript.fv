@@ -108,20 +108,20 @@ sem = elimD (λx. Set → Set)
             (λF G semF semG X. semF X + semG X);
 -}
 
-lift : (D : Desc) →
+lift' : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 1) →
        sem D α → Set 2 ;
-lift D α Φ = elimD (λD. sem D α → Set 2)
-                   (λA x. Unit)
-                   (λx. Φ x)
-                   (λF G f g x. f (fst x) × g (snd x))
-                   (λF G f g x. case x for d. Set 2 with
-                                  { inl y. f y
-                                  ; inr z. g z
-                                  })
-                   D;
-
+lift' D α Φ = elimD (λD. sem D α → Set 2)
+                    (λA x. Unit)
+                    (λx. Φ x)
+                    (λF G f g x. f (fst x) × g (snd x))
+                    (λF G f g x. case x for d. Set 2 with
+                                   { inl y. f y
+                                   ; inr z. g z
+                                   })
+                    D;
+{-
 lift' : (D : Desc) →
         (α : Set) →
         (Φ : α → Set 2) →
@@ -135,18 +135,18 @@ lift' D α Φ = elimD (λD. sem D α → Set 2)
                                    ; inr z. g z
                                    })
                     D;
-
+-}
 all : (D : Desc) →
       (X : Set) →
       (P : X → Set 1) →
       (p : (x : X) → P x) →
       (xs : sem D X) →
-      lift D X P xs ;
-all D X P p = elimD (\D. (xs : sem D X) → lift D X P xs)
+      lift' D X P xs ;
+all D X P p = elimD (\D. (xs : sem D X) → lift' D X P xs)
                     (\A x. ())
                     (\x. p x)
                     (\F G f g x. «f (fst x), g (snd x)»)
-                    (\F G f g x. case x for d. lift (F “+” G) X P d with
+                    (\F G f g x. case x for d. lift' (F “+” G) X P d with
                                     { inl y. f y
                                     ; inr z. g z
                                     }) 
@@ -273,15 +273,15 @@ lift-to-lift2 : (D : Desc) →
                 (A : Set) →
                 (Φ : A → Set 1) →
                 (x : sem D A) →
-                lift D A Φ x →
+                lift' D A Φ x →
                 semI' (sem D A) A (lift2 D A) Φ x;
 lift-to-lift2 D A Φ =
-  elimD (λD'. (x : sem D' A) → lift D' A Φ x → semI' (sem D' A) A (lift2 D' A) Φ x)
+  elimD (λD'. (x : sem D' A) → lift' D' A Φ x → semI' (sem D' A) A (lift2 D' A) Φ x)
         (λA x u. ⋄)
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
         (λD₁ D₂ f₁ f₂ x.
-            case x for x. lift (D₁ “+” D₂) A Φ x → semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x with
+            case x for x. lift' (D₁ “+” D₂) A Φ x → semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x with
               { inl y. λa. f₁ y a
               ; inr z. λb. f₂ z b
               })
@@ -292,14 +292,14 @@ lift2-to-lift : (D : Desc) →
                 (Φ : A → Set 1) →
                 (x : sem D A) →
                 semI' (sem D A) A (lift2 D A) Φ x →
-                lift D A Φ x;
+                lift' D A Φ x;
 lift2-to-lift D A Φ =
-  elimD (λD'. (x : sem D' A) → semI' (sem D' A) A (lift2 D' A) Φ x → lift D' A Φ x)
+  elimD (λD'. (x : sem D' A) → semI' (sem D' A) A (lift2 D' A) Φ x → lift' D' A Φ x)
         (λA x u. ⋄)
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
         (λD₁ D₂ f₁ f₂ x.
-            case x for x. semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x → lift (D₁ “+” D₂) A Φ x with
+            case x for x. semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x → lift' (D₁ “+” D₂) A Φ x with
               { inl y. λa. f₁ y a
               ; inr z. λb. f₂ z b
               })
@@ -655,14 +655,14 @@ complete-counit A AI Φ =
 collapse2 : (D : Desc) →
             (X : Set) →
             (x : sem D X) →
-            (φ : lift D X (λx. IDesc X) x) →
+            (φ : lift' D X (λx. IDesc X) x) →
             IDesc X;
 collapse2 D X =
-  elimD (λD'. (x : sem D' X) → lift D' X (λx. IDesc X) x → IDesc X)
+  elimD (λD'. (x : sem D' X) → lift' D' X (λx. IDesc X) x → IDesc X)
         (λA x u. “K” Unit)
         (λx ID. ID)
         (λD₁ D₂ f₁ f₂ x p. f₁ (fst x) (fst p) “×” f₂ (snd x) (snd p))
-        (λD₁ D₂ f₁ f₂ x. case x for x. lift (D₁ “+” D₂) X (λx. IDesc X) x → IDesc X with
+        (λD₁ D₂ f₁ f₂ x. case x for x. lift' (D₁ “+” D₂) X (λx. IDesc X) x → IDesc X with
                            { inl x₁. f₁ x₁
                            ; inr x₂. f₂ x₂
                            })
@@ -673,11 +673,11 @@ step :
   (Ψ : µ D → IDesc (µ D)) →
   (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
-  lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+  lift' D (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
   semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ;
 step D Ψ Φ =
   elimD (λD'. (x : sem D' (µ D)) →
-              lift D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+              lift' D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
               semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ)
     (λA x u. ⋄)
     (λx p. p)
@@ -686,7 +686,7 @@ step D Ψ Φ =
       , step₂ (snd x) (snd p)
       »)
     (λD₁ D₂ step₁ step₂ x.
-      case x for x. lift (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
+      case x for x. lift' (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
                     semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ
                     with
         { inl x₁. step₁ x₁
@@ -700,11 +700,11 @@ unstep :
   (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
   semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
-  lift D (µ D) (semI' (µ D) (µ D) Ψ Φ) x;
+  lift' D (µ D) (semI' (µ D) (µ D) Ψ Φ) x;
 unstep D Ψ Φ =
   elimD (λD'. (x : sem D' (µ D)) →
               semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
-              lift D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x)
+              lift' D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x)
     (λA x u. ⋄)
     (λx p. p)
     (λD₁ D₂ unstep₁ unstep₂ x p.
@@ -713,7 +713,7 @@ unstep D Ψ Φ =
       »)
     (λD₁ D₂ unstep₁ unstep₂ x.
       case x for x. semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
-                    lift (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x with
+                    lift' (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x with
         { inl x₁. unstep₁ x₁
         ; inr x₂. unstep₂ x₂
         })
@@ -743,10 +743,10 @@ complete2-snd :
   (Φ : µ D → Set 1) →
   (x : µ D) →
   semI' (µ D) (µ D) (complete2-carrier D) Φ x →
-  lift D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x);
+  lift' D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x);
 complete2-snd D Φ =
   caseD D (λx. semI' (µ D) (µ D) (complete2-carrier D) Φ x →
-               lift D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x))
+               lift' D (µ D) (semI' (µ D) (µ D) (complete2-carrier D) Φ) (deconstruct D x))
     (λx p. unstep D (complete2-carrier D) Φ x (snd p));
 
 – This other second projection goes an extra step to translate between
@@ -769,21 +769,21 @@ apply :
  (A : Set) →
  (Φ Ψ : A → Set 1) →
  (x : sem D A) →
- lift D A (λa. Φ a → Ψ a) x →
- lift D A Φ x →
- lift D A Ψ x;
+ lift' D A (λa. Φ a → Ψ a) x →
+ lift' D A Φ x →
+ lift' D A Ψ x;
 apply D A Φ Ψ =
   elimD (λD. (x : sem D A) →
-             lift D A (λa. Φ a → Ψ a) x →
-             lift D A Φ x →
-             lift D A Ψ x)
+             lift' D A (λa. Φ a → Ψ a) x →
+             lift' D A Φ x →
+             lift' D A Ψ x)
     (λA a u₁ u₂. ⋄)
     (λx f. f)
     (λD₁ D₂ ap₁ ap₂ x f φ. « ap₁ (fst x) (fst f) (fst φ), ap₂ (snd x) (snd f) (snd φ) »)
     (λD₁ D₂ ap₁ ap₂ x.
-      case x for x. lift (D₁ “+” D₂) A (λa. Φ a → Ψ a) x →
-                    lift (D₁ “+” D₂) A Φ x →
-                    lift (D₁ “+” D₂) A Ψ x with
+      case x for x. lift' (D₁ “+” D₂) A (λa. Φ a → Ψ a) x →
+                    lift' (D₁ “+” D₂) A Φ x →
+                    lift' (D₁ “+” D₂) A Ψ x with
         { inl x₁. ap₁ x₁
         ; inr x₂. ap₂ x₂
         })
@@ -794,15 +794,15 @@ apply D A Φ Ψ =
 unit : (A : Set) →
        (D : Desc) →
        (x : sem D A) →
-       lift D A (λx. Unit) x;
+       lift' D A (λx. Unit) x;
 unit A = elimD
-  (λD. (x : sem D A) → lift D A (λx. Unit) x)
+  (λD. (x : sem D A) → lift' D A (λx. Unit) x)
   (λA x. ⋄)
   (λa. ⋄)
   (λD₁ D₂ unit₁ unit₂ x.
     « unit₁ (fst x), unit₂ (snd x) »)
   (λD₁ D₂ unit₁ unit₂ x.
-    case x for x. lift (D₁ “+” D₂) A (λx. Unit) x with
+    case x for x. lift' (D₁ “+” D₂) A (λx. Unit) x with
       { inl x₁. unit₁ x₁
       ; inr x₂. unit₂ x₂
       });
@@ -906,7 +906,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc (λn. Φ n)
-            (\x. case x for x. lift' NatDesc Nat Φ x → Φ (construct x) with
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
