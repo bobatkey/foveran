@@ -44,16 +44,21 @@ import Language.Foveran.Syntax.Checked
 
 {------------------------------------------------------------------------------}
 data Value
-    = VLam   Ident (Value -> Value)
-    | VSet   Int
+    = VSet   Int
+
     | VPi    (Maybe Ident) Value (Value -> Value)
+    | VLam   Ident (Value -> Value)
+
     | VSigma (Maybe Ident) Value (Value -> Value)
-    | VSum   Value Value
     | VPair  Value Value
+
+    | VSum   Value Value
     | VInl   Value
     | VInr   Value
+
     | VUnit
     | VUnitI
+
     | VEmpty
 
     | VDesc
