@@ -1,3 +1,4 @@
+{-
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
@@ -19,7 +20,7 @@ lift D α Φ = elimD (\D. sem D α → Set 2)
                                    ; inr z. g z
                                    })
                    D;
-
+-}
 data Nat : Set :=
   | zero :
   | succ : Nat

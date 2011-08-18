@@ -1,3 +1,4 @@
+{-
 sem : Desc → Set → Set ;
 sem = elimD (λx. Set → Set)
             (λA X. A)
@@ -18,7 +19,7 @@ lift D α Φ = elimD (\D. sem D α → Set 2)
                                    ; inr z. g z
                                    })
                    D;
-
+-}
 -- lift D (µ D) (W P) : sem D (µ D) → Set
 -- (x : sem D (µ D)) → lift D (µ D) (W P) x → P (construct D x)
 -- 
@@ -44,5 +45,7 @@ coMap A W = fst (snd (snd (snd W))) ;
 
 ------------------------------------------------------------------------------
 
+{-
 distributiveLaw : (A : Set) → comonad A → Desc → Set 1;
 distributiveLaw A W D = (P : A → Set) → 
+-}

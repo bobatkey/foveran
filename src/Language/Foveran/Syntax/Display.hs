@@ -58,6 +58,7 @@ data TermCon tm
     | Desc_Prod tm tm
     | Desc_Sum  tm tm
     | Desc_Elim
+    | Sem
     | Mu        tm
     | Construct tm
     | Induction

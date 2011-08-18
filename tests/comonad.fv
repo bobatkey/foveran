@@ -1,5 +1,6 @@
 --------------------------------------------------------------------------------
 -- These two should be built-in (in some sense)
+{-
 sem : Desc → Set → Set ;
 sem d = elimD (\x. Set → Set)
               (\A X. A)
@@ -7,6 +8,7 @@ sem d = elimD (\x. Set → Set)
               (\d1 d2 F G X. F X × G X)
               (\d1 d2 F G X. F X + G X)
               d ;
+-}
 
 map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
 map F α β f = elimD (\F. sem F α → sem F β)

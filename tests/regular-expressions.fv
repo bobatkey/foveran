@@ -1,26 +1,3 @@
-sem : Desc → Set → Set ;
-sem = elimD (λx. Set → Set)
-            (λA X. A)
-            (λX. X)
-            (λF G semF semG X. semF X × semG X)
-            (λF G semF semG X. semF X + semG X);
-
-lift : (D : Desc) →
-       (α : Set) →
-       (Φ : α → Set 2) →
-       sem D α →
-       Set 2 ;
-lift D α Φ = elimD (λD. sem D α → Set 2)
-                   (λA x. Unit)
-                   (λx. Φ x)
-                   (λF G f g x. f (fst x) × g (snd x))
-                   (λF G f g x. case x for d. Set 2 with
-                                  { inl y. f y
-                                  ; inr z. g z
-                                  })
-                   D;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 bool : Set;
 bool = Unit + Unit;
 

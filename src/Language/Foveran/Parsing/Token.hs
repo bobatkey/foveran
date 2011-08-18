@@ -33,6 +33,7 @@ data Token
     | Construct
     | Induction
     | ElimD
+    | Sem
     | UnitValue
     | LDoubleAngle
     | RDoubleAngle

@@ -69,6 +69,7 @@ eval Desc_Elim          = pure (VLam "P" $ \p ->
                                 VLam "Su" $ \su ->
                                 VLam "Tg" $ \tg ->
                                 vdesc_elim p k i pr su tg)
+eval Sem                = pure (VLam "D" $ vsem)
 eval (Mu t)             = VMu <$> t
 eval (Construct t)      = VConstruct <$> t
 eval Induction          = pure (VLam "F" $ \f ->

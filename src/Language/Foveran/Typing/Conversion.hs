@@ -8,7 +8,6 @@ module Language.Foveran.Typing.Conversion
        , (.->.)
        , forall
        , reflect
-       , vsemTy
        , vsem
        , vsemI
        , vfst

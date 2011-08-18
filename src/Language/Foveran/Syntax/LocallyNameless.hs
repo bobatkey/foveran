@@ -39,12 +39,14 @@ data TermCon tm
   | UnitI
   | Empty
   | ElimEmpty
+
   | Desc
   | Desc_K    tm
   | Desc_Id
   | Desc_Prod tm tm
   | Desc_Sum  tm tm
   | Desc_Elim
+  | Sem
   | Mu        tm
   | Construct tm
   | Induction
@@ -99,6 +101,7 @@ toLN DS.Desc_Id           bv = Layer $ Desc_Id
 toLN (DS.Desc_Prod t1 t2) bv = Layer $ Desc_Prod (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.Desc_Sum t1 t2)  bv = Layer $ Desc_Sum (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.Desc_Elim         bv = Layer $ Desc_Elim
+toLN DS.Sem               bv = Layer $ Sem
 toLN (DS.Mu t)            bv = Layer $ Mu (Var $ t bv)
 toLN (DS.Construct t)     bv = Layer $ Construct (Var $ t bv)
 toLN DS.Induction         bv = Layer $ Induction
@@ -145,6 +148,7 @@ close' fnm Desc_Id          = pure Desc_Id
 close' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
 close' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
 close' fnm Desc_Elim        = pure Desc_Elim
+close' fnm Sem              = pure Sem
 close' fnm (Mu t)           = Mu <$> t
 close' fnm (Construct t)    = Construct <$> t
 close' fnm Induction        = pure Induction

@@ -183,6 +183,8 @@ term00 =
     <|>
     keyword Desc_Elim <$> token Tok.ElimD
     <|>
+    keyword Sem <$> token Tok.Sem
+    <|>
     keyword UnitI <$> token Tok.UnitValue
     <|>
     -- FIXME: extend the left and right positions of the term to include the parens

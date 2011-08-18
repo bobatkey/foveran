@@ -32,6 +32,7 @@ lexicalSpec =
     , ("construct",       Emit Construct)
     , ("induction",       Emit Induction)
     , ("elimD",           Emit ElimD)
+    , ("sem",             Emit Sem)
     , ("()" .|. "⋄",      Emit UnitValue)
     , ("«",               Emit LDoubleAngle)
     , ("»",               Emit RDoubleAngle)

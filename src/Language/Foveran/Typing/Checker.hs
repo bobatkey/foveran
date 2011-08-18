@@ -120,7 +120,7 @@ tyCheck (Annot p (Desc_Sum t1 t2)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (Construct t)) ctxt (VMu f) =
-    do tm <- tyCheck t ctxt (vsem $$ f $$ VMu f)
+    do tm <- tyCheck t ctxt (vsem f $$ VMu f)
        return ( In $ CS.Construct tm )
 
 tyCheck (Annot p (Construct t)) ctxt (VMuI a d i) =
@@ -246,6 +246,8 @@ tySynth (Annot p Desc_Elim) ctxt =
               (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Sum d1 d2))) .->.
              (forall "x" VDesc $ \x -> vP $$ x)
            , In $ CS.Desc_Elim)
+tySynth (Annot p Sem) ctxt =
+    return ( VDesc .->. VSet 0 .->. VSet 0, In $ CS.Sem )
 tySynth (Annot p (Mu t)) ctxt =
     do tm <- tyCheck t ctxt VDesc
        return (VSet 0, In $ CS.Mu tm)
@@ -259,7 +261,7 @@ tySynth (Annot p (MuI t1 t2)) ctxt =
 tySynth (Annot p Induction) ctxt =
     return ( forall "F" VDesc               $ \f ->
              forall "P" (VMu f .->. VSet 2) $ \p ->
-             (forall "x" (vsem $$ f $$ VMu f) $ \x ->
+             (forall "x" (vsem f $$ VMu f) $ \x ->
               (vlift $$ f $$ VMu f $$ p $$ x) .->.
               p $$ (VConstruct x)) .->.
              (forall "x" (VMu f) $ \x -> p $$ x)

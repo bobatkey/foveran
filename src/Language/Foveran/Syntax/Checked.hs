@@ -52,6 +52,7 @@ data TermCon tm
     | Desc_Prod tm tm
     | Desc_Sum  tm tm
     | Desc_Elim
+    | Sem
     | Mu        tm
     | Construct tm
     | Induction
@@ -102,6 +103,7 @@ bind' fnm Desc_Id          = pure Desc_Id
 bind' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
 bind' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
 bind' fnm Desc_Elim        = pure Desc_Elim
+bind' fnm Sem              = pure Sem
 bind' fnm (Mu t)           = Mu <$> t
 bind' fnm (Construct t)    = Construct <$> t
 bind' fnm Induction        = pure Induction
@@ -160,6 +162,7 @@ toDisplay Desc_Id                 = pure DS.Desc_Id
 toDisplay (Desc_Prod t1 t2)       = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (Desc_Sum t1 t2)        = DS.Desc_Sum <$> t1 <*> t2
 toDisplay Desc_Elim               = pure DS.Desc_Elim
+toDisplay Sem                     = pure DS.Sem
 toDisplay (Mu t)                  = DS.Mu <$> t
 toDisplay (Construct t)           = DS.Construct <$> t
 toDisplay Induction               = pure DS.Induction
@@ -232,6 +235,7 @@ instance Eq Term where
   In (Desc_Prod t1 t2) == In (Desc_Prod t1' t2') = t1 == t1' && t2 == t2'
   In (Desc_Sum t1 t2)  == In (Desc_Sum t1' t2')  = t1 == t1' && t2 == t2'
   In Desc_Elim  == In Desc_Elim      = True
+  In Sem        == In Sem            = True
   In (Mu t)     == In (Mu t')        = t == t'
   In (Construct t) == In (Construct t') = t == t'
   In Induction  == In Induction      = True

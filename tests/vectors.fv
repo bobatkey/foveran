@@ -1,26 +1,3 @@
-sem : Desc → Set → Set ;
-sem d = elimD (\x. Set → Set)
-              (\A X. A)
-              (\X. X)
-              (\d1 d2 F G X. F X × G X)
-              (\d1 d2 F G X. F X + G X)
-              d ;
-
-lift : (D : Desc) →
-       (α : Set) →
-       (P : α → Set 2) →
-       sem D α →
-       Set 2 ;
-lift D α P = elimD (\D. sem D α → Set 2)
-                   (\A x. Unit)
-                   (\x. P x)
-                   (\F G f g x. f (fst x) × g (snd x))
-                   (\F G f g x. case x for d. Set 2 with
-                                   { inl y. f y
-                                   ; inr z. g z
-                                   })
-                   D;
-
 data Nat : Set :=
   | zero :
   | succ : Nat

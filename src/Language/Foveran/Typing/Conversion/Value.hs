@@ -17,7 +17,6 @@ module Language.Foveran.Typing.Conversion.Value
     , vdesc_elim
     , videsc_elim
 
-    , vsemTy
     , vsem
     , vsemI
 
@@ -139,11 +138,24 @@ velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
                                        `tmApp` n)
 
 {------------------------------------------------------------------------------}
+{-
 vsemTy :: Value
 vsemTy = VDesc .->. VSet 0 .->. VSet 0
+-}
+vsem :: Value -> Value
+vsem vD = loop vD
+    where
+      loop (VDesc_K v)        = VLam "X" $ \_  -> v
+      loop VDesc_Id           = VLam "X" $ \vX -> vX
+      loop (VDesc_Prod v1 v2) = VLam "X" $ \vX -> (loop v1 $$ vX) .*. (loop v2 $$ vX)
+      loop (VDesc_Sum v1 v2)  = VLam "X" $ \vX -> (loop v1 $$ vX) .+. (loop v2 $$ vX)
+      loop (VNeutral tm)      =
+          reflect (VSet 0 .->. VSet 0)
+                  (pure (In Sem) `tmApp` tm)
+          
 
-vsem :: Value
-vsem = VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
+{-
+VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
                              (VLam "A" $ \a -> VLam "X" $ \_ -> a)
                              (VLam "X" $ \x -> x)
                              (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
@@ -152,6 +164,7 @@ vsem = VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
                              (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
                               VLam "F" $ \f -> VLam "G" $ \g ->
                               VLam "X" $ \x -> (f $$ x) .+. (g $$ x))
+-}
 
 {------------------------------------------------------------------------------}
 vsemI :: Value
@@ -241,7 +254,7 @@ vliftTy :: Value
 vliftTy = forall "D" VDesc $ \vD ->
           forall "A" (VSet 0) $ \vA ->
           forall "P" (vA .->. VSet 2) $ \vP ->
-          (vsem $$ vD $$ vA) .->. VSet 2
+          (vsem vD $$ vA) .->. VSet 2
 
 vlift :: Value
 vlift = VLam "D" $ \d ->
@@ -249,7 +262,7 @@ vlift = VLam "D" $ \d ->
         VLam "P" $ \p ->
         VLam "x" $ \v ->
         vdesc_elim (VLam "D" $ \d ->
-                    (vsem $$ d $$ vA) .->. VSet 2)
+                    (vsem d $$ vA) .->. VSet 2)
                    (VLam "A" $ \a ->
                     VLam "x" $ \x ->
                     VUnit)
@@ -267,8 +280,8 @@ vlift = VLam "D" $ \d ->
                     VLam "g" $ \g ->
                     VLam "x" $ \x ->
                     vcase x
-                          (vsem $$ fd $$ vA)
-                          (vsem $$ gd $$ vA)
+                          (vsem fd $$ vA)
+                          (vsem gd $$ vA)
                           "x" (\_ -> VSet 2)
                           "x" (\x -> f $$ x)
                           "x" (\x -> g $$ x))
@@ -282,7 +295,7 @@ vall = VLam "D" $ \vF ->
        VLam "P" $ \vP ->
        VLam "p" $ \vp ->
        vdesc_elim (VLam "D" $ \vD ->
-                   forall "xs" (vsem $$ vD $$ vX) $ \xs ->
+                   forall "xs" (vsem vD $$ vX) $ \xs ->
                    vlift $$ vD $$ vX $$ vP $$ xs)
                   (VLam "A" $ \a ->
                    VLam "x" $ \x ->
@@ -301,8 +314,8 @@ vall = VLam "D" $ \vF ->
                    VLam "g" $ \vg ->
                    VLam "x" $ \x ->
                    vcase x
-                         (vsem $$ vF $$ vX)
-                         (vsem $$ vG $$ vX)
+                         (vsem vF $$ vX)
+                         (vsem vG $$ vX)
                          "d" (\d -> vlift $$ VDesc_Sum vF vG $$ vX $$ vP $$ d)
                          "y" (\y -> vf $$ y)
                          "z" (\z -> vg $$ z))
@@ -319,7 +332,7 @@ vinduction vF vP vK = loop
                   (pure (In Induction)
                    `tmApp` reify VDesc vF
                    `tmApp` reify (VMu vF .->. VSet 2) vP
-                   `tmApp` reify (VPi (Just "x") (vsem $$ vF $$ VMu vF) $ \x ->
+                   `tmApp` reify (VPi (Just "x") (vsem vF $$ VMu vF) $ \x ->
                                   (vlift $$ vF $$ VMu vF $$ vP $$ x) .->.
                                   vP $$ VConstruct x)
                                  vK
@@ -375,7 +388,7 @@ reify VDesc            (VDesc_K v)         = \i -> In $ Desc_K (reifyType v i)
 reify VDesc            VDesc_Id            = \i -> In $ Desc_Id
 reify VDesc            (VDesc_Prod v1 v2)  = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
 reify VDesc            (VDesc_Sum v1 v2)   = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
-reify (VMu tA)         (VConstruct v)      = \i -> In $ Construct (reify (vsem $$ tA $$ (VMu tA)) v i)
+reify (VMu tA)         (VConstruct v)      = \i -> In $ Construct (reify (vsem tA $$ (VMu tA)) v i)
 reify (VMuI tI tD ti)  (VConstruct v)      = \i -> In $ Construct (reify (vsemI $$ tI $$ (tD $$ ti) $$ (vmuI tI tD)) v i)
 reify (VIDesc tI)      (VIDesc_Id x)       = \i -> In $ IDesc_Id (reify tI x i)
 reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
