@@ -1,0 +1,103 @@
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Ty : Set :=
+  | v    :
+  | arr  : Ty Ty
+  ;
+
+tyInduction :
+  (Φ : Ty → Set 2) →
+  (Φ v) →
+  ((τ₁ τ₂ : Ty) → Φ τ₁ → Φ τ₂ → Φ (arr τ₁ τ₂)) →
+  (τ : Ty) → Φ τ ;
+tyInduction Φ φv φarr =
+  induction TyDesc Φ
+    (λτ. case τ for τ. lift TyDesc Ty Φ τ → Φ (construct τ) with
+           { inl u. λu'. φv
+           ; inr p. λq. φarr (fst p) (snd p) (fst q) (snd q)
+	   });
+
+ty-sem : Ty → Set → Set;
+ty-sem =
+  tyInduction
+    (λτ. Set → Set)
+    (λα. α)
+    (λτ₁ τ₂ T₁ T₂ α. T₁ α → T₂ α);
+
+ty-pred :
+  (τ : Ty) →
+  (α : Set) →
+  (φ : α → Set) →
+  ty-sem τ α → Set;
+ty-pred τ α φ =
+  tyInduction
+    (λτ. ty-sem τ α → Set)
+    (λa. φ a)
+    (λτ₁ τ₂ P₁ P₂ f. (a : ty-sem τ₁ α) → P₁ a → P₂ (f a))
+    τ;
+
+{-
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Ctxt : Set :=
+  | eps :
+  | ext : Ctxt Ty
+  ;
+
+ctxtInduction :
+  (Φ : Ctxt → Set 2) →
+  (Φ eps) →
+  ((Γ : Ctxt) → (τ : Ty) → Φ Γ → Φ (ext Γ τ)) →
+  (Γ : Ctxt) → Φ Γ;
+ctxtInduction Φ φeps φext =
+  induction CtxtDesc Φ
+    (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct x) with
+           { inl u. λu'. φeps
+           ; inr p. λφ. φext (fst p) (snd p) (fst φ)
+           });
+
+ctxt-sem : Ctxt → Set → Set;
+ctxt-sem =
+  ctxtInduction
+    (λΓ. Set → Set)
+    (λα. Unit)
+    (λΓ τ S α. S α × ty-sem τ α);
+
+ctxt-pred :
+  (Γ : Ctxt) →
+  (α : Set) →
+  (φ : α → Set) →
+  ctxt-sem Γ α → Set;
+ctxt-pred Γ α φ =
+  ctxtInduction
+    (λΓ. ctxt-sem Γ α → Set)
+    (λu. Unit)
+    (λΓ τ P p. P (fst p) × ty-pred τ α φ (snd p))
+    Γ;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+assume param-old : 
+  (Γ : Ctxt) →
+  (τ : Ty) →
+  (t : (α : Set) → ctxt-sem Γ α → ty-sem τ α) →
+  (α : Set) →
+  (Φ : α → Set) →
+  (γ : ctxt-sem Γ α) →
+  ctxt-pred Γ α Φ γ →
+  ty-pred τ α Φ (t α γ);
+-}
+
+assume param :
+  (τ : Ty) →
+  (t : (α : Set) → ty-sem τ α) →
+  (α : Set) →
+  (Φ : α → Set) →
+  ty-pred τ α Φ (t α);
+
+
+– param (arr (arr v v) (arr v v)) : 
+–    (t : (α : Set) → (α → α) → (α → α)) →
+–    (α : Set) → 
+–    (Φ : α → Set) → 
+–    (s : α → α) → ((x : α) → Φ x → Φ (s x)) → (z : α) → Φ z → Φ (t α s z)
+
+– is it possible to deal with partially known types and terms?
+– can I get 

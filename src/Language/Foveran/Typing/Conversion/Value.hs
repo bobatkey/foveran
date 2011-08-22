@@ -77,6 +77,7 @@ data Value
     | VIDesc_Pi   Value Value
 
     | VNeutral   (Int -> Term)
+    | VInnerNeutral (Int -> Maybe InnerTerm)
     deriving Show
 
 {------------------------------------------------------------------------------}
@@ -138,10 +139,6 @@ velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
                                        `tmApp` n)
 
 {------------------------------------------------------------------------------}
-{-
-vsemTy :: Value
-vsemTy = VDesc .->. VSet 0 .->. VSet 0
--}
 vsem :: Value -> Value
 vsem vD = loop vD
     where
@@ -397,3 +394,200 @@ reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify _                (VNeutral tm)       = tm
 reify _                v                   = error $ "reify: attempt to reify: " ++ show v
+
+--------------------------------------------------------------------------------
+-- parametricity stuff
+
+data InnerTerm
+    = InnerBound   Int
+    | InnerApp     InnerTerm InnerTerm
+    | InnerLam     InnerTerm
+    -- | InnerPair    InnerTerm InnerTerm
+    -- | InnerFst     InnerTerm
+    -- | InnerSnd     InnerTerm
+    deriving Show
+
+type InnerTermFam =
+    Int -> InnerTerm
+
+-- the type, the term to reflect.
+-- pattern matching is on (the representations of) little language types
+-- there are four cases, three for when the (inner) type is known, and one for when it isn't
+-- 
+-- reflectInner :: Value -> InnerTermFam -> Value
+-- reflectInner (VConstruct (VInl VUnitI))
+--              tm
+--     = VInnerNeutral tm
+-- reflectInner (VConstruct (VInr (VInl (VPair t1 t2))))
+--              tm
+--     = VLam "x" $ \x -> reflectInner t1 (InnerApp <$> tm <*> reifyInner t2 x)
+-- --reflectInner (VConstruct (VInr (VInr (VPair t1 t2))))
+-- --             tm
+-- --    = VPair (reflectInner t1 (InnerFst <$> tm)) (reflectInner t2 (InnerSnd <$> tm))
+-- reflectInner (VNeutral _)
+--              tm
+--     = VInnerNeutral tm
+
+vinnerbound :: Int -> (Int -> Maybe InnerTerm)
+vinnerbound i j = return $ InnerBound (j - i - 1)
+
+-- reifyInner :: Value -> -- representation of the type
+--               Value -> -- semantic term
+--               InnerTermFam
+-- reifyInner (VConstruct (VInl VUnitI))
+--            (VInnerNeutral tm)
+--     = tm
+-- reifyInner (VConstruct (VInr (VInl (VPair t1 t2))))
+--            (VLam nm f)
+--     = \i -> let d = reflectInner t1 (vinnerbound i)
+--             in InnerLam $ reifyInner t2 (f d) (i+1)
+-- --reifyInner (VConstruct (VInr (VInr (VPair t1 t2))))
+-- --           (VPair tm1 tm2)
+-- --    = InnerPair <$> reifyInner t1 tm1 <*> reifyInner t2 tm2
+-- reifyInner _
+--            (VNeutral tm)
+--     = \i -> InnerNeutral tm
+-- -- FIXME: what to do with the shift? add it on? no? because it is an
+-- -- outer term? what if it has inner terms inside it? can that happen?
+-- reifyInner _
+--            (VInnerNeutral tm)
+--     = tm
+-- FIXME: will it ever be VInnerNeutral in the second argument? Yes,
+-- when the type is unknown (a VNeutral itself). Leave it for now,
+-- just to see when Haskell throws an unexhausted case error.
+
+data InnerType
+    = Base
+    | InnerType :=> InnerType
+    deriving Show
+
+reifyInnerType :: Value -> Maybe InnerType
+reifyInnerType (VConstruct (VInl VUnitI))        = pure Base
+reifyInnerType (VConstruct (VInr (VPair t1 t2))) = (:=>) <$> reifyInnerType t1 <*> reifyInnerType t2
+reifyInnerType (VNeutral _)                      = Nothing
+
+reifyInner :: InnerType -> Value -> (Int -> Maybe InnerTerm)
+reifyInner Base        (VInnerNeutral tm) =
+    tm
+reifyInner (t1 :=> t2) (VLam _ f)         = -- FIXME: preserve the variable name
+    \i -> let d = reflectInner t1 (vinnerbound i)
+          in InnerLam <$> reifyInner t2 (f d) (i+1)
+reifyInner _           (VNeutral _)       =
+    \i -> Nothing
+
+reflectInner :: InnerType -> (Int -> Maybe InnerTerm) -> Value
+reflectInner Base        tm = VInnerNeutral tm
+reflectInner (t1 :=> t2) tm =
+    VLam "x" $ \x -> reflectInner t1 $ \i -> InnerApp <$> tm i <*> reifyInner t2 x i
+
+vTyDesc = VDesc_Sum (VDesc_K VUnit)
+                    (VDesc_Prod VDesc_Id VDesc_Id)
+
+vTy = VMu vTyDesc
+
+vtyinduction vP base arr =
+    vinduction vTyDesc vP
+               (VLam "t" $ \t ->
+                vcase t VUnit (vTy .*. vTy)
+                      "t" (\t -> vlift $$ vTyDesc $$ vTy $$ vP $$ t .->. vP $$ (VConstruct t))
+                      "u" (\u -> VLam "u'" $ \u' -> base)
+                      "p" (\p -> VLam "q" $ \q -> arr $$ vfst p $$ vsnd p $$ vfst q $$ vsnd q))
+
+vtysem = vtyinduction (VLam "t" $ \t -> VSet 0 .->. VSet 0)
+                      (VLam "A" $ \a -> a)
+                      (VLam "t1" $ \t1 ->
+                       VLam "t2" $ \t2 ->
+                       VLam "s1" $ \s1 ->
+                       VLam "s2" $ \s2 ->
+                       VLam "A" $ \a ->
+                       (s1 $$ a) .->. (s2 $$ a))
+
+vtypred t vA vP =
+    vtyinduction (VLam "t" $ \t -> vtysem t $$ vA .->. VSet 0)
+                 (VLam "a" $ \a -> vP $$ a)
+                 (VLam "t1" $ \t1 ->
+                  VLam "t2" $ \t2 ->
+                  VLam "P1" $ \p1 ->
+                  VLam "P2" $ \p2 ->
+                  VLam "f" $ \f ->
+                  forall "a" (vtysem t1 $$ vA) $ \a -> (p1 $$ a) .->. (p2 $$ (f $$ a)))
+                 t
+
+param :: Value -> -- type
+         Value -> -- term
+         Value -> -- set
+         Value -> -- predicate
+         Value    -- proof of abstraction theorem, or neutral
+param vty vterm vA vP =
+    case v of
+      Just v  -> v
+      Nothing -> 
+          reflect (vtypred vty vA vP $$ (vterm $$ vA))
+                  (In <$> (undefined -- FIXME Param
+                           <$> reify vTy vty
+                           <*> reify (forall "A" (VSet 0) $ \a -> vtysem vty $$ a) vterm
+                           <*> reifyType vA
+                           <*> reify (vA .->. VSet 0) vP))
+    where
+      v = do
+        ty <- reifyInnerType vty
+        tm <- reifyInner ty vterm 0
+        return (absThm tm [])
+
+      sem :: InnerTerm -> [Value] -> Value
+      sem (InnerBound i)     env = env !! i
+      sem (InnerLam tm)      env = VLam "x" $ \v -> sem tm (v:env)
+      sem (InnerApp tm1 tm2) env = sem tm1 env $$ sem tm2 env
+
+      absThm :: InnerTerm -> [(Value,Value)] -> Value
+      absThm (InnerBound i)     env = snd (env !! i)
+      absThm (InnerLam tm)      env = VLam "x" $ \x -> VLam "φx" $ \phix -> absThm tm ((x,phix):env)
+      absThm (InnerApp tm1 tm2) env = absThm tm1 env $$ sem tm2 (map fst env) $$ absThm tm2 env
+
+
+
+-- param (ext eps v) v (\a ((),x) -> blah a x) b p env penv
+
+-- what will happen?
+
+-- we'll pass in an VInnerNeutral (\i -> InnerBound (xxx)) for the
+-- variable
+
+-- applied, it will become an attempt to reify a VInnerNeutral
+-- variable at type 'a', in the main reify function, which will crash
+
+-- we want the parametricity proof to be stuck at this point, and to
+-- evaluate to just the form above.
+
+-- could just add a case to reify to catch VInnerNeutral, but I'm not
+-- sure what'll happen to the bound variables? 
+
+-- vparam :: Value -> -- Context
+--           Value -> -- Ty
+--           Value -> -- The term
+--           Value -> -- the set (a stooge)
+--           Value -> -- the predicate (another stooge)
+--           Value -> -- the environment (a member of the context)
+--           Value -> -- a proof for every member of the context
+--           Value 
+-- vparam vCtxt vTy vTm vA vP venv vpenv =
+--     undefined
+--     where
+--       vTm' = vTm $$ vA
+
+--       tm = undefined
+
+{-
+      loop (InnerBound i) venv vpenv = undefined -- do the ith projection from vpenv
+      loop (InnerApp tm1 tm2) venv vpenv =
+          let v1 = loop tm1 venv vpenv
+              v2 = loop tm2 venv vpenv
+          in v1 $$ 
+-}
+
+-- plan: reify vTm in the context vCtxt and the type vTy
+-- then recurse down the newly reified term, generating the proof of the abstraction theorem
+
+-- due to the definition of ctxt-pred, we know that we can always do
+-- the appropriate projections to get the components of the proof from
+-- vpenv
