@@ -40,6 +40,7 @@ import Text.Show.Functions ()
 
 import Control.Applicative
 
+import qualified Data.Text as T
 import Data.Maybe (fromMaybe)
 import Data.Rec
 
@@ -406,60 +407,11 @@ reify _                v                   = error $ "reify: attempt to reify: "
 data InnerTerm
     = InnerBound   Int
     | InnerApp     InnerTerm InnerTerm
-    | InnerLam     InnerTerm
-    -- | InnerPair    InnerTerm InnerTerm
-    -- | InnerFst     InnerTerm
-    -- | InnerSnd     InnerTerm
+    | InnerLam     Ident InnerTerm
     deriving Show
-
-type InnerTermFam =
-    Int -> InnerTerm
-
--- the type, the term to reflect.
--- pattern matching is on (the representations of) little language types
--- there are four cases, three for when the (inner) type is known, and one for when it isn't
--- 
--- reflectInner :: Value -> InnerTermFam -> Value
--- reflectInner (VConstruct (VInl VUnitI))
---              tm
---     = VInnerNeutral tm
--- reflectInner (VConstruct (VInr (VInl (VPair t1 t2))))
---              tm
---     = VLam "x" $ \x -> reflectInner t1 (InnerApp <$> tm <*> reifyInner t2 x)
--- --reflectInner (VConstruct (VInr (VInr (VPair t1 t2))))
--- --             tm
--- --    = VPair (reflectInner t1 (InnerFst <$> tm)) (reflectInner t2 (InnerSnd <$> tm))
--- reflectInner (VNeutral _)
---              tm
---     = VInnerNeutral tm
 
 vinnerbound :: Int -> (Int -> Maybe InnerTerm)
 vinnerbound i j = return $ InnerBound (j - i - 1)
-
--- reifyInner :: Value -> -- representation of the type
---               Value -> -- semantic term
---               InnerTermFam
--- reifyInner (VConstruct (VInl VUnitI))
---            (VInnerNeutral tm)
---     = tm
--- reifyInner (VConstruct (VInr (VInl (VPair t1 t2))))
---            (VLam nm f)
---     = \i -> let d = reflectInner t1 (vinnerbound i)
---             in InnerLam $ reifyInner t2 (f d) (i+1)
--- --reifyInner (VConstruct (VInr (VInr (VPair t1 t2))))
--- --           (VPair tm1 tm2)
--- --    = InnerPair <$> reifyInner t1 tm1 <*> reifyInner t2 tm2
--- reifyInner _
---            (VNeutral tm)
---     = \i -> InnerNeutral tm
--- -- FIXME: what to do with the shift? add it on? no? because it is an
--- -- outer term? what if it has inner terms inside it? can that happen?
--- reifyInner _
---            (VInnerNeutral tm)
---     = tm
--- FIXME: will it ever be VInnerNeutral in the second argument? Yes,
--- when the type is unknown (a VNeutral itself). Leave it for now,
--- just to see when Haskell throws an unexhausted case error.
 
 data InnerType
     = Base
@@ -474,16 +426,17 @@ reifyInnerType (VNeutral _)                      = Nothing
 reifyInner :: InnerType -> Value -> (Int -> Maybe InnerTerm)
 reifyInner Base        (VInnerNeutral tm) =
     tm
-reifyInner (t1 :=> t2) (VLam _ f)         = -- FIXME: preserve the variable name
+reifyInner (t1 :=> t2) (VLam nm f)        =
     \i -> let d = reflectInner t1 (vinnerbound i)
-          in InnerLam <$> reifyInner t2 (f d) (i+1)
+          in InnerLam nm <$> reifyInner t2 (f d) (i+1)
 reifyInner _           (VNeutral _)       =
     \i -> Nothing
+reifyInner t           v                  = error ("reifyInner: attempt to reify " ++ show v ++ " at type " ++ show t)
 
 reflectInner :: InnerType -> (Int -> Maybe InnerTerm) -> Value
 reflectInner Base        tm = VInnerNeutral tm
 reflectInner (t1 :=> t2) tm =
-    VLam "x" $ \x -> reflectInner t1 $ \i -> InnerApp <$> tm i <*> reifyInner t2 x i
+    VLam "x" $ \x -> reflectInner t2 $ \i -> InnerApp <$> tm i <*> reifyInner t1 x i
 
 vTyDesc = VDesc_Sum (VDesc_K VUnit)
                     (VDesc_Prod VDesc_Id VDesc_Id)
@@ -536,17 +489,17 @@ vparam vty vterm vA vP =
     where
       v = do
         ty <- reifyInnerType vty
-        tm <- reifyInner ty (vterm $$ vTy) 0 -- FIXME: is this the right thing to do?
+        tm <- reifyInner ty (vterm $$ VNeutral (const undefined)) 0 -- FIXME: is this the right thing to do?
         return (absThm tm [])
 
       sem :: InnerTerm -> [Value] -> Value
       sem (InnerBound i)     env = env !! i
-      sem (InnerLam tm)      env = VLam "x" $ \v -> sem tm (v:env)
+      sem (InnerLam nm tm)   env = VLam nm $ \v -> sem tm (v:env)
       sem (InnerApp tm1 tm2) env = sem tm1 env $$ sem tm2 env
 
       absThm :: InnerTerm -> [(Value,Value)] -> Value
       absThm (InnerBound i)     env = snd (env !! i)
-      absThm (InnerLam tm)      env = VLam "x" $ \x -> VLam "φx" $ \phix -> absThm tm ((x,phix):env)
+      absThm (InnerLam nm tm)   env = VLam nm $ \x -> VLam ("φ" `T.append` nm) $ \phix -> absThm tm ((x,phix):env)
       absThm (InnerApp tm1 tm2) env = absThm tm1 env $$ sem tm2 (map fst env) $$ absThm tm2 env
 
 

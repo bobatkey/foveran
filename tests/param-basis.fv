@@ -1,4 +1,33 @@
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
+                    });
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p. case x for x. A (construct x) with
+                                    { inl u. a
+                                    ; inr n. f n
+                                    });
+
+equal : Nat → Nat → Set;
+equal = natInduction (λx. Nat → Set)
+                     (natCase (λx. Set) Unit (λn. Empty))
+                     (λn f. natCase (λx. Set) Empty f);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Ty : Set :=
   | v    :
   | arr  : Ty Ty
@@ -28,80 +57,136 @@ ty-pred :
   (α : Set) →
   (φ : α → Set) →
   ty-sem τ α → Set;
-ty-pred τ α φ =
+ty-pred τ α Φ =
   tyInduction
     (λτ. ty-sem τ α → Set)
-    (λa. φ a)
+    (λa. Φ a)
     (λτ₁ τ₂ P₁ P₂ f. (a : ty-sem τ₁ α) → P₁ a → P₂ (f a))
     τ;
 
-{-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-data Ctxt : Set :=
-  | eps :
-  | ext : Ctxt Ty
-  ;
+ty-rel :
+  (τ : Ty) →
+  (α β : Set) →
+  (Φ : α → β → Set) →
+  ty-sem τ α →
+  ty-sem τ β →
+  Set;
+ty-rel τ α β Φ =
+  tyInduction
+    (λτ. ty-sem τ α → ty-sem τ β → Set)
+    (λa b. Φ a b)
+    (λτ₁ τ₂ ρ₁ ρ₂ f g. (a : ty-sem τ₁ α) → (b : ty-sem τ₁ β) → ρ₁ a b → ρ₂ (f a) (g b))
+    τ;
 
-ctxtInduction :
-  (Φ : Ctxt → Set 2) →
-  (Φ eps) →
-  ((Γ : Ctxt) → (τ : Ty) → Φ Γ → Φ (ext Γ τ)) →
-  (Γ : Ctxt) → Φ Γ;
-ctxtInduction Φ φeps φext =
-  induction CtxtDesc Φ
-    (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct x) with
-           { inl u. λu'. φeps
-           ; inr p. λφ. φext (fst p) (snd p) (fst φ)
-           });
+assume le : Nat → Nat → Set;
 
-ctxt-sem : Ctxt → Set → Set;
-ctxt-sem =
-  ctxtInduction
-    (λΓ. Set → Set)
-    (λα. Unit)
-    (λΓ τ S α. S α × ty-sem τ α);
-
-ctxt-pred :
-  (Γ : Ctxt) →
+ty-kripke-pred :
+  (τ : Ty) →
   (α : Set) →
-  (φ : α → Set) →
-  ctxt-sem Γ α → Set;
-ctxt-pred Γ α φ =
-  ctxtInduction
-    (λΓ. ctxt-sem Γ α → Set)
-    (λu. Unit)
-    (λΓ τ P p. P (fst p) × ty-pred τ α φ (snd p))
-    Γ;
+  (Φ : α → Nat → Set) →
+  ty-sem τ α → Nat → Set;
+ty-kripke-pred τ α Φ =
+  tyInduction
+    (λτ. ty-sem τ α → Nat → Set)
+    (λa n. (n' : Nat) → le n n' → Φ a n')
+    (λτ₁ τ₂ Φ₁ Φ₂ f n. (n' : Nat) → le n n' → (a : ty-sem τ₁ α) → Φ₁ a n' → Φ₂ (f a) n')
+    τ;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-assume param-old : 
-  (Γ : Ctxt) →
-  (τ : Ty) →
-  (t : (α : Set) → ctxt-sem Γ α → ty-sem τ α) →
-  (α : Set) →
-  (Φ : α → Set) →
-  (γ : ctxt-sem Γ α) →
-  ctxt-pred Γ α Φ γ →
-  ty-pred τ α Φ (t α γ);
--}
-{-
-assume param :
-  (τ : Ty) →
-  (t : (α : Set) → ty-sem τ α) →
-  (α : Set) →
-  (Φ : α → Set) →
-  ty-pred τ α Φ (t α);
--}
+abs-ty : Ty → Set 1;
+abs-ty τ = (α : Set) → ty-sem τ α;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+churchNat : Ty;
+churchNat = arr (arr v v) (arr v v);
 
 assume t : (α : Set) → (α → α) → α → α;
 
-normalise param (arr (arr v v) (arr v v)) t;
+normalise param churchNat (λα. t α);
 
-– param (arr (arr v v) (arr v v)) : 
-–    (t : (α : Set) → (α → α) → (α → α)) →
-–    (α : Set) → 
-–    (Φ : α → Set) → 
-–    (s : α → α) → ((x : α) → Φ x → Φ (s x)) → (z : α) → Φ z → Φ (t α s z)
+normalise param churchNat (λα s z. s (s z));
 
-– is it possible to deal with partially known types and terms?
-– can I get 
+normalise param churchNat (λα s z. s (t α s z));
+
+fromNat : Nat → abs-ty churchNat;
+fromNat n α s z =
+  natInduction (λn. α)
+    z
+    (λn a. s a)
+    n;
+
+toNat : abs-ty churchNat → Nat;
+toNat t = t Nat succ zero;
+
+normalise param churchNat (fromNat (succ (succ zero)));
+
+natTest : (Φ : Nat → Set) →
+          Φ zero →
+          ((n : Nat) → Φ n → Φ (succ n)) →
+          (n : Nat) →
+          Φ (toNat (fromNat n));
+natTest Φ φzero φsucc n =
+  param (arr (arr v v) (arr v v)) (fromNat n) Nat Φ succ φsucc zero φzero;
+
+assume eql : (n : Nat) → equal (toNat (fromNat n)) n;
+– is this provable using the binary parametricity principle?
+– can you prove it by induction on the natural numbers?
+
+– I think the binary parametricity principle is needed to prove that fromNat (toNat t) ≡ t
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– another sort of stuck term
+assume b : Unit + Unit ;
+
+normalise param (arr v (arr v v)) (λα x₁ x₂. case b for b. α with { inl u. x₁; inr u. x₂ });
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+test : (A : Set) →
+       (P : A → Set) →
+       (a : A → A) → ((a' : A) → P a' → P (a a')) →
+       (a' : A) → P a' →
+       P (a (a a'));
+test = λA P s φs z φz. φs (s z) (φs z φz);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+hoasTy : Ty;
+hoasTy = arr (arr (arr v v) v) (arr (arr v (arr v v)) v);
+
+hoasTerm : Set 1;
+hoasTerm = abs-ty hoasTy;
+
+tm : hoasTerm;
+tm α lam app =
+  lam (λx. app x x);
+
+normalise ty-pred hoasTy;
+
+normalise ty-kripke-pred hoasTy;
+
+normalise param hoasTy tm;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Making sure that the computed term type checks
+{-
+test2 : (A : Set) → (P : A → Set) → (a : (A → A) → A) → ((a' : A →
+                                                           A) → ((a'' : A) → P a'' → P (a' a'')) →
+                                                                P (a (λx. a' x))) →
+                                                    (a' : A → A → A) → ((a'' : A) → P a'' →
+                                                                                    (a''' : A) → P a''' →
+                                                                                                 P (a' a''
+                                                                                                       a''')) →
+                                                                       P (a (λx. a' x x));
+test2 = λA P lam φlam app φapp. φlam (λx. app x x)
+                                 (λx φx. φapp x φx x φx);
+-}
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– to do Kripke parametricity:
+–   ty-pred v         α Φ = λa n. Φ a n
+–   ty-pred (τ₁ ⇒ τ₂) α Φ = λf n. (n' : Nat) → n ≤ n' → (a : ty-sem τ₁ α) → ty-pred τ₁ α Φ a n' → ty-pred τ₂ α Φ (f a) n'
+
+– the generated proof gets commensurately more complicated...
+– but the general idea is the same.
+
+– binary parametricity is probably easier to do, but needs equality to
+– do anything exciting. Proving initiality might be possible, with an
+– assumption of functional extensionality
