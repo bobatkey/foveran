@@ -28,6 +28,11 @@ module Language.Foveran.Typing.Conversion.Value
     , reflect
     , reifyType
     , reify
+
+    , vTy
+    , vtysem
+    , vtypred
+    , vparam
     )
     where
 
@@ -513,25 +518,25 @@ vtypred t vA vP =
                   forall "a" (vtysem t1 $$ vA) $ \a -> (p1 $$ a) .->. (p2 $$ (f $$ a)))
                  t
 
-param :: Value -> -- type
-         Value -> -- term
-         Value -> -- set
-         Value -> -- predicate
-         Value    -- proof of abstraction theorem, or neutral
-param vty vterm vA vP =
+vparam :: Value -> -- type
+          Value -> -- term
+          Value -> -- set
+          Value -> -- predicate
+          Value    -- proof of abstraction theorem, or neutral
+vparam vty vterm vA vP =
     case v of
       Just v  -> v
       Nothing -> 
           reflect (vtypred vty vA vP $$ (vterm $$ vA))
-                  (In <$> (undefined -- FIXME Param
-                           <$> reify vTy vty
-                           <*> reify (forall "A" (VSet 0) $ \a -> vtysem vty $$ a) vterm
-                           <*> reifyType vA
-                           <*> reify (vA .->. VSet 0) vP))
+                  (pure (In Param)
+                   `tmApp` reify vTy vty
+                   `tmApp` reify (forall "A" (VSet 0) $ \a -> vtysem vty $$ a) vterm
+                   `tmApp` reifyType vA
+                   `tmApp` reify (vA .->. VSet 0) vP)
     where
       v = do
         ty <- reifyInnerType vty
-        tm <- reifyInner ty vterm 0
+        tm <- reifyInner ty (vterm $$ vTy) 0 -- FIXME: is this the right thing to do?
         return (absThm tm [])
 
       sem :: InnerTerm -> [Value] -> Value

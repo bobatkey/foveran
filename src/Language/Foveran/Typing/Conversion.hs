@@ -14,6 +14,10 @@ module Language.Foveran.Typing.Conversion
        , vfst
        , vlift
        , vmuI
+
+       , vTy
+       , vtysem
+       , vtypred
        )
        where
 

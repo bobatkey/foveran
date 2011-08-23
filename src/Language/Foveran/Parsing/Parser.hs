@@ -190,6 +190,8 @@ term00 =
     <|>
     keyword Sem <$> token Tok.Sem
     <|>
+    keyword Param <$> token Tok.Param
+    <|>
     keyword UnitI <$> token Tok.UnitValue
     <|>
     -- FIXME: extend the left and right positions of the term to include the parens

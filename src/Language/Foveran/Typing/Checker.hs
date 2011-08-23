@@ -307,5 +307,15 @@ tySynth (Annot p IDesc_Elim) ctxt =
               , In $ CS.IDesc_Elim
               )
 
+-- parametricity
+tySynth (Annot p Param) ctxt =
+    do return ( forall "ty" vTy $ \ty ->
+                forall "t" (forall "A" (VSet 0) $ \a -> vtysem ty $$ a) $ \t ->
+                forall "A" (VSet 0) $ \a ->
+                forall "P" (a .->. VSet 0) $ \p ->
+                vtypred ty a p $$ (t $$ a)
+              , In $ CS.Param
+              )
+
 tySynth (Annot p t) ctxt =
     Error p UnableToSynthesise

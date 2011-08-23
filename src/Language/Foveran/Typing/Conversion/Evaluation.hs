@@ -95,6 +95,12 @@ eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 videsc_elim i p pId pK pPair pSg pPi d)
 eval (MuI t1 t2)        = vmuI <$> t1 <*> t2
 
+eval Param              = pure (VLam "ty" $ \ty ->
+                                VLam "t" $ \t ->
+                                VLam "A" $ \a ->
+                                VLam "P" $ \p ->
+                                vparam ty t a p)
+
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value
 evaluate t env defs = foldRec eval t (env,defs)

@@ -84,14 +84,18 @@ assume param-old :
   ctxt-pred Γ α Φ γ →
   ty-pred τ α Φ (t α γ);
 -}
-
+{-
 assume param :
   (τ : Ty) →
   (t : (α : Set) → ty-sem τ α) →
   (α : Set) →
   (Φ : α → Set) →
   ty-pred τ α Φ (t α);
+-}
 
+assume t : (α : Set) → (α → α) → α → α;
+
+normalise param (arr (arr v v) (arr v v)) t;
 
 – param (arr (arr v v) (arr v v)) : 
 –    (t : (α : Set) → (α → α) → (α → α)) →
