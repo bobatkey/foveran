@@ -75,6 +75,11 @@ declaration =
         <*  token Tok.ColonEquals
         <*> constructorList
         <*> token Tok.Semicolon
+    <|>
+    (\p tm p' -> Normalise tm)
+    <$> token Tok.Normalise
+    <*> term
+    <*> token Tok.Semicolon
 
 dataParamList :: Parser Tok.Token [(Ident,TermPos)]
 dataParamList =

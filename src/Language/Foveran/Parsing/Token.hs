@@ -53,7 +53,8 @@ data Token
     | Number
     | Pipe
     | Data
-      
+    | Normalise      
+
     | IDesc
     | Quote_IId
     | Quote_Sg
@@ -108,7 +109,9 @@ instance SyntaxHighlight Token where
     lexicalClass Number      = Constant
     lexicalClass Pipe        = Punctuation
     lexicalClass Data        = Keyword
+    lexicalClass Normalise   = Keyword
     lexicalClass IDesc       = Keyword
+    lexicalClass Sem         = Keyword
     lexicalClass Quote_IId   = Constructor
     lexicalClass Quote_Sg    = Constructor
     lexicalClass Quote_Pi    = Constructor
@@ -164,4 +167,5 @@ instance Show Token where
   show Quote_Sg    = "“Σ”"
   show Quote_Pi    = "“Π”"
   show IDesc_Elim  = "elimID"
+  show Sem         = "sem"
   show MuI         = "µI"

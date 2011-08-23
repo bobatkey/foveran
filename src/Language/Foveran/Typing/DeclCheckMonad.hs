@@ -18,6 +18,7 @@ import Text.PrettyPrint.IsString ()
 import Language.Foveran.Util.PrettyPrinting
 
 import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
+import qualified Language.Foveran.Syntax.Display as DS
 import Language.Foveran.Syntax.LocallyNameless (Ident, toLocallyNameless)
 import qualified Language.Foveran.Syntax.Checked as CS
 import Language.Foveran.Parsing.PrettyPrinter
@@ -42,6 +43,9 @@ instance Monad (DeclCheckM p) where
                                   Left error      -> return $ Left error
                                   Right (a,ctxt') -> let DM t' = f a
                                                      in t' ctxt'
+
+getContext :: DeclCheckM p Context
+getContext = DM $ \c -> return (Right (c,c))
 
 liftTyCheck :: (Context -> TypingMonad p a) -> DeclCheckM p a
 liftTyCheck f = DM $ \ctxt -> case f ctxt of
@@ -84,6 +88,21 @@ checkDatatype d =
        checkDefinition (genDatatypeCarrier d)
        mapM_ checkDefinition (genConstructors d)
 
+doNormalise :: DS.TermPos -> DeclCheckM Span ()
+doNormalise tmDS = do
+  let tm = toLocallyNameless tmDS
+  (ty,c) <- liftTyCheck $ tySynth tm
+  v <- evaluate c
+  ctxt <- getContext
+  let d  = ppTerm ctxt v ty
+      d0 = ppPlain $ contextNameSupply ctxt $ CS.toDisplaySyntax c
+  liftIO $ putStrLn $ render $ ("normalised: "
+                                $$ nest 4 d0
+                                $$ "to"
+                                $$ nest 4 d
+                                $$ "")
+  return ()
+
 checkDecl :: Declaration -> DeclCheckM Span ()
 checkDecl (AssumptionDecl p nm extTm) =
   do let t = toLocallyNameless extTm
@@ -92,6 +111,7 @@ checkDecl (AssumptionDecl p nm extTm) =
      extend p nm v Nothing
 checkDecl (DefinitionDecl d) = checkDefinition d
 checkDecl (DatatypeDecl d)   = checkDatatype d
+checkDecl (Normalise tm)     = doNormalise tm
 
 runDeclCheckM :: DeclCheckM Span () -> IO ()
 runDeclCheckM (DM f) =

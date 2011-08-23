@@ -10,6 +10,7 @@ import Language.Foveran.Parsing.Token
 lexicalSpec :: LexicalSpecification (Action Token)
 lexicalSpec = 
     [ ("assume",          Emit Assume)
+    , ("normalise",       Emit Normalise)
     , (":",               Emit Colon)
     , (":=",              Emit ColonEquals)
     , (";",               Emit Semicolon)

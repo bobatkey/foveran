@@ -26,6 +26,7 @@ data Declaration
     = AssumptionDecl Span Ident TermPos
     | DefinitionDecl Definition
     | DatatypeDecl   Datatype
+    | Normalise      TermPos
 
 type Term = Rec TermCon
 type TermPos = AnnotRec Span TermCon

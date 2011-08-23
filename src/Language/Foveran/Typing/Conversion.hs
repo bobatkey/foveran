@@ -4,6 +4,7 @@ module Language.Foveran.Typing.Conversion
        ( Value (..)
        , evaluate
        , reifyType0
+       , reify
        , ($$)
        , (.->.)
        , forall

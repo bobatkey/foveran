@@ -24,6 +24,8 @@ natCase A a f = induction NatDesc A
 add : Nat → Nat → Nat ;
 add n₁ n₂ = natInduction (λx. Nat) n₂ (λn. succ) n₁;
 
+normalise add (succ zero) (succ zero) ;
+
 mul : Nat → Nat → Nat ;
 mul n₁ n₂ = natInduction (λx. Nat) zero (λn. add n₂) n₁;
 

@@ -4,6 +4,7 @@ module Language.Foveran.Typing.Checker
     ( TypingMonad (..)
     , tyCheck
     , setCheck
+    , tySynth
     )
     where
 

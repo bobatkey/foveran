@@ -3,13 +3,14 @@
 module Language.Foveran.Typing.Errors
     ( TypeError (..)
     , ppTypeError
+    , ppTerm
     )
     where
 
 import           Text.PrettyPrint
 import           Text.PrettyPrint.IsString
 import           Language.Foveran.Typing.Context
-import           Language.Foveran.Typing.Conversion (Value, reifyType0)
+import           Language.Foveran.Typing.Conversion (Value, reifyType0, reify)
 import           Language.Foveran.Syntax.Checked (Ident, toDisplaySyntax)
 import           Language.Foveran.Parsing.PrettyPrinter
 import qualified Data.Text as T
@@ -35,6 +36,11 @@ data TypeError
 ppType :: Context -> Value -> Doc
 ppType ctxt v =
   ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reifyType0 v
+
+ppTerm :: Context -> Value -> Value -> Doc
+ppTerm ctxt v vty =
+    ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reify vty v 0
+
 
 ppTypeError :: TypeError -> Doc
 ppTypeError (ExpectingPiTypeForLambda ctxt ty)
