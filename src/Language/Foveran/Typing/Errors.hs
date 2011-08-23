@@ -4,6 +4,7 @@ module Language.Foveran.Typing.Errors
     ( TypeError (..)
     , ppTypeError
     , ppTerm
+    , ppType
     )
     where
 

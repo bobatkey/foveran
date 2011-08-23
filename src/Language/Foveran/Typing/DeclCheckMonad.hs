@@ -98,6 +98,8 @@ doNormalise tmDS = do
       d0 = ppPlain $ contextNameSupply ctxt $ CS.toDisplaySyntax c
   liftIO $ putStrLn $ render $ ("normalised: "
                                 $$ nest 4 d0
+                                $$ "of type"
+                                $$ nest 4 (ppType ctxt ty)
                                 $$ "to"
                                 $$ nest 4 d
                                 $$ "")
