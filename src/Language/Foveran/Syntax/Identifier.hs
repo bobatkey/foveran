@@ -25,7 +25,10 @@ newtype NameSupply a = NS { unNS :: (S.Set Ident, [Ident]) -> a }
     deriving (Functor, Applicative, Monad)
 
 -- FIXME: find a better way of freshening names
-freshen used nm = if S.member nm used then freshen used (nm `mappend` "'") else (S.insert nm used, nm)
+freshen used nm = loop variants
+    where loop (nm:nms) = if S.member nm used then loop nms else (S.insert nm used, nm)
+
+          variants = nm:[ nm `mappend` (T.pack $ show i) | i <- [0..]]
 
 getBound :: Int -> NameSupply Ident
 getBound i       = NS $ \(used, bound) -> bound !! i
