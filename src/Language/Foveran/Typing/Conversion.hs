@@ -14,10 +14,14 @@ module Language.Foveran.Typing.Conversion
        , vfst
        , vlift
        , vmuI
+       , tmFree -- FIXME: replace this with reflectFree
 
        , vTy
+       , vCtxt
        , vtysem
        , vtypred
+       , vctxtsem
+       , vctxtpred
        )
        where
 

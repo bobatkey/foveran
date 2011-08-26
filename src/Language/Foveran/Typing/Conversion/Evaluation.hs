@@ -95,11 +95,14 @@ eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 videsc_elim i p pId pK pPair pSg pPi d)
 eval (MuI t1 t2)        = vmuI <$> t1 <*> t2
 
-eval Param              = pure (VLam "ty" $ \ty ->
-                                VLam "t" $ \t ->
+eval Param              = pure (VLam "G" $ \g ->
+                                VLam "ty" $ \ty ->
+                                VLam "tm" $ \tm ->
                                 VLam "A" $ \a ->
                                 VLam "P" $ \p ->
-                                vparam ty t a p)
+                                VLam "env" $ \env ->
+                                VLam "phienv" $ \phienv ->
+                                vparam2 g ty tm a p env phienv)
 
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value

@@ -48,7 +48,7 @@ tyCheck :: AnnotRec p TermCon -> Context -> Value -> TypingMonad p CS.Term
 
 tyCheck (Annot p (Lam x t)) ctxt (VPi _ tA tB) =
   do let (x',ctxt') = ctxtExtendFreshen ctxt x tA Nothing
-     tm <- tyCheck (close x' t) ctxt' (tB $ reflect tA (CS.tmFree x'))
+     tm <- tyCheck (close x' t) ctxt' (tB $ reflect tA (tmFree x'))
      return (In $ CS.Lam x (CS.bindFree x' tm))
 
 tyCheck (Annot p (Lam x t)) ctxt v =
@@ -208,10 +208,10 @@ tySynth (Annot p (Case t x tP y tL z tR)) ctxt =
                 (i,tmP0) <- setCheck (close x' tP) ctxt1
                 let tmP         = CS.bindFree x' tmP0
                     (y', ctxt2) = ctxtExtendFreshen ctxt y tA Nothing
-                    vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (CS.tmFree y')))
+                    vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (tmFree y')))
                 tmL <- tyCheck (close y' tL) ctxt2 vtP1
                 let (z', ctxt3) = ctxtExtendFreshen ctxt z tB Nothing
-                    vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (CS.tmFree z')))
+                    vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (tmFree z')))
                 tmR <- tyCheck (close z' tR) ctxt3 vtP2
                 let tmA = reifyType0 tA
                     tmB = reifyType0 tB
@@ -309,11 +309,14 @@ tySynth (Annot p IDesc_Elim) ctxt =
 
 -- parametricity
 tySynth (Annot p Param) ctxt =
-    do return ( forall "ty" vTy $ \ty ->
-                forall "t" (forall "A" (VSet 0) $ \a -> vtysem ty $$ a) $ \t ->
+    do return ( forall "G" vCtxt $ \vG ->
+                forall "ty" vTy $ \ty ->
+                forall "t" (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem ty $$ a) $ \t ->
                 forall "A" (VSet 0) $ \a ->
                 forall "P" (a .->. VSet 0) $ \p ->
-                vtypred ty a p $$ (t $$ a)
+                forall "env" (vctxtsem vG $$ a) $ \env ->
+                vctxtpred vG a p $$ env .->.
+                vtypred ty a p $$ (t $$ a $$ env)
               , In $ CS.Param
               )
 

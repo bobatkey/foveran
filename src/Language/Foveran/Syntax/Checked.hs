@@ -4,12 +4,6 @@ module Language.Foveran.Syntax.Checked
     ( Ident
     , Term
     , TermCon (..)
-    , tmApp
-    , tmFree
-    , tmBound
-    , tmFst
-    , tmSnd
-    , vbound
       
     , bindFree
     , toDisplaySyntax
@@ -70,6 +64,9 @@ data TermCon tm
 
     | Param
     deriving (Show, Functor)
+
+instance Show Term where
+    show (In t) = "(" ++ show t ++ ")"
 
 --------------------------------------------------------------------------------
 binder :: (Int -> a) -> Int -> a
@@ -184,31 +181,6 @@ toDisplay Param                   = pure DS.Param
 
 toDisplaySyntax :: Term -> NameSupply DS.Term
 toDisplaySyntax = translateRec toDisplay
-
-{------------------------------------------------------------------------------}
-tmApp :: (Int -> Term) -> (Int -> Term) -> (Int -> Term)
-tmApp t1 t2 = In <$> (App <$> t1 <*> t2)
-
-tmFst :: (Int -> Term) -> (Int -> Term)
-tmFst t = In . Proj1 <$> t
-
-tmSnd :: (Int -> Term) -> (Int -> Term)
-tmSnd t = In . Proj2 <$> t
-
-tmInl :: (Int -> Term) -> (Int -> Term)
-tmInl t = In . Inl <$> t
-
-tmInr :: (Int -> Term) -> (Int -> Term)
-tmInr t = In . Inr <$> t
-
-vbound :: Int -> (Int -> Term)
-vbound i j = In $ Bound (j - i - 1)
-
-tmBound :: ((Int -> Term) -> (Int -> Term)) -> Int -> Term
-tmBound f i = f (vbound i) (i+1)
-
-tmFree :: Ident -> Int -> Term
-tmFree nm = \i -> In $ Free nm
 
 {------------------------------------------------------------------------------}
 -- FIXME: some of these things are irrelevant: so they needn't be

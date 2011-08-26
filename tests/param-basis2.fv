@@ -64,6 +64,56 @@ ty-pred τ α Φ =
     (λτ₁ τ₂ P₁ P₂ f. (a : ty-sem τ₁ α) → P₁ a → P₂ (f a))
     τ;
 
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Ctxt : Set :=
+  | eps :
+  | ext : Ctxt Ty
+  ;
+
+ctxtInduction :
+  (Φ : Ctxt → Set 2) →
+  (Φ eps) →
+  ((Γ : Ctxt) → (τ : Ty) → Φ Γ → Φ (ext Γ τ)) →
+  (Γ : Ctxt) → Φ Γ;
+ctxtInduction Φ φeps φext =
+  induction CtxtDesc Φ
+    (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct x) with
+           { inl u. λu'. φeps
+           ; inr p. λq. φext (fst p) (snd p) (fst q)
+           });
+
+ctxt-sem : Ctxt → Set → Set;
+ctxt-sem = ctxtInduction (λΓ. Set → Set)
+             (λα. Unit)
+             (λΓ τ sΓ α. sΓ α × ty-sem τ α);
+
+ctxt-pred : (Γ : Ctxt) → (α : Set) → (Φ : α → Set) → ctxt-sem Γ α → Set;
+ctxt-pred Γ α Φ =
+  ctxtInduction (λΓ. ctxt-sem Γ α → Set)
+    (λu. Unit)
+    (λΓ τ ΦΓ γ. ΦΓ (fst γ) × ty-pred τ α Φ (snd γ))
+    Γ;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+normalise param eps (arr v (arr v v));
+
+– assume t : (α : Set) → (α → α) → α → α;
+
+– normalise param eps (arr (arr v v) (arr v v)) (λα γ s z. s (t α s z));
+
+test : (t : (α : Set) → (α → α) → α → α) →
+       (α : Set) →
+       (Φ : α → Set) →
+       ty-pred (arr (arr v v) (arr v v)) α Φ (λs z. s (t α (λa. t α s a) z));
+test t α Φ = param eps (arr (arr v v) (arr v v))
+                   (λα γ s z. s (t α (λa. t α s a) z))
+                   α Φ
+                   () ();
+
+normalise test;
+
+{-
+
 ty-rel :
   (τ : Ty) →
   (α β : Set) →

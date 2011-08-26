@@ -7,6 +7,8 @@ module Language.Foveran.Typing.Conversion.Value
     , (.*.)
     , (.+.)
 
+    , tmFree
+
     , ($$)
 
     , vfst
@@ -32,7 +34,11 @@ module Language.Foveran.Typing.Conversion.Value
     , vTy
     , vtysem
     , vtypred
+    , vCtxt
+    , vctxtsem
+    , vctxtpred
     , vparam
+    , vparam2
     )
     where
 
@@ -46,6 +52,11 @@ import Data.Rec
 
 import Language.Foveran.Syntax.Identifier (Ident)
 import Language.Foveran.Syntax.Checked
+
+import Debug.Trace
+
+{------------------------------------------------------------------------------}
+data Setting = Local | Global deriving Show
 
 {------------------------------------------------------------------------------}
 data Value
@@ -86,7 +97,80 @@ data Value
     | VInnerNeutral (Int -> Maybe InnerTerm)
     deriving Show
 
+{-
+data Neutral
+    = NApp       Neutral Value Value
+    | NFree      Ident
+    | NBound     Int
+    | NFst       Neutral
+    | NSnd       Neutral
+    | NCase      Neutral Ident (Value -> Value) Ident (Value -> Value) Ident (Value -> Value)
+    | NElimEmpty Neutral Value
+    | NSem       Neutral
+    | NDescElim  Neutral Value Value Value Value Value
+    | NIDescElim Neutral Value Value Value Value Value Value Value
+    | NInduction Neutral Value Value Value
+    deriving Show
+
+vNeutral :: Neutral -> Value
+vNeutral = undefined
+
+tmBound' :: (Value -> Int -> Term) -> Int -> Term
+tmBound' f i = f (vNeutral $ NBound i) (i+1)
+
+-- maybe, instead of storing the type with the 'NApp', we could get
+-- reifyNeutral to return the type. This would require a typing
+-- environment to be passed in. Otherwise, we need to magic up a type
+-- from somewhere during evaluation. This means we'd need to know the
+-- types of the components of the sum type in NCase, because they'll
+-- be needed to add to the typing environment to be passed to reify.
+
+-- This seems to me to be repeating a whole load of work all the
+-- time... In the reflect/reify version we only ever need to construct
+-- a new tuple for each product once.
+
+reifyNeutral :: Neutral -> (Int -> Term)
+reifyNeutral (NApp n v vTy)
+    = reifyNeutral n `tmApp` reify vTy v
+reifyNeutral (NFree s)
+    = tmFree s
+reifyNeutral (NBound i)
+    = \j -> In $ Bound (j - i - 1) -- and tmBound
+reifyNeutral (NFst n)
+    = tmFst $ reifyNeutral n
+reifyNeutral (NSnd n)
+    = tmSnd $ reifyNeutral n
+reifyNeutral (NCase n x vP l vL r vR)
+    = In <$> (Case
+              <$> reifyNeutral n
+              <*> undefined -- don't need these under this regime, which might mean it is better
+              <*> undefined -- 
+              <*> pure x <*> tmBound' (\tmV -> reifyType (vP tmV))
+              <*> pure l <*> tmBound' (\tmV -> reify (vP $ VInl tmV) (vL tmV))
+              <*> pure r <*> tmBound' (\tmV -> reify (vP $ VInr tmV) (vR tmV)))
+reifyNeutral (NElimEmpty n vA)
+    = pure (In ElimEmpty) `tmApp` reifyType vA `tmApp` reifyNeutral n
+reifyNeutral (NSem n)
+    = pure (In Sem) `tmApp` reifyNeutral n
+reifyNeutral (NDescElim n vP vK vI vPr vSu)
+    = pure (In Desc_Elim)
+      `tmApp` reify (VDesc .->. VSet 1) vP
+      `tmApp` reify (forall "A" (VSet 0) $ \vA -> vP $$ VDesc_K vA) vK
+      `tmApp` reify (vP $$ VDesc_Id) vI
+      `tmApp` reify (forall "F" VDesc $ \f -> forall "G" VDesc $ \g -> (vP $$ f) .->. (vP $$ g) .->. (vP $$ (VDesc_Prod f g))) vPr
+      `tmApp` reify (forall "F" VDesc $ \f -> forall "G" VDesc $ \g -> (vP $$ f) .->. (vP $$ g) .->. (vP $$ (VDesc_Sum f g))) vSu
+      `tmApp` reifyNeutral n
+
+
+-- Now, to do parametricity reflection with this representation...
+--
+-- When the return type is 'v', then the returned value must be neutral...
+-- if it is 'NApp', then we have to find a way of reabstracting the argument in order to apply the param function again
+-- if it is 'NCase', then we have to check to see whether it returns a 
+-}
+
 {------------------------------------------------------------------------------}
+-- combinators for building (codes for) types
 forall :: Ident -> Value -> (Value -> Value) -> Value
 forall nm tA tB = VPi (Just nm) tA tB
 
@@ -136,7 +220,42 @@ vcase (VNeutral n) vA vB x vP y vL z vR
                        <*> pure x <*> tmBound (\tmV -> reify (VSet 0) (vP (reflect (VSum vA vB) tmV)))
                        <*> pure y <*> tmBound (\tmV -> let v = reflect vA tmV in reify (vP $ VInl v) (vL v))
                        <*> pure z <*> tmBound (\tmV -> let v = reflect vB tmV in reify (vP $ VInr v) (vR v))))
+{-
+vcase (VInnerNeutral n) vA vB x vP y vL z vR
+    = reflectInner ty
+                   (InnerCase <$> n
+                              <*> pure y <*> (\i -> reifyInner ty (vL (reflectInner tyA (vinnerbound i))) (i+1))
+                              <*> pure z <*> (\i -> reifyInner ty (vR (reflectInner tyB (vinnerbound i))) (i+1))
+    where
+      ty = reifyInnerType' (vP $ VInnerNeutral n) -- is this OK?
+      tyA = reifyInnerType' vA
+      tyB = reifyInnerType' vB
+-}
 vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when eliminating case"
+
+-- basically, if we get VInnerNeutral as an argument, then we make a
+-- best effort to reify it as an inner language term. We look at the
+-- type argument, and if it normalises to an inner language type, then
+-- we 
+
+-- what if we have
+--   foo : (n : nat) → (A : Set) → (A → A) → A → A
+-- and
+--   x : A + A |- foo (case x for Nat with inl a. 2; inr b. 3) A succ zero : A
+-- ??
+--
+-- nice case:
+--   x : A + A |- case x for A with inl a. a; inr b. b : A
+
+-- so if the case appears in a context that is not an inner term then
+-- we are stuck.
+
+-- this matches codes for types that are in the image of the ty-sem
+-- constructor.
+--reifyInnerType' :: Value -> Maybe InnerType
+--reifyInnerType' (VPi _ vA vB) = reifyInnerType' vA :=> reifyInnerType' (vB (VNeutral undefined))
+--reifyInnerType' VInnerTypeVar = return Base
+--reifyInnerType' (VSum vA vB)  = SumTy <$> reifyInnerType' vA <*> reifyInnerType' vB
 
 {------------------------------------------------------------------------------}
 velimEmpty :: Value -> Value -> Value
@@ -155,19 +274,6 @@ vsem vD = loop vD
       loop (VNeutral tm)      =
           reflect (VSet 0 .->. VSet 0)
                   (pure (In Sem) `tmApp` tm)
-          
-
-{-
-VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
-                             (VLam "A" $ \a -> VLam "X" $ \_ -> a)
-                             (VLam "X" $ \x -> x)
-                             (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
-                              VLam "F" $ \f -> VLam "G" $ \g -> 
-                              VLam "X" $ \x -> (f $$ x) .*. (g $$ x))
-                             (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
-                              VLam "F" $ \f -> VLam "G" $ \g ->
-                              VLam "X" $ \x -> (f $$ x) .+. (g $$ x))
--}
 
 {------------------------------------------------------------------------------}
 vsemI :: Value
@@ -341,6 +447,30 @@ vinduction vF vP vK = loop
                                  vK
                    `tmApp` n)
 
+{------------------------------------------------------------------------------}
+tmApp :: (Int -> Term) -> (Int -> Term) -> (Int -> Term)
+tmApp t1 t2 = In <$> (App <$> t1 <*> t2)
+
+tmFst :: (Int -> Term) -> (Int -> Term)
+tmFst t = In . Proj1 <$> t
+
+tmSnd :: (Int -> Term) -> (Int -> Term)
+tmSnd t = In . Proj2 <$> t
+
+tmInl :: (Int -> Term) -> (Int -> Term)
+tmInl t = In . Inl <$> t
+
+tmInr :: (Int -> Term) -> (Int -> Term)
+tmInr t = In . Inr <$> t
+
+vbound :: Int -> (Int -> Term)
+vbound i j = In $ Bound (j - i - 1)
+
+tmBound :: ((Int -> Term) -> (Int -> Term)) -> Int -> Term
+tmBound f i = f (vbound i) (i+1)
+
+tmFree :: Ident -> Int -> Term
+tmFree nm = \i -> In $ Free nm
 
 {------------------------------------------------------------------------------}
 reflect :: Value -> (Int -> Term) -> Value
@@ -399,7 +529,7 @@ reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDes
 reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify _                (VNeutral tm)       = tm
-reify _                v                   = error $ "reify: attempt to reify: " ++ show v
+reify ty                v                   = error $ "reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
 
 --------------------------------------------------------------------------------
 -- parametricity stuff
@@ -418,11 +548,13 @@ data InnerType
     | InnerType :=> InnerType
     deriving Show
 
+--------------------------------------------------------------------------------
 reifyInnerType :: Value -> Maybe InnerType
 reifyInnerType (VConstruct (VInl VUnitI))        = pure Base
 reifyInnerType (VConstruct (VInr (VPair t1 t2))) = (:=>) <$> reifyInnerType t1 <*> reifyInnerType t2
 reifyInnerType (VNeutral _)                      = Nothing
 
+--------------------------------------------------------------------------------
 reifyInner :: InnerType -> Value -> (Int -> Maybe InnerTerm)
 reifyInner Base        (VInnerNeutral tm) =
     tm
@@ -431,12 +563,15 @@ reifyInner (t1 :=> t2) (VLam nm f)        =
           in InnerLam nm <$> reifyInner t2 (f d) (i+1)
 reifyInner _           (VNeutral _)       =
     \i -> Nothing
-reifyInner t           v                  = error ("reifyInner: attempt to reify " ++ show v ++ " at type " ++ show t)
+reifyInner t           v                  =
+    error ("reifyInner: attempt to reify " ++ show v ++ " at type " ++ show t)
 
 reflectInner :: InnerType -> (Int -> Maybe InnerTerm) -> Value
-reflectInner Base        tm = VInnerNeutral tm
+reflectInner Base        tm =
+    VInnerNeutral tm
 reflectInner (t1 :=> t2) tm =
     VLam "x" $ \x -> reflectInner t2 $ \i -> InnerApp <$> tm i <*> reifyInner t1 x i
+--------------------------------------------------------------------------------
 
 vTyDesc = VDesc_Sum (VDesc_K VUnit)
                     (VDesc_Prod VDesc_Id VDesc_Id)
@@ -502,50 +637,135 @@ vparam vty vterm vA vP =
       absThm (InnerLam nm tm)   env = VLam nm $ \x -> VLam ("φ" `T.append` nm) $ \phix -> absThm tm ((x,phix):env)
       absThm (InnerApp tm1 tm2) env = absThm tm1 env $$ sem tm2 (map fst env) $$ absThm tm2 env
 
+--------------------------------------------------------------------------------
+vCtxtDesc = VDesc_Sum (VDesc_K VUnit)
+                      (VDesc_Prod VDesc_Id (VDesc_K vTy))
+vCtxt = VMu vCtxtDesc
+
+vctxtinduction vP veps vext =
+    vinduction vCtxtDesc vP
+               (VLam "G" $ \vG ->
+                vcase vG VUnit (vCtxt .*. vTy)
+                      "G" (\vG -> vlift $$ vCtxtDesc $$ vCtxt $$ vP $$ vG .->. vP $$ (VConstruct vG))
+                      "u" (\u -> VLam "u" $ \u' -> veps)
+                      "p" (\p -> VLam "q" $ \q -> vext $$ vfst p $$ vsnd p $$ vfst q))
+
+vctxtsem = vctxtinduction (VLam "G" $ \vG -> VSet 0 .->. VSet 0)
+                          (VLam "A" $ \a -> VUnit)
+                          (VLam "G" $ \vG ->
+                           VLam "t " $ \t ->
+                           VLam "sG" $ \sG ->
+                           VLam "A" $ \a ->
+                           (sG $$ a) .*. (vtysem t $$ a))
+
+vctxtpred vG vA vP =
+    vctxtinduction (VLam "G" $ \vG -> vctxtsem vG $$ vA .->. VSet 0)
+                   (VLam "u" $ \u -> VUnit)
+                   (VLam "G" $ \vG ->
+                    VLam "t" $ \t ->
+                    VLam "pG" $ \pG ->
+                    VLam "e" $ \p ->
+                    (pG $$ vfst p) .*. (vtypred t vA vP $$ vsnd p))
+                   vG
+
+vparam2 :: Value -> -- context
+           Value -> -- type
+           Value -> -- term
+           Value -> -- concrete type
+           Value -> -- predicate
+           Value -> -- environment
+           Value -> -- environment proof
+           Value    -- proof of the abstraction theorem
+vparam2 vG vT vTm vA vP = loop vG vT vTm
+    where
+      -- if vT is neutral, then stop
+      -- if vT is a function type, then advance
+      -- if vT is a base type, then intend to reify and analyse the term
+      loop vG vT@(VNeutral n) vTm venv vphienv
+          = reflect (vtypred vT vA vP $$ (vTm $$ vA $$ venv))
+                    (pure (In Param)
+                     `tmApp` reify vCtxt vG
+                     `tmApp` n
+                     `tmApp` reify (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vT $$ a) vTm
+                     `tmApp` reifyType vA
+                     `tmApp` reify (vA .->. VSet 0) vP
+                     `tmApp` reify (vctxtsem vG $$ vA) venv
+                     `tmApp` reify (vctxtpred vG vA vP $$ venv) vphienv)
+      loop vG (VConstruct (VInr (VPair vT1 vT2))) vTm venv vphienv
+          = VLam "x" $ \x ->
+            VLam "φx" $ \phix ->
+            loop (VConstruct (VInr (VPair vG vT1)))
+                 vT2
+                 (VLam "A" $ \a -> VLam "γ" $ \g -> vTm $$ a $$ vfst g $$ vsnd g)
+                 (VPair venv x)
+                 (VPair vphienv phix)
+      loop vG vT@(VConstruct (VInl VUnitI)) vTm venv vphienv
+          = trace (show tm) $
+            reflect (vtypred vT vA vP $$ (vTm $$ vA $$ venv))
+                    (pure (In Param)
+                     `tmApp` reify vCtxt vG
+                     `tmApp` reify vTy vT
+                     `tmApp` reify (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vT $$ a) vTm
+                     `tmApp` reifyType vA
+                     `tmApp` reify (vA .->. VSet 0) vP
+                     `tmApp` reify (vctxtsem vG $$ vA) venv
+                     `tmApp` reify (vctxtpred vG vA vP $$ venv) vphienv
+                     )
+          where
+            vDTV = reflect (VSet 0) (tmFree "DummyTyVar")
+            vTm' = vTm $$ vDTV $$ reflect (vctxtsem vG $$ vDTV) (tmFree "DummyEnv")
+
+            tm = reify (vtysem vT $$ vDTV) vTm' 0
+
+            -- problem: by feeding in '0' we are generating clashes
+            -- between the genuinely free variables, and the bound
+            -- variables. We really need to feed in a separate
+            -- variable stream that allows us to reify this term here.
+
+            -- problem 2: how do we recover the original values of the
+            -- free-but-bound variables?  we turn 'vbound i' into 0 -
+            -- i - 1 = - (i+1). This should be recoverable.
+
+            -- I think what I need to do is to turn the local lambdas
+            -- into something different. Maybe an additional parameter
+            -- to the reify function that is carried through
+            -- everywhere?
+
+            scan (In (App f a)) = undefined
+            scan n              = undefined -- determine whether this is 
+
+-- now look at tm. if it is an application, and the head is a
+-- reference to the inner context, then extract the appropriate member
+-- of vphienv and then work our way back up the spine, converting each
+-- normal-form term back into a value abstracted over the type and
+-- context.
 
 
--- param (ext eps v) v (\a ((),x) -> blah a x) b p env penv
 
--- what will happen?
 
--- we'll pass in an VInnerNeutral (\i -> InnerBound (xxx)) for the
--- variable
 
--- applied, it will become an attempt to reify a VInnerNeutral
--- variable at type 'a', in the main reify function, which will crash
+-- otherwise reify vTm at the type (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vTy $$ a) and level 0
 
--- we want the parametricity proof to be stuck at this point, and to
--- evaluate to just the form above.
+-- Then inspect the term
 
--- could just add a case to reify to catch VInnerNeutral, but I'm not
--- sure what'll happen to the bound variables? 
 
--- vparam :: Value -> -- Context
---           Value -> -- Ty
---           Value -> -- The term
---           Value -> -- the set (a stooge)
---           Value -> -- the predicate (another stooge)
---           Value -> -- the environment (a member of the context)
---           Value -> -- a proof for every member of the context
---           Value 
--- vparam vCtxt vTy vTm vA vP venv vpenv =
---     undefined
---     where
---       vTm' = vTm $$ vA
 
---       tm = undefined
+-- Why not just try to call 'reify' on vterm? with '0' as the offset
 
-{-
-      loop (InnerBound i) venv vpenv = undefined -- do the ith projection from vpenv
-      loop (InnerApp tm1 tm2) venv vpenv =
-          let v1 = loop tm1 venv vpenv
-              v2 = loop tm2 venv vpenv
-          in v1 $$ 
--}
+-- Then have a look at the returned term. It will always be in
+-- beta-eta-normal form. So we will get (Lam (Lam -- neutral --))
+-- Look at the neutral term:
+--  App t1 t2 : get a parametricity proof for t1, and a value for t2 and a param proof for t2
+--  Case blah blah blah : do the appropriate thing for the parametricity proof for this term?
 
--- plan: reify vTm in the context vCtxt and the type vTy
--- then recurse down the newly reified term, generating the proof of the abstraction theorem
+--  if we get out something that isn't in the little inner language of
+--  simple types, then turn it into a stuck instance of param
 
--- due to the definition of ctxt-pred, we know that we can always do
--- the appropriate projections to get the components of the proof from
--- vpenv
+-- to turn things back into values, we basically just go over and
+-- replace all the appropriate bound variables with lambda
+-- abstractions. Then do an eval... This seems like it might be hard.
+
+--  key is that normal forms of the type (A : Set) → [[t]]A are just
+--  normal forms of the simply-typed lambda calculus...
+
+-- 
