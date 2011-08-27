@@ -70,10 +70,10 @@ liftIO c = DM $ \ctxt -> do r <- c
 checkDefinition :: Definition -> DeclCheckM Span ()
 checkDefinition (Definition p nm extTy nm' extTm) =
     do unless (nm == nm') $ malformedDefinition p nm nm'
-       liftIO $ do putStrLn ("Checking definition: " ++ T.unpack nm)
-                   putStrLn $ render $ ("Type: " <+> ppAnnotTerm extTy
-                                        $$ "Term: " <+> ppAnnotTerm extTm)
-                   putStrLn ""
+       -- liftIO $ do putStrLn ("Checking definition: " ++ T.unpack nm)
+       --             putStrLn $ render $ ("Type: " <+> ppAnnotTerm extTy
+       --                                  $$ "Term: " <+> ppAnnotTerm extTm)
+       --             putStrLn ""
        let ty = toLocallyNameless extTy
            tm = toLocallyNameless extTm
        (_, cTy) <- liftTyCheck $ setCheck ty
@@ -98,8 +98,8 @@ doNormalise tmDS = do
       d0 = ppPlain $ contextNameSupply ctxt $ CS.toDisplaySyntax c
   liftIO $ putStrLn $ render $ ("normalised: "
                                 $$ nest 4 d0
-                                $$ "of type"
-                                $$ nest 4 (ppType ctxt ty)
+--                                $$ "of type"
+--                                $$ nest 4 (ppType ctxt ty)
                                 $$ "to"
                                 $$ nest 4 d
                                 $$ "")

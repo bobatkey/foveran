@@ -19,7 +19,7 @@ type Eval a = ([Value], Ident -> (Value, Maybe Value)) -> a
 getBound k (env, _) = env !! k
 
 getDef nm (_, context) = case def of
-                           Nothing -> reflect ty (tmFree nm)
+                           Nothing -> reflect ty (tmFree ty nm)
                            Just d  -> d
     where
       (ty, def) = context nm
@@ -28,8 +28,8 @@ withBound :: Eval a -> Eval (Value -> a)
 withBound p = \(env,defs) v -> p (v:env, defs)
 
 eval :: TermCon (Eval Value) -> Eval Value
-eval (Bound k)     = getBound k
-eval (Free nm)     = getDef nm
+eval (Bound k v)   = getBound k
+eval (Free nm _)   = getDef nm
 
 eval (Set l)       = pure $ VSet l
 
@@ -109,4 +109,4 @@ evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value
 evaluate t env defs = foldRec eval t (env,defs)
 
 reifyType0 :: Value -> Term
-reifyType0 v = reifyType v 0
+reifyType0 v = reifyType v (0,Nothing)

@@ -40,7 +40,7 @@ ppType ctxt v =
 
 ppTerm :: Context -> Value -> Value -> Doc
 ppTerm ctxt v vty =
-    ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reify vty v 0
+    ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reify vty v (0,Nothing)
 
 
 ppTypeError :: TypeError -> Doc

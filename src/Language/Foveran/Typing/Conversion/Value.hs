@@ -37,7 +37,7 @@ module Language.Foveran.Typing.Conversion.Value
     , vCtxt
     , vctxtsem
     , vctxtpred
-    , vparam
+--    , vparam
     , vparam2
     )
     where
@@ -56,46 +56,6 @@ import Language.Foveran.Syntax.Checked
 import Debug.Trace
 
 {------------------------------------------------------------------------------}
-data Setting = Local | Global deriving Show
-
-{------------------------------------------------------------------------------}
-data Value
-    = VSet   Int
-
-    | VPi    (Maybe Ident) Value (Value -> Value)
-    | VLam   Ident (Value -> Value)
-
-    | VSigma (Maybe Ident) Value (Value -> Value)
-    | VPair  Value Value
-
-    | VSum   Value Value
-    | VInl   Value
-    | VInr   Value
-
-    | VUnit
-    | VUnitI
-
-    | VEmpty
-
-    | VDesc
-    | VMu         Value
-    | VDesc_K     Value
-    | VDesc_Id
-    | VDesc_Prod  Value Value
-    | VDesc_Sum   Value Value
-    | VConstruct  Value
-
-    | VIDesc      Value
-    | VMuI        Value Value Value
-    | VIDesc_K    Value
-    | VIDesc_Id   Value
-    | VIDesc_Pair Value Value
-    | VIDesc_Sg   Value Value
-    | VIDesc_Pi   Value Value
-
-    | VNeutral   (Int -> Term)
-    | VInnerNeutral (Int -> Maybe InnerTerm)
-    deriving Show
 
 {-
 data Neutral
@@ -217,9 +177,9 @@ vcase (VNeutral n) vA vB x vP y vL z vR
                        <$> n
                        <*> reifyType vA
                        <*> reifyType vB
-                       <*> pure x <*> tmBound (\tmV -> reify (VSet 0) (vP (reflect (VSum vA vB) tmV)))
-                       <*> pure y <*> tmBound (\tmV -> let v = reflect vA tmV in reify (vP $ VInl v) (vL v))
-                       <*> pure z <*> tmBound (\tmV -> let v = reflect vB tmV in reify (vP $ VInr v) (vR v))))
+                       <*> pure x <*> tmBound (VSum vA vB) (\tmV -> reify (VSet 0) (vP (reflect (VSum vA vB) tmV)))
+                       <*> pure y <*> tmBound vA (\tmV -> let v = reflect vA tmV in reify (vP $ VInl v) (vL v))
+                       <*> pure z <*> tmBound vB (\tmV -> let v = reflect vB tmV in reify (vP $ VInr v) (vR v))))
 {-
 vcase (VInnerNeutral n) vA vB x vP y vL z vR
     = reflectInner ty
@@ -448,32 +408,36 @@ vinduction vF vP vK = loop
                    `tmApp` n)
 
 {------------------------------------------------------------------------------}
-tmApp :: (Int -> Term) -> (Int -> Term) -> (Int -> Term)
+tmApp :: (a -> Term) -> (a -> Term) -> (a -> Term)
 tmApp t1 t2 = In <$> (App <$> t1 <*> t2)
 
-tmFst :: (Int -> Term) -> (Int -> Term)
+tmFst :: (a -> Term) -> (a -> Term)
 tmFst t = In . Proj1 <$> t
 
-tmSnd :: (Int -> Term) -> (Int -> Term)
+tmSnd :: (a -> Term) -> (a -> Term)
 tmSnd t = In . Proj2 <$> t
 
-tmInl :: (Int -> Term) -> (Int -> Term)
+tmInl :: (a -> Term) -> (a -> Term)
 tmInl t = In . Inl <$> t
 
-tmInr :: (Int -> Term) -> (Int -> Term)
+tmInr :: (a -> Term) -> (a -> Term)
 tmInr t = In . Inr <$> t
 
-vbound :: Int -> (Int -> Term)
-vbound i j = In $ Bound (j - i - 1)
+-- FIXME: make vbound and tmbound a bit more rational
+vbound :: Value -> (Int,Maybe Int) -> ((Int,Maybe Int) -> Term)
+vbound v (i,Nothing) (j,Nothing) = In $ Bound (j - i - 1) v
+vbound v (i,Nothing) (j,Just _)  = In $ Bound (j - i - 1) v
+vbound v (i,Just i') (j,Just j') = In $ BoundLocal (j' - i' - 1)
 
-tmBound :: ((Int -> Term) -> (Int -> Term)) -> Int -> Term
-tmBound f i = f (vbound i) (i+1)
+tmBound :: Value -> (((Int,Maybe Int) -> Term) -> ((Int,Maybe Int) -> Term)) -> (Int,Maybe Int) -> Term
+tmBound v f (i,Nothing) = f (vbound v (i,Nothing)) (i+1,Nothing)
+tmBound v f (i,Just i') = f (vbound v (i,Just i')) (i,Just (i'+1))
 
-tmFree :: Ident -> Int -> Term
-tmFree nm = \i -> In $ Free nm
+tmFree :: Value -> Ident -> a -> Term
+tmFree v nm = \i -> In $ Free nm v
 
 {------------------------------------------------------------------------------}
-reflect :: Value -> (Int -> Term) -> Value
+reflect :: Value -> ((Int,Maybe Int) -> Term) -> Value
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
@@ -483,9 +447,9 @@ reflect _                tm = VNeutral tm
 
 
 {------------------------------------------------------------------------------}
-reifyType :: Value -> (Int -> Term)
-reifyType (VPi x v f)     = \i -> In $ Pi x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSigma x v f)  = \i -> In $ Sigma x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
+reifyType :: Value -> ((Int,Maybe Int) -> Term)
+reifyType (VPi x v f)     = \i -> In $ Pi x (reifyType v i) (tmBound v (\x -> reifyType (f (reflect v x))) i)
+reifyType (VSigma x v f)  = \i -> In $ Sigma x (reifyType v i) (tmBound v (\x -> reifyType (f (reflect v x))) i)
 reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
 reifyType (VSet l)        = \i -> In $ Set l
 reifyType VUnit           = \i -> In $ Unit
@@ -499,12 +463,11 @@ reifyType v               = error ("internal: reifyType given non-type: " ++ sho
 
 
 {------------------------------------------------------------------------------}
-reify :: Value -> Value -> (Int -> Term)
+reify :: Value -> Value -> ((Int,Maybe Int) -> Term)
 
 reify (VSet _) a = reifyType a
 
-reify (VPi _ tA tB)    (VLam nm f) = \i -> let d = reflect tA (vbound i)
-                                           in In $ Lam nm $ reify (tB d) (f d) (i + 1)
+reify (VPi _ tA tB)    (VLam nm f) = tmBound tA $ \x -> let d = reflect tA x in In . Lam nm <$> reify (tB d) (f d)
 reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-blah should only be VLam"
 
 reify (VSigma _ tA tB) e = let v1 = vfst e
@@ -533,7 +496,7 @@ reify ty                v                   = error $ "reify: attempt to reify: 
 
 --------------------------------------------------------------------------------
 -- parametricity stuff
-
+{-
 data InnerTerm
     = InnerBound   Int
     | InnerApp     InnerTerm InnerTerm
@@ -572,7 +535,7 @@ reflectInner Base        tm =
 reflectInner (t1 :=> t2) tm =
     VLam "x" $ \x -> reflectInner t2 $ \i -> InnerApp <$> tm i <*> reifyInner t1 x i
 --------------------------------------------------------------------------------
-
+-}
 vTyDesc = VDesc_Sum (VDesc_K VUnit)
                     (VDesc_Prod VDesc_Id VDesc_Id)
 
@@ -606,6 +569,7 @@ vtypred t vA vP =
                   forall "a" (vtysem t1 $$ vA) $ \a -> (p1 $$ a) .->. (p2 $$ (f $$ a)))
                  t
 
+{-
 vparam :: Value -> -- type
           Value -> -- term
           Value -> -- set
@@ -636,6 +600,7 @@ vparam vty vterm vA vP =
       absThm (InnerBound i)     env = snd (env !! i)
       absThm (InnerLam nm tm)   env = VLam nm $ \x -> VLam ("φ" `T.append` nm) $ \phix -> absThm tm ((x,phix):env)
       absThm (InnerApp tm1 tm2) env = absThm tm1 env $$ sem tm2 (map fst env) $$ absThm tm2 env
+-}
 
 --------------------------------------------------------------------------------
 vCtxtDesc = VDesc_Sum (VDesc_K VUnit)
@@ -700,23 +665,62 @@ vparam2 vG vT vTm vA vP = loop vG vT vTm
                  (VPair venv x)
                  (VPair vphienv phix)
       loop vG vT@(VConstruct (VInl VUnitI)) vTm venv vphienv
-          = trace (show tm) $
-            reflect (vtypred vT vA vP $$ (vTm $$ vA $$ venv))
-                    (pure (In Param)
-                     `tmApp` reify vCtxt vG
-                     `tmApp` reify vTy vT
-                     `tmApp` reify (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vT $$ a) vTm
-                     `tmApp` reifyType vA
-                     `tmApp` reify (vA .->. VSet 0) vP
-                     `tmApp` reify (vctxtsem vG $$ vA) venv
-                     `tmApp` reify (vctxtpred vG vA vP $$ venv) vphienv
-                     )
+          = --trace (show tm) $
+            case scan tm of
+              Nothing ->
+                  reflect (vtypred vT vA vP $$ (vTm $$ vA $$ venv))
+                          (pure (In Param)
+                           `tmApp` reify vCtxt vG
+                           `tmApp` reify vTy vT
+                           `tmApp` reify (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vT $$ a) vTm
+                           `tmApp` reifyType vA
+                           `tmApp` reify (vA .->. VSet 0) vP
+                           `tmApp` reify (vctxtsem vG $$ vA) venv
+                           `tmApp` reify (vctxtpred vG vA vP $$ venv) vphienv
+                          )
+              Just (v,_) -> v
           where
-            vDTV = reflect (VSet 0) (tmFree "DummyTyVar")
-            vTm' = vTm $$ vDTV $$ reflect (vctxtsem vG $$ vDTV) (tmFree "DummyEnv")
+            In (Lam nmA (In (Lam nmEnv tm))) =
+                reify (forall "A" (VSet 0) $ \a -> vctxtsem vG $$ a .->. vtysem vT $$ a) vTm (0,Just 0)
 
-            tm = reify (vtysem vT $$ vDTV) vTm' 0
+            -- references to the environment will look like Proj2 (Proj1* (BoundLocal 0))
+            -- to reflect the arguments, we re-interpret the reified normal-form term as a value, abstracted over the type variable and the context variable
 
+            ctxtFst (VConstruct (VInr (VPair vG _))) = vG
+            ctxtSnd (VConstruct (VInr (VPair _ vT))) = vT
+
+            isEnvProj (In (BoundLocal 0)) = return (vphienv, vG)
+            isEnvProj (In (Proj1 n))      = (\(x,y) -> (vfst x, ctxtFst y)) <$> isEnvProj n
+            isEnvProj _                   = Nothing
+
+            scan (In (Proj2 n)) = do (phi,ty) <- isEnvProj n
+                                     return (vsnd phi, ctxtSnd ty)
+            scan (In (App f x)) = do (phi,ty) <- scan f
+                                     let VConstruct (VInr (VPair vT1 vT2)) = ty
+                                     let va = VLam nmA $ \a -> VLam nmEnv $ \env -> evalNF x [env,a]
+                                     return (phi $$ (va $$ vA $$ venv) $$ loop vG vT1 va venv vphienv, vT2)
+            scan _              = Nothing
+
+withBound :: ([Value] -> a) -> ([Value] -> Value -> a)
+withBound p = \env v -> p (v:env)
+
+evalNF (In (Bound i v))    = pure $ reflect v (vbound v (-i-1,Nothing))
+evalNF (In (BoundLocal i)) = (!! i)
+evalNF (In (Free nm v))    = pure $ reflect v (tmFree v nm)
+evalNF (In (Lam nm t))     = VLam nm <$> withBound (evalNF t)
+evalNF (In (Proj1 t))      = vfst <$> evalNF t
+evalNF (In (Proj2 t))      = vsnd <$> evalNF t
+evalNF (In (App t1 t2))    = ($$) <$> evalNF t1 <*> evalNF t2
+-- FIXME: and everything else...
+
+-- now look at tm. if it is an application, and the head is a
+-- reference to the inner context, then extract the appropriate member
+-- of vphienv and then work our way back up the spine, converting each
+-- normal-form term back into a value abstracted over the type and
+-- context.
+
+
+    -- These problems appear to be fixed now...
             -- problem: by feeding in '0' we are generating clashes
             -- between the genuinely free variables, and the bound
             -- variables. We really need to feed in a separate
@@ -730,15 +734,6 @@ vparam2 vG vT vTm vA vP = loop vG vT vTm
             -- into something different. Maybe an additional parameter
             -- to the reify function that is carried through
             -- everywhere?
-
-            scan (In (App f a)) = undefined
-            scan n              = undefined -- determine whether this is 
-
--- now look at tm. if it is an application, and the head is a
--- reference to the inner context, then extract the appropriate member
--- of vphienv and then work our way back up the spine, converting each
--- normal-form term back into a value abstracted over the type and
--- context.
 
 
 

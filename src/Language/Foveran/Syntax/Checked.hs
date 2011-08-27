@@ -4,12 +4,15 @@ module Language.Foveran.Syntax.Checked
     ( Ident
     , Term
     , TermCon (..)
-      
+
+    , Value (..)
+
     , bindFree
     , toDisplaySyntax
     )
     where
 
+import Text.Show.Functions ()
 import           Control.Applicative
 import           Data.Rec
 import qualified Language.Foveran.Syntax.Display as DS
@@ -22,8 +25,9 @@ import           Language.Foveran.Syntax.Identifier
 type Term = Rec TermCon
 
 data TermCon tm
-    = Free  Ident
-    | Bound Int
+    = Free  Ident Value  -- value components only used for parametricity
+    | Bound Int   Value
+    | BoundLocal Int  -- only used for parametricity
     | Lam   Ident tm
     | App   tm tm
     | Set   Int
@@ -69,12 +73,50 @@ instance Show Term where
     show (In t) = "(" ++ show t ++ ")"
 
 --------------------------------------------------------------------------------
+data Value
+    = VSet   Int
+
+    | VPi    (Maybe Ident) Value (Value -> Value)
+    | VLam   Ident (Value -> Value)
+
+    | VSigma (Maybe Ident) Value (Value -> Value)
+    | VPair  Value Value
+
+    | VSum   Value Value
+    | VInl   Value
+    | VInr   Value
+
+    | VUnit
+    | VUnitI
+
+    | VEmpty
+
+    | VDesc
+    | VMu         Value
+    | VDesc_K     Value
+    | VDesc_Id
+    | VDesc_Prod  Value Value
+    | VDesc_Sum   Value Value
+    | VConstruct  Value
+
+    | VIDesc      Value
+    | VMuI        Value Value Value
+    | VIDesc_K    Value
+    | VIDesc_Id   Value
+    | VIDesc_Pair Value Value
+    | VIDesc_Sg   Value Value
+    | VIDesc_Pi   Value Value
+
+    | VNeutral   ((Int,Maybe Int) -> Term)
+    deriving Show
+
+--------------------------------------------------------------------------------
 binder :: (Int -> a) -> Int -> a
 binder f i = f (i+1)
 
 bind' :: Ident -> TermCon (Int -> a) -> Int -> TermCon a
-bind' fnm (Free nm')       = \i -> if fnm == nm' then Bound i else Free nm'
-bind' fnm (Bound k)        = pure $ Bound k
+bind' fnm (Free nm' v)     = \i -> if fnm == nm' then Bound i v else Free nm' v
+bind' fnm (Bound k v)      = pure $ Bound k v
 bind' fnm (Lam nm body)    = Lam nm <$> binder body
 bind' fnm (App t t')       = App <$> t <*> t'
 bind' fnm (Set l)          = pure $ Set l
@@ -131,8 +173,8 @@ gatheringApp (In (DS.App t1 t2)) t3 = DS.App t1 (t2 ++ [t3])
 gatheringApp t1                  t2 = DS.App t1 [t2]
 
 toDisplay :: TermCon (NameSupply DS.Term) -> NameSupply (DS.TermCon DS.Term)
-toDisplay (Free nm)               = pure $ DS.Var nm
-toDisplay (Bound i)               = DS.Var <$> getBound i
+toDisplay (Free nm _)             = pure $ DS.Var nm
+toDisplay (Bound i _)             = DS.Var <$> getBound i
 toDisplay (Lam nm body)           = bindK nm body $ \nm body -> pure (gatheringLam nm body)
 toDisplay (App t t')              = gatheringApp <$> t <*> t'
 toDisplay (Set i)                 = pure $ DS.Set i
@@ -189,8 +231,8 @@ toDisplaySyntax = translateRec toDisplay
 -- FIXME: Should reimplement this with (optional) set-level
 -- cummulativity checking
 instance Eq Term where
-  In (Free nm1) == In (Free nm2)     = nm1 == nm2
-  In (Bound i)  == In (Bound j)      = i == j
+  In (Free nm1 _) == In (Free nm2 _)     = nm1 == nm2
+  In (Bound i _)  == In (Bound j _)      = i == j
   In (Lam _ t)  == In (Lam _ t')     = t == t'
   In (App t ts) == In (App t' ts')   = t == t' && ts == ts'
   In (Set i)    == In (Set j)        = i == j

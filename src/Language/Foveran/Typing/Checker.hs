@@ -48,7 +48,7 @@ tyCheck :: AnnotRec p TermCon -> Context -> Value -> TypingMonad p CS.Term
 
 tyCheck (Annot p (Lam x t)) ctxt (VPi _ tA tB) =
   do let (x',ctxt') = ctxtExtendFreshen ctxt x tA Nothing
-     tm <- tyCheck (close x' t) ctxt' (tB $ reflect tA (tmFree x'))
+     tm <- tyCheck (close x' t) ctxt' (tB $ reflect tA (tmFree tA x'))
      return (In $ CS.Lam x (CS.bindFree x' tm))
 
 tyCheck (Annot p (Lam x t)) ctxt v =
@@ -175,7 +175,7 @@ tySynth (Annot p (Bound _)) ctxt =
 tySynth (Annot p (Free nm)) ctxt =
     case lookupType nm ctxt of
       Nothing -> Error p (UnknownIdentifier nm)
-      Just tA -> return (tA, In $ CS.Free nm)
+      Just tA -> return (tA, In $ CS.Free nm tA)
 tySynth (Annot p (App t t')) ctxt =
     do (tF, tm) <- tySynth t ctxt
        case tF of
@@ -208,10 +208,10 @@ tySynth (Annot p (Case t x tP y tL z tR)) ctxt =
                 (i,tmP0) <- setCheck (close x' tP) ctxt1
                 let tmP         = CS.bindFree x' tmP0
                     (y', ctxt2) = ctxtExtendFreshen ctxt y tA Nothing
-                    vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (tmFree y')))
+                    vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (tmFree tA y')))
                 tmL <- tyCheck (close y' tL) ctxt2 vtP1
                 let (z', ctxt3) = ctxtExtendFreshen ctxt z tB Nothing
-                    vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (tmFree z')))
+                    vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (tmFree tB z')))
                 tmR <- tyCheck (close z' tR) ctxt3 vtP2
                 let tmA = reifyType0 tA
                     tmB = reifyType0 tB

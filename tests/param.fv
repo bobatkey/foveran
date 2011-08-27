@@ -1,0 +1,74 @@
+data Ty : Set :=
+  | v    :
+  | arr  : Ty Ty
+  ;
+
+tyInduction :
+  (Φ : Ty → Set 2) →
+  (Φ v) →
+  ((τ₁ τ₂ : Ty) → Φ τ₁ → Φ τ₂ → Φ (arr τ₁ τ₂)) →
+  (τ : Ty) → Φ τ ;
+tyInduction Φ φv φarr =
+  induction TyDesc Φ
+    (λτ. case τ for τ. lift TyDesc Ty Φ τ → Φ (construct τ) with
+           { inl u. λu'. φv
+           ; inr p. λq. φarr (fst p) (snd p) (fst q) (snd q)
+	   });
+
+ty-sem : Ty → Set → Set;
+ty-sem =
+  tyInduction
+    (λτ. Set → Set)
+    (λα. α)
+    (λτ₁ τ₂ T₁ T₂ α. T₁ α → T₂ α);
+
+ty-pred :
+  (τ : Ty) →
+  (α : Set) →
+  (φ : α → Set) →
+  ty-sem τ α → Set;
+ty-pred τ α Φ =
+  tyInduction
+    (λτ. ty-sem τ α → Set)
+    (λa. Φ a)
+    (λτ₁ τ₂ P₁ P₂ f. (a : ty-sem τ₁ α) → P₁ a → P₂ (f a))
+    τ;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Ctxt : Set :=
+  | eps :
+  | ext : Ctxt Ty
+  ;
+
+ctxtInduction :
+  (Φ : Ctxt → Set 2) →
+  (Φ eps) →
+  ((Γ : Ctxt) → (τ : Ty) → Φ Γ → Φ (ext Γ τ)) →
+  (Γ : Ctxt) → Φ Γ;
+ctxtInduction Φ φeps φext =
+  induction CtxtDesc Φ
+    (λx. case x for x. lift CtxtDesc Ctxt Φ x → Φ (construct x) with
+           { inl u. λu'. φeps
+           ; inr p. λq. φext (fst p) (snd p) (fst q)
+           });
+
+ctxt-sem : Ctxt → Set → Set;
+ctxt-sem = ctxtInduction (λΓ. Set → Set)
+             (λα. Unit)
+             (λΓ τ sΓ α. sΓ α × ty-sem τ α);
+
+ctxt-pred : (Γ : Ctxt) → (α : Set) → (Φ : α → Set) → ctxt-sem Γ α → Set;
+ctxt-pred Γ α Φ =
+  ctxtInduction (λΓ. ctxt-sem Γ α → Set)
+    (λu. Unit)
+    (λΓ τ ΦΓ γ. ΦΓ (fst γ) × ty-pred τ α Φ (snd γ))
+    Γ;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+–normalise param eps (arr v (arr v v));
+
+–normalise param eps (arr (arr v v) (arr v v)) (λα γ s z. s (s z));
+
+assume t : (α : Set) → α → α;
+
+normalise param eps (arr (arr v v) (arr v v)) (λα γ s z. s (t α z));
