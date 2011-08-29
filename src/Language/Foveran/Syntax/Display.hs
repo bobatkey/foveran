@@ -71,6 +71,7 @@ data TermCon tm
     | IDesc_Pi   tm tm
     | IDesc_Elim
     | MuI        tm tm
+    | InductionI
     deriving (Show, Functor)
 
 data Constructor

@@ -307,5 +307,19 @@ tySynth (Annot p IDesc_Elim) ctxt =
               , In $ CS.IDesc_Elim
               )
 
+tySynth (Annot p InductionI) ctxt =
+    do return ( forall "I" (VSet 0) $ \vI ->
+                forall "D" (vI .->. VIDesc vI) $ \vD ->
+                forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
+                forall "k" (forall "i" vI $ \i ->
+                            forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
+                            (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
+                            (vP $$ i $$ VConstruct x)) $ \k ->
+                forall "i" vI $ \i ->
+                forall "x" (vmuI vI vD $$ i) $ \x ->
+                vP $$ i $$ x
+              , In $ CS.InductionI
+              )
+
 tySynth (Annot p t) ctxt =
     Error p UnableToSynthesise

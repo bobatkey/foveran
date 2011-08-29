@@ -23,7 +23,10 @@ module Language.Foveran.Typing.Conversion.Value
     , vliftTy
     , vlift
     , vinduction
+    , vliftITy
+    , vliftI
     , vmuI
+    , vinductionI
 
     , reflect
     , reifyType
@@ -138,10 +141,6 @@ velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
                                        `tmApp` n)
 
 {------------------------------------------------------------------------------}
-{-
-vsemTy :: Value
-vsemTy = VDesc .->. VSet 0 .->. VSet 0
--}
 vsem :: Value -> Value
 vsem vD = loop vD
     where
@@ -152,19 +151,6 @@ vsem vD = loop vD
       loop (VNeutral tm)      =
           reflect (VSet 0 .->. VSet 0)
                   (pure (In Sem) `tmApp` tm)
-          
-
-{-
-VLam "d" $ vdesc_elim (VLam "d" $ \_ -> VSet 0 .->. VSet 0)
-                             (VLam "A" $ \a -> VLam "X" $ \_ -> a)
-                             (VLam "X" $ \x -> x)
-                             (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
-                              VLam "F" $ \f -> VLam "G" $ \g -> 
-                              VLam "X" $ \x -> (f $$ x) .*. (g $$ x))
-                             (VLam "d1" $ \_ -> VLam "d2" $ \_ ->
-                              VLam "F" $ \f -> VLam "G" $ \g ->
-                              VLam "X" $ \x -> (f $$ x) .+. (g $$ x))
--}
 
 {------------------------------------------------------------------------------}
 vsemI :: Value
@@ -338,6 +324,98 @@ vinduction vF vP vK = loop
                                  vK
                    `tmApp` n)
 
+{------------------------------------------------------------------------------}
+vliftITy :: Value
+vliftITy = forall "I" (VSet 0) $ \vI ->
+           forall "D" (VIDesc vI) $ \vD ->
+           forall "A" (vI .->. VSet 0) $ \vA ->
+           forall "P" (forall "i" vI $ \vi -> vA $$ vi .->. VSet 2) $ \_ ->
+           vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi) .->.
+           VSet 2
+
+vliftI :: Value
+vliftI = VLam "I" $ \vI ->
+         VLam "D" $ \vD ->
+         VLam "A" $ \vA ->
+         VLam "P" $ \vP ->
+         VLam "x" $ \vx ->
+         videsc_elim vI (VLam "D" $ \vD ->
+                         vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi) .->.
+                         VSet 2)
+           (VLam "i" $ \vi ->
+            VLam "a" $ \va ->
+            vP $$ vi $$ va)
+           (VLam "A'" $ \vA' ->
+            VLam "a" $ \va ->
+            VUnit)
+           (VLam "D1" $ \vD1 ->
+            VLam "D2" $ \vD2 ->
+            VLam "lift1" $ \lift1 ->
+            VLam "lift2" $ \lift2 ->
+            VLam "p" $ \p ->
+            (lift1 $$ vfst p) .*. (lift2 $$ vsnd p))
+           (VLam "B" $ \vB ->
+            VLam "D" $ \vD ->
+            VLam "liftD" $ \vliftD ->
+            VLam "p" $ \vp ->
+            vliftD $$ vfst vp $$ vsnd vp)
+           (VLam "B" $ \vB ->
+            VLam "D" $ \vD ->
+            VLam "liftD" $ \vliftD ->
+            VLam "f" $ \f ->
+            forall "b" vB $ \vb -> vliftD $$ vb $$ (f $$ vb))
+           vD $$ vx
+
+vallI :: Value
+vallI = VLam "I" $ \vI ->
+        VLam "D" $ \vD ->
+        VLam "A" $ \vA ->
+        VLam "P" $ \vP ->
+        VLam "p" $ \vp ->
+        VLam "xs" $ \xs ->
+        videsc_elim vI (VLam "D" $ \vD ->
+                        forall "xs" (vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi)) $ \xs ->
+                        vliftI $$ vI $$ vD $$ vA $$ vP $$ xs)
+          (VLam "x" $ \x ->
+           VLam "xs" $ \xs ->
+           vp $$ x $$ xs)
+          (VLam "A" $ \vA ->
+           VLam "xs" $ \xs ->
+           VUnitI)
+          (VLam "D1" $ \vD1 ->
+           VLam "D2" $ \vD2 ->
+           VLam "all1" $ \all1 ->
+           VLam "all2" $ \all2 ->
+           VLam "x" $ \x ->
+           VPair (all1 $$ vfst x) (all2 $$ vsnd x))
+          (VLam "B" $ \vB ->
+           VLam "D" $ \vD ->
+           VLam "all" $ \all ->
+           VLam "x" $ \x ->
+           all $$ vfst x $$ vsnd x)
+          (VLam "B" $ \vB ->
+           VLam "D" $ \vD ->
+           VLam "all" $ \all ->
+           VLam "x" $ \x ->
+           VLam "b" $ \b -> all $$ b $$ (x $$ b))
+          vD $$ xs
+
+vinductionI vI vD vP vk = loop
+    where
+      loop vi (VConstruct x) =
+          vk $$ vi $$ x $$ (vallI $$ vI $$ (vD $$ vi) $$ vmuI vI vD $$ vP $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x) $$ x)
+      loop vi (VNeutral n) =
+          reflect (vP $$ vi $$ VNeutral n)
+                  (pure (In InductionI)
+                   `tmApp` reify (VSet 0) vI
+                   `tmApp` reify (vI .->. VIDesc vI) vD
+                   `tmApp` reify (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) vP
+                   `tmApp` reify (forall "i" vI $ \i ->
+                                  forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
+                                  (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
+                                  vP $$ i $$ VConstruct x) vk
+                   `tmApp` reify vI vi
+                   `tmApp` n)
 
 {------------------------------------------------------------------------------}
 reflect :: Value -> (Int -> Term) -> Value

@@ -13,6 +13,7 @@ module Language.Foveran.Typing.Conversion
        , vsemI
        , vfst
        , vlift
+       , vliftI
        , vmuI
        )
        where

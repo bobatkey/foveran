@@ -94,6 +94,13 @@ eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 VLam "d" $ \d ->
                                 videsc_elim i p pId pK pPair pSg pPi d)
 eval (MuI t1 t2)        = vmuI <$> t1 <*> t2
+eval InductionI         = pure (VLam "I" $ \vI ->
+                                VLam "D" $ \vD ->
+                                VLam "P" $ \vP ->
+                                VLam "k" $ \vk ->
+                                VLam "i" $ \vi ->
+                                VLam "x" $ \vx ->
+                                vinductionI vI vD vP vk vi vx)
 
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value

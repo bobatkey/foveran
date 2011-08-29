@@ -58,6 +58,7 @@ lexicalSpec =
     , "“Π”" :==>             Emit Quote_Pi
     , "elimID" :==>          Emit IDesc_Elim
     , "µI" :==>              Emit MuI
+    , "inductionI" :==>      Emit InductionI
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                            Emit Ident
     , oneOrMore (tok digit) :==>

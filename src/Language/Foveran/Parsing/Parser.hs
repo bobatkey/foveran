@@ -186,6 +186,8 @@ term00 =
     <|>
     keyword Induction <$> token Tok.Induction
     <|>
+    keyword InductionI <$> token Tok.InductionI
+    <|>
     keyword Desc_Elim <$> token Tok.ElimD
     <|>
     keyword Sem <$> token Tok.Sem

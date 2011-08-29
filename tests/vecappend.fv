@@ -1,0 +1,83 @@
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD. Set 2)
+                    (λi. X i)
+                    (λA. A)
+                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
+                    (λA D semD. (a : A) × semD a)
+                    (λA D semD. (a : A) → semD a)
+                    D;
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
+                    });
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p. case x for x. A (construct x) with
+                                    { inl u. a
+                                    ; inr n. f n
+                                    });
+
+add : Nat → Nat → Nat ;
+add n₁ n₂ = natInduction (λx. Nat) n₂ (λn. succ) n₁;
+
+assume A : Set;
+
+VecDesc : Nat → IDesc Nat;
+VecDesc = natCase (λn. IDesc Nat)
+                  (“K” Unit)
+                  (λn. “Σ” A (λa. “IId” n));
+
+Vec : Nat → Set;
+Vec = µI Nat VecDesc;
+
+vnil : Vec zero;
+vnil = construct ();
+
+vcons : (n : Nat) → A → Vec n → Vec (succ n);
+vcons n a v = construct «a,v»;
+
+VecInduction :
+  (Φ : (n : Nat) → Vec n → Set 2) →
+  (Φ zero vnil) →
+  ((n : Nat) → (a : A) → (v : Vec n) → Φ n v → Φ (succ n) (vcons n a v)) →
+  (n : Nat) → (v : Vec n) → Φ n v;
+VecInduction Φ φnil φcons =
+  inductionI Nat VecDesc Φ
+    (natCase (λn. (x : semI Nat (VecDesc n) (λi. Vec i)) → liftI Nat (VecDesc n) Vec Φ x → Φ n (construct x))
+       (λx φ. φnil)
+       (λn x φ. φcons n (fst x) (snd x) φ));
+
+vecappend : (n₁ n₂ : Nat) → Vec n₁ → Vec n₂ → Vec (add n₁ n₂);
+vecappend n₁ n₂ v₁ v₂ =
+  VecInduction (λn v. Vec (add n n₂))
+    v₂
+    (λn a v v'. vcons (add n n₂) a v')
+    n₁ v₁;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+assume a : A;
+assume b : A;
+
+one : Nat;
+one = succ zero;
+
+two : Nat;
+two = succ one;
+
+v : Vec two;
+v = vcons one a (vcons zero b vnil);
+
+normalise vecappend two two v v;

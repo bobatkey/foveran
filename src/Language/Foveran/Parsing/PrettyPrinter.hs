@@ -66,6 +66,7 @@ pprint (IDesc_Sg t1 t2)    = paren 01 ("“Σ”" <+> down t1 <+> down t2)
 pprint (IDesc_Pi t1 t2)    = paren 01 ("“Π”" <+> down t1 <+> down t2)
 pprint IDesc_Elim          = "elimID"
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
+pprint InductionI          = "inductionI"
 
 pp :: TermPos -> PrecDoc
 pp = foldAnnot pprint

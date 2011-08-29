@@ -65,8 +65,8 @@ data TermCon tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
     | IDesc_Elim
-
     | MuI        tm tm
+    | InductionI
     deriving (Show, Functor)
 
 --------------------------------------------------------------------------------
@@ -116,6 +116,7 @@ bind' fnm (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
 bind' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 bind' fnm IDesc_Elim       = pure IDesc_Elim
 bind' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
+bind' fnm InductionI       = pure InductionI
 
 bindFree :: Ident -> Term -> Term
 bindFree nm x = translateRec (bind' nm) x 0
@@ -175,6 +176,7 @@ toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
+toDisplay InductionI              = pure DS.InductionI
 
 toDisplaySyntax :: Term -> NameSupply DS.Term
 toDisplaySyntax = translateRec toDisplay
@@ -248,5 +250,6 @@ instance Eq Term where
   In (IDesc_Pi t1 t2)   == In (IDesc_Pi t1' t2')   = t1 == t1' && t2 == t2'
   In IDesc_Elim == In IDesc_Elim     = True
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
+  In InductionI  == In InductionI    = True
   
   _             == _                 = False
