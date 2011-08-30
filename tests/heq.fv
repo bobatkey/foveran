@@ -1,0 +1,52 @@
+assume eq : (α β : Set) → α → β → Set;
+
+assume refl : (α : Set) → (a : α) → eq α α a a;
+
+assume elimEq :
+  (α : Set) →
+  (x : α) →
+  (Φ : α → Set) →
+  Φ x →
+  (y : α) →
+  eq α α x y →
+  Φ y;
+
+assume elimEq' :
+  (α : Set) →
+  (a : α) →
+  (Φ : (a' : α) → eq α α a a' → Set) →
+  Φ a (refl α a) →
+  (a' : α) →
+  (q  : eq α α a a') →
+  Φ a' q;
+
+delimEq :
+  (α : Set) →
+  (x : α) →
+  (Φ : α → Set) →
+  Φ x →
+  (y : α) →
+  eq α α x y →
+  Φ y;
+delimEq α x Φ φ y eq =
+  elimEq' α x (λa eq. Φ a) φ y eq;
+
+trans :
+  (α : Set) →
+  (a₁ a₂ a₃ : α) →
+  eq α α a₁ a₂ →
+  eq α α a₂ a₃ →
+  eq α α a₁ a₃;
+trans α a₁ a₂ a₃ eq₁ eq₂ =
+  elimEq' α a₂ (λa p. eq α α a₁ a) eq₁ a₃ eq₂;
+
+k : (α : Set) →
+    (a : α) →
+    (p : eq α α a a) →
+    eq (eq α α a a) (eq α α a a) p (refl α a);
+k α a p =
+  elimEq' α a
+    (λa' p. eq (eq α α a a') (eq α α a a') p (trans α a a a' (refl α a) p))
+    (refl (eq α α a a) (refl α a))
+    a
+    p;
