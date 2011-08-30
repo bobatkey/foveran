@@ -66,6 +66,8 @@ vecappend n₁ n₂ v₁ v₂ =
     v₂
     (λn a v v'. vcons (add n n₂) a v')
     n₁ v₁;
+– vecappend zero      n₂ ()     v₂ = v₂
+– vecappend (succ n₁) n₂ «a,v₁» v₂ = vcons n₁ a (vecappend n₁ n₂ v₁ v₂)
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 assume a : A;
