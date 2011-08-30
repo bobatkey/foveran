@@ -145,9 +145,13 @@ term08 :: Parser Tok.Token TermPos
 term08 =
     -- product types
     -- right associative
-    optBinary <$> term01 <*> (optional $ (Prod,) <$ token Tok.Times <*> term08  
+    optBinary <$> term07 <*> (optional $ (Prod,) <$ token Tok.Times <*> term08  
                                          <|>
                                          (Desc_Prod,) <$ token Tok.QuoteTimes <*> term08)
+
+term07 :: Parser Tok.Token TermPos
+term07 =
+    optBinary <$> term01 <*> (optional $ (Eq,) <$ token Tok.Eq <*> term07)
 
 term01 :: Parser Tok.Token TermPos
 term01 =
@@ -194,6 +198,8 @@ term00 =
     <|>
     keyword UnitI <$> token Tok.UnitValue
     <|>
+    keyword Refl <$> token Tok.Refl
+    <|>
     -- FIXME: extend the left and right positions of the term to include the parens
     token Tok.LParen *> term10 <* token Tok.RParen
     <|>
@@ -208,6 +214,10 @@ term00 =
                         <* token Tok.Semicolon
                         <* token Tok.Inr <*> identifier <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
+    <|>
+    (\p t a e t1 t2 -> Annot (makeSpan p t2)
+                             (ElimEq t a e t1 t2)) <$>
+      token Tok.ElimEq <*> term10 <* token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10 <* token Tok.With <*> term00
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
                        Just (l,p') -> Annot (makeSpan p p') (Set l)) <$> token Tok.Set <*> optional number

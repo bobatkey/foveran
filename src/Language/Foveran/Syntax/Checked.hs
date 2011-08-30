@@ -12,6 +12,7 @@ module Language.Foveran.Syntax.Checked
     , vbound
       
     , bindFree
+    , bindFree1
     , toDisplaySyntax
     )
     where
@@ -46,6 +47,11 @@ data TermCon tm
     | UnitI
     | Empty
     | ElimEmpty
+
+    | Eq     tm tm tm tm
+    | Refl
+    | ElimEq tm tm tm tm Ident Ident tm tm
+
     | Desc
     | Desc_K    tm
     | Desc_Id
@@ -97,6 +103,11 @@ bind' fnm Unit             = pure Unit
 bind' fnm UnitI            = pure UnitI
 bind' fnm Empty            = pure Empty
 bind' fnm ElimEmpty        = pure ElimEmpty
+
+bind' fnm (Eq tA tB t1 t2) = Eq <$> tA <*> tB <*> t1 <*> t2
+bind' fnm Refl             = pure Refl
+bind' fnm (ElimEq tA ta tb t a e t1 t2) = ElimEq <$> tA <*> ta <*> tb <*> t <*> pure a <*> pure e <*> binder (binder t1) <*> t2
+
 bind' fnm Desc             = pure Desc
 bind' fnm (Desc_K t)       = Desc_K <$> t
 bind' fnm Desc_Id          = pure Desc_Id
@@ -120,6 +131,9 @@ bind' fnm InductionI       = pure InductionI
 
 bindFree :: Ident -> Term -> Term
 bindFree nm x = translateRec (bind' nm) x 0
+
+bindFree1 :: Ident -> Term -> Term
+bindFree1 nm x = translateRec (bind' nm) x 1
 
 --------------------------------------------------------------------------------
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term
@@ -157,6 +171,13 @@ toDisplay Unit                    = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty
 toDisplay ElimEmpty               = pure DS.ElimEmpty
+
+toDisplay (Eq _ _ t1 t2)          = DS.Eq <$> t1 <*> t2
+toDisplay Refl                    = pure DS.Refl
+toDisplay (ElimEq _ _ _ t a e t1 t2) =
+    do (a', (e', t1')) <- bind a (bind e t1)
+       DS.ElimEq <$> t <*> pure a' <*> pure e' <*> pure t1' <*> t2
+
 toDisplay Desc                    = pure DS.Desc
 toDisplay (Desc_K t)              = DS.Desc_K <$> t
 toDisplay Desc_Id                 = pure DS.Desc_Id
@@ -231,6 +252,11 @@ instance Eq Term where
   In UnitI      == In UnitI          = True
   In Empty      == In Empty          = True
   In ElimEmpty  == In ElimEmpty      = True
+
+  In (Eq _ _ ta tb) == In (Eq _ _ ta' tb') = ta == ta' && tb == tb'
+  In Refl           == In Refl             = True
+  In (ElimEq _ _ _ t _ _ tP tp) == In (ElimEq _ _ _ t' _ _ tP' tp') = t == t' && tP == tP' && tp == tp'
+
   In Desc       == In Desc           = True
   In (Desc_K t) == In (Desc_K t')    = t == t'
   In Desc_Id    == In Desc_Id        = True

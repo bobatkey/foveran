@@ -12,11 +12,12 @@ import Data.Rec
 import Language.Foveran.Syntax.Checked
 import Language.Foveran.Typing.Conversion.Value
 
+import Debug.Trace
 
 {------------------------------------------------------------------------------}
 type Eval a = ([Value], Ident -> (Value, Maybe Value)) -> a
 
-getBound k (env, _) = env !! k
+getBound k (env, _) = env !! k -- in (trace ("env = " ++ show env ++ ", k = " ++ show k) ()) `seq` (x `seq` x)
 
 getDef nm (_, context) = case def of
                            Nothing -> reflect ty (tmFree nm)
@@ -57,6 +58,11 @@ eval UnitI     = pure VUnitI
 eval Empty     = pure VEmpty
 eval ElimEmpty = pure $ VLam "A" $ \a -> VLam "x" $ \x -> velimEmpty a x
 
+eval (Eq tA tB ta tb) = VEq <$> tA <*> tB <*> ta <*> tb
+eval Refl             = pure VRefl
+eval (ElimEq tA ta tb teq a e tP tp) =
+    velimeq <$> tA <*> ta <*> tb <*> teq <*> pure a <*> pure e <*> withBound (withBound tP) <*> tp
+                                   
 eval Desc               = pure VDesc
 eval (Desc_K t)         = VDesc_K <$> t
 eval Desc_Id            = pure VDesc_Id

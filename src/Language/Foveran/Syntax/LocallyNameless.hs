@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, TypeSynonymInstances #-}
 
 module Language.Foveran.Syntax.LocallyNameless
     ( Ident
@@ -6,6 +6,7 @@ module Language.Foveran.Syntax.LocallyNameless
     , TermCon (..)
     , toLocallyNameless
     , close
+    , close1
     )
     where
 
@@ -19,6 +20,7 @@ import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier (Ident)
 
 type TermPos = AnnotRec Span TermCon
+type TermPos' p = AnnotRec p TermCon
 
 data TermCon tm
   = Free  Ident
@@ -40,6 +42,10 @@ data TermCon tm
   | Empty
   | ElimEmpty
 
+  | Eq        tm tm
+  | Refl
+  | ElimEq    tm Ident Ident tm tm
+
   | Desc
   | Desc_K    tm
   | Desc_Id
@@ -59,6 +65,10 @@ data TermCon tm
   | MuI        tm tm
   | InductionI
   deriving (Show, Functor)
+
+instance Show (TermPos' p) where
+    show (Annot p t) = "(" ++ show t ++ ")"
+
 
 toLN :: DS.TermCon ([Ident] -> a) -> [Ident] -> FM TermCon a
 toLN (DS.Var nm)          bv = Layer $ case elemIndex nm bv of
@@ -96,6 +106,14 @@ toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
 toLN DS.ElimEmpty         bv = Layer $ ElimEmpty
+
+toLN (DS.Eq t1 t2)        bv = Layer $ Eq (Var $ t1 bv) (Var $ t2 bv)
+toLN DS.Refl              bv = Layer $ Refl
+toLN (DS.ElimEq t x y t1 t2) bv =
+    Layer $ ElimEq (Var $ t bv)
+                   x y (Var $ t1 (y:x:bv))
+                   (Var $ t2 bv)
+
 toLN DS.Desc              bv = Layer $ Desc
 toLN (DS.Desc_K t)        bv = Layer $ Desc_K (Var $ t bv)
 toLN DS.Desc_Id           bv = Layer $ Desc_Id
@@ -144,6 +162,11 @@ close' fnm Unit             = pure Unit
 close' fnm UnitI            = pure UnitI
 close' fnm Empty            = pure Empty
 close' fnm ElimEmpty        = pure ElimEmpty
+
+close' fnm (Eq t1 t2)       = Eq <$> t1 <*> t2
+close' fnm Refl             = pure Refl
+close' fnm (ElimEq t x y t1 t2) = ElimEq <$> t <*> pure x <*> pure y <*> binder (binder t1) <*> t2
+
 close' fnm Desc             = pure Desc
 close' fnm (Desc_K t)       = Desc_K <$> t
 close' fnm Desc_Id          = pure Desc_Id
@@ -165,3 +188,6 @@ close' fnm InductionI       = pure InductionI
 
 close :: Ident -> AnnotRec a TermCon -> AnnotRec a TermCon
 close fnm x = translate (close' fnm) x 0
+
+close1 :: Ident -> AnnotRec a TermCon -> AnnotRec a TermCon
+close1 fnm x = translate (close' fnm) x 1

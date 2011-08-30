@@ -59,6 +59,9 @@ lexicalSpec =
     , "elimID" :==>          Emit IDesc_Elim
     , "µI" :==>              Emit MuI
     , "inductionI" :==>      Emit InductionI
+    , "≡" :==>               Emit Eq
+    , "refl" :==>            Emit Refl
+    , "elimEq" :==>          Emit ElimEq
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                            Emit Ident
     , oneOrMore (tok digit) :==>

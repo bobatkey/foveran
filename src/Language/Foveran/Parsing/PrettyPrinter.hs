@@ -49,6 +49,10 @@ pprint UnitI               = "()"
 pprint Empty               = "𝟘"
 pprint ElimEmpty           = "elimEmpty"
 
+pprint (Eq t1 t2)          = paren 07 (down t1 <+> "≡" <+> t2)
+pprint Refl                = "refl"
+pprint (ElimEq t a e t1 t2) = paren 00 ("elimEq" <+> resetPrec t <+> "for" <+> name a <+> name e <> "." <+> resetPrec t1 <+> "with" <+> t2)
+
 pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("“K”" <+> down t)
 pprint Desc_Id             = "“Id”"

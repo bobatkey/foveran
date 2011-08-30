@@ -55,6 +55,10 @@ data Token
     | Data
     | Normalise      
 
+    | Eq
+    | Refl
+    | ElimEq
+
     | IDesc
     | Quote_IId
     | Quote_Sg
@@ -119,6 +123,9 @@ instance SyntaxHighlight Token where
     lexicalClass IDesc_Elim  = Keyword
     lexicalClass MuI         = Keyword
     lexicalClass InductionI  = Keyword
+    lexicalClass Eq          = Operator
+    lexicalClass Refl        = Constructor
+    lexicalClass ElimEq      = Keyword
 
 instance Show Token where
   show Assume = "assume"
@@ -172,3 +179,6 @@ instance Show Token where
   show Sem         = "sem"
   show MuI         = "µI"
   show InductionI  = "inductionI"
+  show Eq          = "≡"
+  show Refl        = "refl"
+  show ElimEq      = "elimEq"

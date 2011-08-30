@@ -33,6 +33,10 @@ data TypeError
     | Proj2FromNonSigma           Context Value
     | LevelProblem                Int Int
     | TypesNotEqual               Context Value Value
+    | ReflCanOnlyProduceHomogenousEquality Context Value Value
+    | ReflCanOnlyProduceEquality  Context Value Value Value
+    | ReflExpectingEqualityType   Context Value
+    | ElimEqCanOnlyHandleHomogenousEq Context Value Value
 
 ppType :: Context -> Value -> Doc
 ppType ctxt v =
@@ -89,3 +93,18 @@ ppTypeError (TypesNotEqual ctxt ty1 ty2)
       $$ nest 4 (ppType ctxt ty1)
       $$ "but term has type"
       $$ nest 4 (ppType ctxt ty2)
+ppTypeError (ReflCanOnlyProduceHomogenousEquality ctxt tyA tyB)
+    = "'refl' can only produce homogenous equalities; types given:"
+      $$ nest 4 (ppType ctxt tyA)
+      $$ "and"
+      $$ nest 4 (ppType ctxt tyB)
+ppTypeError (ReflCanOnlyProduceEquality ctxt ty a b)
+    = "Type checking 'refl', but terms"
+      $$ nest 4 (ppTerm ctxt a ty)
+      $$ "and"
+      $$ nest 4 (ppTerm ctxt b ty)
+      $$ "are not equal."
+
+ppTypeError (ReflExpectingEqualityType ctxt ty)
+    = "Term produces a value of equality type, checker is expecting the type"
+      $$ nest 4 (ppType ctxt ty)

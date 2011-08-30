@@ -52,6 +52,10 @@ data TermCon tm
     | Empty
     | ElimEmpty
 
+    | Eq     tm tm
+    | Refl
+    | ElimEq tm Ident Ident tm tm
+
     {- Descriptions of non-indexed types -}
     | Desc
     | Desc_K    tm

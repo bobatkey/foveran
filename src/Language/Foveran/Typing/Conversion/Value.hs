@@ -13,6 +13,7 @@ module Language.Foveran.Typing.Conversion.Value
     , vsnd
     , vcase
     , velimEmpty
+    , velimeq
 
     , vdesc_elim
     , videsc_elim
@@ -62,6 +63,9 @@ data Value
     | VUnitI
 
     | VEmpty
+
+    | VEq    Value Value Value Value
+    | VRefl
 
     | VDesc
     | VMu         Value
@@ -139,6 +143,18 @@ velimEmpty :: Value -> Value -> Value
 velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
                                        `tmApp` reifyType a
                                        `tmApp` n)
+
+{------------------------------------------------------------------------------}
+velimeq tA ta tb VRefl a e tP tp = tp
+velimeq tA ta tb (VNeutral n) a e tP tp =
+    reflect (tP tA tb)
+            (In <$> (ElimEq
+                     <$> reifyType tA
+                     <*> reify tA ta
+                     <*> reify tA tb
+                     <*> n
+                     <*> pure a <*> pure e <*> tmBound (\tma -> tmBound (\tme -> reifyType (tP (reflect tA tma) (reflect (VEq tA tA ta (reflect tA tma)) tme))))
+                     <*> reify (tP ta VRefl) tp))
 
 {------------------------------------------------------------------------------}
 vsem :: Value -> Value
@@ -435,6 +451,7 @@ reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
 reifyType (VSet l)        = \i -> In $ Set l
 reifyType VUnit           = \i -> In $ Unit
 reifyType VEmpty          = \i -> In $ Empty
+reifyType (VEq vA vB va vb) = \i -> In $ Eq (reifyType vA i) (reifyType vB i) (reify vA va i) (reify vB vb i)
 reifyType VDesc           = \i -> In $ Desc
 reifyType (VMu v)         = \i -> In $ Mu (reify VDesc v i)
 reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VIDesc v1) v2 i)) `tmApp` reify v1 v3
@@ -473,5 +490,6 @@ reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)
 reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
+reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
 reify _                (VNeutral tm)       = tm
-reify _                v                   = error $ "reify: attempt to reify: " ++ show v
+reify ty               v                   = error $ "reify: attempt to reify: " ++ show v ++ " at type " ++ show ty

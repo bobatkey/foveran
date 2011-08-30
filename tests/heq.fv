@@ -1,7 +1,57 @@
+x : (α : Set) → (a b : α) → Set;
+x α a b = a ≡ b;
+
+normalise x;
+
+t : (α β : Set) → (a : α) → (b : β) → a ≡ a;
+t α β a b = refl;
+
+normalise t;
+
+trans :
+  (α : Set) →
+  (a₁ a₂ a₃ : α) →
+  a₁ ≡ a₂ →
+  a₂ ≡ a₃ →
+  a₁ ≡ a₃;
+trans α a₁ a₂ a₃ eq₁ eq₂ =
+  elimEq eq₂ for a p. a₁ ≡ a with eq₁;
+
+symm :
+  (α : Set) →
+  (a₁ a₂ : α) →
+  a₁ ≡ a₂ →
+  a₂ ≡ a₁;
+symm α a₁ a₂ eq =
+  elimEq eq for a p. a ≡ a₁ with refl;
+
+assume A : Set;
+assume a : A;
+assume b : A;
+assume q : a ≡ b;
+
+normalise trans A a b b q refl;
+
+r : (α : Set) → (a : α) → a ≡ a;
+r α a = refl;
+
+assume p : a ≡ a;
+
+normalise elimEq p for a' p'. p' ≡ r A a with refl;
+
+k : (α : Set) →
+    (a : α) →
+    (p : a ≡ a) →
+    p ≡ r α a;
+k α a p =
+  elimEq p for b q. q ≡ r α a with refl;
+
+
 assume eq : (α β : Set) → α → β → Set;
 
-assume refl : (α : Set) → (a : α) → eq α α a a;
+assume refl' : (α : Set) → (a : α) → eq α α a a;
 
+{-
 assume elimEq :
   (α : Set) →
   (x : α) →
@@ -10,15 +60,23 @@ assume elimEq :
   (y : α) →
   eq α α x y →
   Φ y;
+-}
 
 assume elimEq' :
   (α : Set) →
   (a : α) →
   (Φ : (a' : α) → eq α α a a' → Set) →
-  Φ a (refl α a) →
+  Φ a (refl' α a) →
   (a' : α) →
   (q  : eq α α a a') →
   Φ a' q;
+{-
+– {α : Set}
+– {a a' : α}
+– q : a ≡ a'
+– a' : α, φ : a ≡ a' ⊢ Φ : Set
+– x : Φ a (refl a)
+– elimEq q for a φ. Φ with x : Φ a' q;
 
 delimEq :
   (α : Set) →
@@ -30,23 +88,16 @@ delimEq :
   Φ y;
 delimEq α x Φ φ y eq =
   elimEq' α x (λa eq. Φ a) φ y eq;
-
-trans :
-  (α : Set) →
-  (a₁ a₂ a₃ : α) →
-  eq α α a₁ a₂ →
-  eq α α a₂ a₃ →
-  eq α α a₁ a₃;
-trans α a₁ a₂ a₃ eq₁ eq₂ =
-  elimEq' α a₂ (λa p. eq α α a₁ a) eq₁ a₃ eq₂;
-
-k : (α : Set) →
-    (a : α) →
-    (p : eq α α a a) →
-    eq (eq α α a a) (eq α α a a) p (refl α a);
-k α a p =
+-}
+{-
+k2 : (α : Set) →
+     (a : α) →
+     (p : eq α α a a) →
+     eq (eq α α a a) (eq α α a a) p (refl' α a);
+k2 α a p =
   elimEq' α a
-    (λa' p. eq (eq α α a a') (eq α α a a') p (trans α a a a' (refl α a) p))
-    (refl (eq α α a a) (refl α a))
+    (λa' p. eq (eq α α a a') (eq α α a a) p (refl' α a))
+    (refl' (eq α α a a) (refl' α a))
     a
     p;
+-}

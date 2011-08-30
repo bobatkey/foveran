@@ -43,5 +43,14 @@ bindK :: Ident -> NameSupply a -> (Ident -> a -> NameSupply b) -> NameSupply b
 bindK nm x k = do (nm',x') <- bind nm x
                   k nm' x'
 
+{-
+bind2 :: Ident -> Ident -> NameSupply a ->
+         (Ident -> Ident -> a -> NameSupply b) ->
+         NameSupply b
+bind2 nm1 nm2 x k = do (nm1',x') <- bind nm1 x
+                       (nm2',x'') <- bind nm2 x'
+                       k nm1 nm2 x''
+-}
+
 runNameSupply :: NameSupply a -> S.Set Ident -> a
 runNameSupply (NS f) used = f (used, [])

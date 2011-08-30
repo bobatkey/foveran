@@ -1,0 +1,112 @@
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD. Set 2)
+                    (λi. X i)
+                    (λA. A)
+                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
+                    (λA D semD. (a : A) × semD a)
+                    (λA D semD. (a : A) → semD a)
+                    D;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p. case x for x. A (construct x) with
+                                    { inl u. a
+                                    ; inr n. f n
+                                    });
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+Bool : Set;
+Bool = Unit + Unit;
+
+body : Set → Nat → Bool → IDesc Nat;
+body α n b =
+  case b for b. IDesc Nat with
+    { inl u. “K” (zero ≡ n)
+    ; inr u. “Σ” Nat (λn'. “K” α “×” “IId” n' “×” “K” (succ n' ≡ n))
+    };
+
+vecDesc : Set → Nat → IDesc Nat;
+vecDesc α n = “Σ” Bool (body α n);
+
+vec : Set → Nat → Set;
+vec α = µI Nat (vecDesc α);
+
+vnil : (α : Set) → vec α zero;
+vnil α = construct «inl (), refl»;
+
+vcons : (α : Set) → (n : Nat) → α → vec α n → vec α (succ n);
+vcons α n a xs = construct «inr (), «n, «a, «xs, refl»»»»;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+vecElim :
+  (α : Set) →
+  (Φ : (n : Nat) → vec α n → Set 2) →
+  Φ zero (vnil α) →
+  ((n : Nat) → (a : α) → (xs : vec α n) → Φ n xs → Φ (succ n) (vcons α n a xs)) →
+  (n : Nat) →
+  (xs : vec α n) →
+  Φ n xs;
+vecElim α Φ φnil φcons =
+  inductionI Nat (vecDesc α) Φ
+    (λn x.
+      case fst x for b. (z : semI Nat (body α n b) (λn. vec α n)) →
+                        liftI Nat (body α n b) (λn. vec α n) Φ z →
+                        Φ n (construct «b,z») with
+        { inl u. λz u.
+            elimEq z
+              for n' p. Φ n' (construct «inl (), p»)
+              with φnil
+        ; inr u. λz φ.
+            elimEq snd (snd (snd z))
+              for n p. Φ n (construct «inr (), «fst z, «fst (snd z), «fst (snd (snd z)), p»»»»)
+              with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst (snd φ)))
+        } (snd x));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+succ≢zero : (n : Nat) → succ n ≡ zero → Empty;
+succ≢zero n eq =
+  elimEq eq for n p. natCase (λn. Set) Empty (λu. Unit) n with ();
+
+symm :
+  (α : Set) →
+  (a₁ a₂ : α) →
+  a₁ ≡ a₂ →
+  a₂ ≡ a₁;
+symm α a₁ a₂ eq =
+  elimEq eq for a p. a ≡ a₁ with refl;
+
+succ-inj : (n₁ n₂ : Nat) → succ n₁ ≡ succ n₂ → n₁ ≡ n₂;
+succ-inj n₁ n₂ eq =
+  elimEq symm Nat (succ n₁) (succ n₂) eq
+    for n p. natCase (λn. Set) Empty (λn. n ≡ n₂) n
+    with refl;
+
+is-vnil : (α : Set) → (xs : vec α zero) → xs ≡ vnil α;
+is-vnil α xs =
+  vecElim α (λn xs. n ≡ zero → xs ≡ vnil α)
+          (λeq. refl)
+          (λn a xs φ eq. elimEmpty (vcons α n a xs ≡ vnil α) (succ≢zero n eq))
+          zero
+          xs
+          refl;
+
+is-vcons : (α : Set) →
+           (n : Nat) →
+           (xs : vec α (succ n)) →
+           (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs';
+is-vcons α n xs =
+  vecElim α (λn' xs. succ n ≡ n' → (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs')
+    (λeq. elimEmpty ((a : α) × (xs' : vec α n) × vnil α ≡ vcons α n a xs') (succ≢zero n eq))
+    (λn' a xs' φ eq. 
+      elimEq symm Nat n n' (succ-inj n n' eq)
+         for n'' p. (a' : α) × (xs'' : vec α n'') × vcons α n' a xs' ≡ vcons α n'' a' xs''
+         with «a, «xs', refl»»)
+    (succ n)
+    xs
+    refl;

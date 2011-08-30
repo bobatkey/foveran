@@ -17,6 +17,8 @@ import           Language.Foveran.Typing.Conversion
 import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Errors
 
+import Debug.Trace
+
 {------------------------------------------------------------------------------}
 -- This is a bit small at the moment, but it might get bigger
 data TypingMonad p a
@@ -154,6 +156,18 @@ tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt (VIDesc v) =
 tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt v =
     Error p (ExpectingDescTypeForDesc ctxt v)
 
+tyCheck (Annot p Refl) ctxt (VEq vA vB va vb) =
+    do let tA = reifyType0 vA
+           tB = reifyType0 vB
+           ta = reify vA va 0
+           tb = reify vB vb 0
+       unless (tA == tB) $ Error p (ReflCanOnlyProduceHomogenousEquality ctxt vA vB)
+       unless (ta == tb) $ Error p (ReflCanOnlyProduceEquality ctxt vA va vb)
+       return (In $ CS.Refl)
+
+tyCheck (Annot p Refl) ctxt v =
+    Error p (ReflExpectingEqualityType ctxt v)
+
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
@@ -233,6 +247,33 @@ tySynth (Annot p ElimEmpty) ctxt =
     return ( forall "A" (VSet 10) $ \a -> VEmpty .->. a
            , In $ CS.ElimEmpty)
 
+tySynth (Annot p (ElimEq t a e tP tp)) ctxt =
+    do (ty, tm) <- tySynth t ctxt
+       case ty of
+         VEq vA vB va vb -> do
+             let tA = reifyType0 vA
+                 tB = reifyType0 vB
+             unless (tA == tB) $ Error p (ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
+             let (a',ctxt0) = ctxtExtendFreshen ctxt a vA Nothing
+                 (e',ctxt1) = ctxtExtendFreshen ctxt0 e (VEq vA vA va (reflect vA (CS.tmFree a'))) Nothing
+                 tP'        = close e' $ close1 a' tP
+             (_,tmP0) <- setCheck tP' ctxt1
+             let tmP        = CS.bindFree e' $ CS.bindFree1 a' $ tmP0
+                 vtmP       = evaluate tmP [VRefl, va] (lookupDef ctxt)
+                 vtmP'      = evaluate tmP [tm `evalIn` ctxt,vb] (lookupDef ctxt)
+             tm_p <- tyCheck tp ctxt vtmP
+             let ta = reify vA va 0
+                 tb = reify vA vb 0
+             return ( vtmP'
+                    , In $ CS.ElimEq tA ta tb tm a e tmP tm_p
+                    )
+         ty ->
+             Error p (ExpectingEqualityType ctxt ty)
+
+             -- check that tP is a set under the appropriate assumptions
+             -- check that tp has the right type
+
+
 tySynth (Annot p Desc) ctxt =
     return (VSet 1, In $ CS.Desc)
 tySynth (Annot p Desc_Elim) ctxt =
@@ -279,6 +320,14 @@ tySynth (Annot p (Proj2 t)) ctxt =
        case tP of
          VSigma _ _ tB -> return (tB (vfst $ tmP `evalIn` ctxt), In $ CS.Proj2 tmP)
          v             -> Error p (Proj2FromNonSigma ctxt v)
+
+tySynth (Annot p (Eq tA tB)) ctxt =
+    do (tyA, tmA) <- tySynth tA ctxt
+       (tyB, tmB) <- tySynth tB ctxt
+       let tyA' = reifyType0 tyA
+           tyB' = reifyType0 tyB
+       -- FIXME: determine the level of tyA and tyB somehow
+       return ( VSet 0, In $ CS.Eq tyA' tyB' tmA tmB )
 
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
