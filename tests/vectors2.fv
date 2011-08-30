@@ -20,6 +20,15 @@ natCase A a f = induction NatDesc A
                                     ; inr n. f n
                                     });
 
+one : Nat;
+one = succ zero;
+
+two : Nat;
+two = succ one;
+
+three : Nat;
+three = succ two;
+
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 Bool : Set;
 Bool = Unit + Unit;
@@ -69,6 +78,14 @@ vecElim α Φ φnil φcons =
         } (snd x));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+assume A : Set;
+assume a : A;
+assume b : A;
+
+v : vec A two;
+v = vcons A one a (vcons A zero b (vnil A));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 succ≢zero : (n : Nat) → succ n ≡ zero → Empty;
 succ≢zero n eq =
   elimEq eq for n p. natCase (λn. Set) Empty (λu. Unit) n with ();
@@ -90,11 +107,11 @@ succ-inj n₁ n₂ eq =
 is-vnil : (α : Set) → (xs : vec α zero) → xs ≡ vnil α;
 is-vnil α xs =
   vecElim α (λn xs. n ≡ zero → xs ≡ vnil α)
-          (λeq. refl)
-          (λn a xs φ eq. elimEmpty (vcons α n a xs ≡ vnil α) (succ≢zero n eq))
-          zero
-          xs
-          refl;
+    (λeq. refl)
+    (λn a xs φ eq. elimEmpty (vcons α n a xs ≡ vnil α) (succ≢zero n eq))
+    zero
+    xs
+    refl;
 
 is-vcons : (α : Set) →
            (n : Nat) →
@@ -110,3 +127,5 @@ is-vcons α n xs =
     (succ n)
     xs
     refl;
+
+normalise is-vcons A one v;
