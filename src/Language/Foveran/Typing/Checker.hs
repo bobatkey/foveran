@@ -270,9 +270,6 @@ tySynth (Annot p (ElimEq t a e tP tp)) ctxt =
          ty ->
              Error p (ExpectingEqualityType ctxt ty)
 
-             -- check that tP is a set under the appropriate assumptions
-             -- check that tp has the right type
-
 
 tySynth (Annot p Desc) ctxt =
     return (VSet 1, In $ CS.Desc)

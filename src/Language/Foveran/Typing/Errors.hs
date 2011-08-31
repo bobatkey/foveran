@@ -37,6 +37,7 @@ data TypeError
     | ReflCanOnlyProduceEquality  Context Value Value Value
     | ReflExpectingEqualityType   Context Value
     | ElimEqCanOnlyHandleHomogenousEq Context Value Value
+    | ExpectingEqualityType       Context Value
 
 ppType :: Context -> Value -> Doc
 ppType ctxt v =
@@ -53,7 +54,9 @@ ppTypeError (ExpectingPiTypeForLambda ctxt ty)
       $$ nest 4 (ppType ctxt ty)
       $$ "but this term is a lambda-abstraction"
 ppTypeError (ExpectingSigmaTypeForPair ctxt ty)
-    = "Expecting Sigma type for pair"
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term constructs a pair"
 ppTypeError (ExpectingSumTypeForInl ctxt ty)
     = "Expecting term to have type"
       $$ nest 4 (ppType ctxt ty)
@@ -104,7 +107,10 @@ ppTypeError (ReflCanOnlyProduceEquality ctxt ty a b)
       $$ "and"
       $$ nest 4 (ppTerm ctxt b ty)
       $$ "are not equal."
-
 ppTypeError (ReflExpectingEqualityType ctxt ty)
     = "Term produces a value of equality type, checker is expecting the type"
       $$ nest 4 (ppType ctxt ty)
+ppTypeError (ExpectingEqualityType ctxt ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term generates equalities"
