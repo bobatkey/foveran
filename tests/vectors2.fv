@@ -1,3 +1,4 @@
+– FIXME: make this not Set 2 (need to fix Value.hs too)
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
 semI I D X = elimID I (λD. Set 2)
                     (λi. X i)
@@ -37,7 +38,7 @@ body : Set → Nat → Bool → IDesc Nat;
 body α n b =
   case b for b. IDesc Nat with
     { inl u. “K” (zero ≡ n)
-    ; inr u. “Σ” Nat (λn'. “K” α “×” “IId” n' “×” “K” (succ n' ≡ n))
+    ; inr u. “Σ” Nat (λn'. “Σ” α (λa. “IId” n' “×” “K” (succ n' ≡ n)))
     };
 
 vecDesc : Set → Nat → IDesc Nat;
@@ -74,7 +75,7 @@ vecElim α Φ φnil φcons =
         ; inr u. λz φ.
             elimEq snd (snd (snd z))
               for n p. Φ n (construct «inr (), «fst z, «fst (snd z), «fst (snd (snd z)), p»»»»)
-              with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst (snd φ)))
+              with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ))
         } (snd x));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -113,6 +114,37 @@ is-vnil α xs =
     xs
     refl;
 
+elim-veczero :
+  (α : Set) →
+  (Φ : (n : Nat) → vec α n → Set) →
+  Φ zero (vnil α) →
+  (xs : vec α zero) →
+  Φ zero xs;
+elim-veczero α Φ φnil xs =
+  vecElim α (λn xs. n ≡ zero → Φ n xs)
+    (λeq. φnil)
+    (λn a xs φ eq. elimEmpty (Φ (succ n) (vcons α n a xs)) (succ≢zero n eq))
+    zero
+    xs
+    refl;
+
+elim-veczero2 :
+  (α : Set) →
+  (Φ : vec α zero → Set) →
+  Φ (vnil α) →
+  (xs : vec α zero) →
+  Φ xs;
+elim-veczero2 α Φ φnil xs =
+  vecElim α (λn xs. (xs' : vec α zero) → n ≡ zero → xs ≡ xs' → Φ xs')
+    (λxs' eq₁ eq₂. elimEq eq₂ for x p. Φ x with φnil)
+    (λn a xs φ xs' eq₁ eq₂. elimEmpty (Φ xs') (succ≢zero n eq₁))
+    zero
+    xs
+    xs
+    refl
+    refl;
+
+{-
 is-vcons : (α : Set) →
            (n : Nat) →
            (xs : vec α (succ n)) →
@@ -129,3 +161,4 @@ is-vcons α n xs =
     refl;
 
 normalise is-vcons A one v;
+-}
