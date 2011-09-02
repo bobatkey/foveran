@@ -110,6 +110,11 @@ ppTypeError (ReflCanOnlyProduceEquality ctxt ty a b)
 ppTypeError (ReflExpectingEqualityType ctxt ty)
     = "Term produces a value of equality type, checker is expecting the type"
       $$ nest 4 (ppType ctxt ty)
+ppTypeError (ElimEqCanOnlyHandleHomogenousEq ctxt ty1 ty2)
+    = "Equality elimination can only handle elimination of homogenous equalities, types involved are:"
+      $$ nest 4 (ppType ctxt ty1)
+      $$ "and"
+      $$ nest 4 (ppType ctxt ty2)
 ppTypeError (ExpectingEqualityType ctxt ty)
     = "Expecting term to have type"
       $$ nest 4 (ppType ctxt ty)
