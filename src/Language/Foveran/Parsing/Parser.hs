@@ -131,7 +131,7 @@ term10 =
     <|>
     -- anonymous Pi/function types
     -- right associative
-    optBinary <$> term09 <*> optional ((Arr,) <$ token Tok.Arrow <*> term10)
+    optBinary <$> term09 <*> optional ((\x -> Arr [x],) <$ token Tok.Arrow <*> term10)
 
 term09 :: Parser Tok.Token TermPos
 term09 =

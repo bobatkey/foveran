@@ -88,8 +88,8 @@ genConstructors (Datatype p nm params constructors) = genConsLoop id constructor
 
       consType elems = paramsType p params (foldr elemType selfTy elems)
       
-      elemType Recursive  t = Annot p $ Arr selfTy t
-      elemType (Fixed ty) t = Annot p $ Arr ty t
+      elemType Recursive  t = Annot p $ Arr [selfTy] t
+      elemType (Fixed ty) t = Annot p $ Arr [ty] t
 
       -- FIXME: be cleverer about freshness;
       -- should probably be using the locally nameless representation
