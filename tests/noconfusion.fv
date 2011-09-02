@@ -1,0 +1,28 @@
+– no confusion example taken from “Eliminating dependent pattern
+– matching” by – Goguen, McBride and McKinna.
+
+data Nat : Set :=
+  | zero :
+  | succ : Nat
+  ;
+
+natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
+natCase A a f = induction NatDesc A
+                          (λx p. case x for x. A (construct x) with
+                                    { inl u. a
+                                    ; inr n. f n
+                                    });
+
+NoConfusion : (Φ : Set 1) → (x y : Nat) → Set 1;
+NoConfusion Φ x y =
+  natCase (λn. Set 1)
+    (natCase (λn. Set 1) (Φ → Φ) (λy. Φ) y)
+    (λx. natCase (λn. Set 1) Φ (λy. (x ≡ y → Φ) → Φ) y)
+    x;
+
+noconfusion : (Φ : Set 1) → (x y : Nat) → x ≡ y → NoConfusion Φ x y;
+noconfusion Φ x y eq =
+  elimEq eq for y p. NoConfusion Φ x y
+    with (natCase (λx. NoConfusion Φ x x)
+           (λp. p)
+           (λn p. p refl) x);
