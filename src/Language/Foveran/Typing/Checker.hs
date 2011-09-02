@@ -17,8 +17,6 @@ import           Language.Foveran.Typing.Conversion
 import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Errors
 
-import Debug.Trace
-
 {------------------------------------------------------------------------------}
 -- This is a bit small at the moment, but it might get bigger
 data TypingMonad p a
