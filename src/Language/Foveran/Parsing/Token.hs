@@ -182,3 +182,4 @@ instance Show Token where
   show Eq          = "≡"
   show Refl        = "refl"
   show ElimEq      = "elimEq"
+  show Normalise   = "normalise"
