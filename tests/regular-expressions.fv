@@ -37,6 +37,12 @@ and b₁ = case b₁ for b₁. bool → bool with
 alphabet : Set;
 alphabet = Unit + Unit;
 
+a : alphabet;
+a = inl ();
+
+b : alphabet;
+b = inr ();
+
 symbol-eq : alphabet → alphabet → bool;
 symbol-eq s₁ s₂ =
   case s₁ for s₁. bool with
@@ -125,5 +131,42 @@ step r s =
                   r;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– now define a type of strings that satisfy a regular expression,
-– using refinement2.fv
+data List (α : Set) : Set :=
+  | nil  :
+  | cons : α List
+  ;
+
+listInduction : (A : Set) →
+                (Φ : List A → Set 2) →
+                (Φ (nil A)) →
+                ((a : A) → (l : List A) → Φ l → Φ (cons A a l)) →
+                (l : List A) → Φ l;
+listInduction A Φ pnil pcons =
+  induction (ListDesc A) Φ
+    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct x) with
+            { inl u. λu'. pnil
+            ; inr p. λih. pcons (fst p) (snd p) (snd ih)
+            });
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+match : List alphabet → regexp → bool;
+match =
+  listInduction alphabet (λl. regexp → bool)
+    (λr. acceptsEmpty r)
+    (λa rest f r. f (step r a));
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+test : regexp;
+test = seq (star (alt (tok a) (tok b))) (tok a); – wouldn't it be great if there was support for infix syntax?
+
+input1 : List alphabet;
+input1 = cons alphabet a (cons alphabet b (cons alphabet a (nil alphabet)));
+
+input2 : List alphabet;
+input2 = cons alphabet a (cons alphabet b (nil alphabet));
+
+test1 : match input1 test ≡ true;
+test1 = refl;
+
+test2 : match input2 test ≡ false;
+test2 = refl;
