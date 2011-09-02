@@ -99,15 +99,6 @@ As it stands, there are several known shortcomings of the present work:
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – First some basic functions that we will need. First for non-indexed
 – descriptions of functors Set → Set.
-{-
-sem : Desc → Set → Set ;
-sem = elimD (λx. Set → Set)
-            (λA X. A)
-            (λX. X)
-            (λF G semF semG X. semF X × semG X)
-            (λF G semF semG X. semF X + semG X);
--}
-
 lift' : (D : Desc) →
        (α : Set) →
        (Φ : α → Set 1) →
@@ -951,8 +942,8 @@ fibonacci =
 nat-equal : Nat → Nat → Set 2;
 nat-equal n₁ n₂ = (F : Nat → Set 1) → F n₁ → F n₂;
 
-refl : (a : Nat) → nat-equal a a;
-refl a = λF x. x;
+nat-refl : (a : Nat) → nat-equal a a;
+nat-refl a = λF x. x;
 
 – This will make the typechecker normalise both sides and compare
 – them. If this works, the implementation above will have computed
@@ -976,7 +967,7 @@ equal-to-leibniz : (n₁ n₂ : Nat) → equalNat n₁ n₂ → nat-equal n₁ n
 equal-to-leibniz =
   natInduction (λn₁. (n₂ : Nat) → equalNat n₁ n₂ → nat-equal n₁ n₂)
                (caseNat (λn₂. equalNat zero n₂ → nat-equal zero n₂)
-                        (λu. refl zero)
+                        (λu. nat-refl zero)
                         (λn₂ e. elimEmpty (nat-equal zero (succ n₂)) e))
                (λn₁ ih. caseNat (λn₂. equalNat (succ n₁) n₂ → nat-equal (succ n₁) n₂)
                                 (λe. elimEmpty (nat-equal (succ n₁) zero) e)
