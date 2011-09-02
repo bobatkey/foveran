@@ -36,8 +36,7 @@ data TermCon tm
     | Lam   [Ident] tm
     | App   tm [tm]
     | Set   Int
-    | Pi    [Ident] tm tm
-    | Arr   [tm] tm
+    | Pi    [([Ident], tm)] tm
     | Sigma [Ident] tm tm
     | Prod  tm tm
     | Pair  tm tm

@@ -22,7 +22,7 @@ timesDesc p x y = Annot p $ Desc_Prod x y
 
 paramsType :: Span -> [(Ident,TermPos)] -> TermPos -> TermPos
 paramsType p []               t = t
-paramsType p ((nm,ty):params) t = Annot p $ Pi [nm] ty (paramsType p params t)
+paramsType p ((nm,ty):params) t = Annot p $ Pi [([nm], ty)] (paramsType p params t)
 
 paramsLam :: Span -> [(Ident,TermPos)] -> TermPos -> TermPos
 paramsLam p params t = Annot p $ Lam (fst <$> params) t
@@ -88,8 +88,8 @@ genConstructors (Datatype p nm params constructors) = genConsLoop id constructor
 
       consType elems = paramsType p params (foldr elemType selfTy elems)
       
-      elemType Recursive  t = Annot p $ Arr [selfTy] t
-      elemType (Fixed ty) t = Annot p $ Arr [ty] t
+      elemType Recursive  t = Annot p $ Pi [([],selfTy)] t
+      elemType (Fixed ty) t = Annot p $ Pi [([],ty)] t
 
       -- FIXME: be cleverer about freshness;
       -- should probably be using the locally nameless representation

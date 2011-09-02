@@ -126,12 +126,12 @@ term10 =
        <*  commit
        <*> term10
        <*  token Tok.RParen
-       <*> (Pi <$ token Tok.Arrow <|> Sigma <$ token Tok.Times)
+       <*> ((\nms t1 t2 -> Pi [(nms,t1)] t2) <$ token Tok.Arrow <|> Sigma <$ token Tok.Times)
        <*> term10
     <|>
     -- anonymous Pi/function types
     -- right associative
-    optBinary <$> term09 <*> optional ((\x -> Arr [x],) <$ token Tok.Arrow <*> term10)
+    optBinary <$> term09 <*> optional ((\x -> Pi [([],x)],) <$ token Tok.Arrow <*> term10)
 
 term09 :: Parser Tok.Token TermPos
 term09 =

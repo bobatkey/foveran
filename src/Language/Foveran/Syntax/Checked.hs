@@ -144,9 +144,9 @@ gatheringApp :: DS.Term -> DS.Term -> DS.TermCon DS.Term
 gatheringApp (In (DS.App t1 t2)) t3 = DS.App t1 (t2 ++ [t3])
 gatheringApp t1                  t2 = DS.App t1 [t2]
 
-gatheringArr :: DS.Term -> DS.Term -> DS.TermCon DS.Term
-gatheringArr t1 (In (DS.Arr t2 t3)) = DS.Arr (t1:t2) t3
-gatheringArr t1 t2                  = DS.Arr [t1] t2
+gatheringPi :: [Ident] -> DS.Term -> DS.Term -> DS.TermCon DS.Term
+gatheringPi nm t1 (In (DS.Pi bs t2)) = DS.Pi ((nm,t1):bs) t2
+gatheringPi nm t1 t2                 = DS.Pi [(nm,t1)] t2
 
 toDisplay :: TermCon (NameSupply DS.Term) -> NameSupply (DS.TermCon DS.Term)
 toDisplay (Free nm)               = pure $ DS.Var nm
@@ -154,8 +154,8 @@ toDisplay (Bound i)               = DS.Var <$> getBound i
 toDisplay (Lam nm body)           = bindK nm body $ \nm body -> pure (gatheringLam nm body)
 toDisplay (App t t')              = gatheringApp <$> t <*> t'
 toDisplay (Set i)                 = pure $ DS.Set i
-toDisplay (Pi Nothing t1 t2)      = gatheringArr <$> t1 <*> bindDummy t2
-toDisplay (Pi (Just nm) t1 t2)    = bindK nm t2 $ \nm t2 -> DS.Pi [nm] <$> t1 <*> pure t2
+toDisplay (Pi Nothing t1 t2)      = gatheringPi [] <$> t1 <*> bindDummy t2
+toDisplay (Pi (Just nm) t1 t2)    = bindK nm t2 $ \nm t2 -> gatheringPi [nm] <$> t1 <*> pure t2
 toDisplay (Sigma Nothing t1 t2)   = DS.Prod <$> t1 <*> bindDummy t2
 toDisplay (Sigma (Just nm) t1 t2) = bindK nm t2 $ \nm t2 -> DS.Sigma [nm] <$> t1 <*> pure t2
 toDisplay (Pair t1 t2)            = DS.Pair <$> t1 <*> t2
