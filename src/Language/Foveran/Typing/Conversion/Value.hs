@@ -147,13 +147,14 @@ velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
 {------------------------------------------------------------------------------}
 velimeq tA ta tb VRefl a e tP tp = tp
 velimeq tA ta tb (VNeutral n) a e tP tp =
-    reflect (tP tA tb)
+    reflect (tP tb (VNeutral n))
             (In <$> (ElimEq
                      <$> reifyType tA
                      <*> reify tA ta
                      <*> reify tA tb
                      <*> n
-                     <*> pure a <*> pure e <*> tmBound (\tma -> tmBound (\tme -> reifyType (tP (reflect tA tma) (reflect (VEq tA tA ta (reflect tA tma)) tme))))
+                     <*> pure a <*> pure e
+                     <*> tmBound (\tma -> tmBound (\tme -> reifyType (tP (reflect tA tma) (reflect (VEq tA tA ta (reflect tA tma)) tme))))
                      <*> reify (tP ta VRefl) tp))
 
 {------------------------------------------------------------------------------}
@@ -339,6 +340,7 @@ vinduction vF vP vK = loop
                                   vP $$ VConstruct x)
                                  vK
                    `tmApp` n)
+      loop v = error ("internal: vinduction stuck on " ++ show v)
 
 {------------------------------------------------------------------------------}
 vliftITy :: Value
