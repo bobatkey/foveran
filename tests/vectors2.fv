@@ -14,6 +14,17 @@ data Nat : Set :=
   | succ : Nat
   ;
 
+natInduction : (Φ : Nat → Set 2) →
+               (Φ zero) →
+               ((n : Nat) → Φ n → Φ (succ n)) →
+               (n : Nat) → Φ n;
+natInduction Φ φ0 φS =
+  induction NatDesc Φ
+            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+                    { inl u. \u'. φ0
+                    ; inr n. \φn. φS n φn
+                    });
+
 natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 natCase A a f = induction NatDesc A
                           (λx p. case x for x. A (construct x) with
@@ -33,6 +44,22 @@ three = succ two;
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 Bool : Set;
 Bool = Unit + Unit;
+
+{-
+– the following should all be generated from:
+
+data vec (α : Set) : Nat → Set where
+  vnil  : vec α zero
+  vcons : (n : Nat) → α → vec α n → vec α (succ n);
+
+in general:
+
+data vec [parameters] : IndexType → Set where
+  cname : [arg] → vec [params] [index-value]
+
+where arg is (x : <some-set>)
+which either ends in vec params index-value, or something else
+-}
 
 body : Set → Nat → Bool → IDesc Nat;
 body α n b =
@@ -79,12 +106,36 @@ vecElim α Φ φnil φcons =
         } (snd x));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+add : Nat → Nat → Nat ;
+add n₁ n₂ = natInduction (λx. Nat) n₂ (λn. succ) n₁;
+
+vecappend :
+  (α : Set) →
+  (n₁ n₂ : Nat) →
+  vec α n₁ →
+  vec α n₂ →
+  vec α (add n₁ n₂);
+vecappend α n₁ n₂ xs ys =
+  vecElim α (λn xs. vec α (add n n₂))
+    ys
+    (λn a xs xys. vcons α (add n n₂) a xys)
+    n₁
+    xs;
+
+-- vecreverse :
+--   (α : Set) →
+--   (n : Nat) →
+--   vec α n → 
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 assume A : Set;
 assume a : A;
 assume b : A;
 
 v : vec A two;
 v = vcons A one a (vcons A zero b (vnil A));
+
+normalise vecappend A two two v v;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 succ≢zero : (n : Nat) → succ n ≡ zero → Empty;
@@ -144,7 +195,6 @@ elim-veczero2 α Φ φnil xs =
     refl
     refl;
 
-{-
 is-vcons : (α : Set) →
            (n : Nat) →
            (xs : vec α (succ n)) →
@@ -160,5 +210,33 @@ is-vcons α n xs =
     xs
     refl;
 
-normalise is-vcons A one v;
--}
+elim-vecsucc :
+  (α : Set) →
+  (Φ : (n : Nat) → vec α (succ n) → Set) →
+  ((n : Nat) → (a : α) → (xs : vec α n) → Φ n (vcons α n a xs)) →
+  (n : Nat) → (xs : vec α (succ n)) → Φ n xs;
+elim-vecsucc α Φ φcons n xs =
+  vecElim α (λn xs. (n' : Nat) → (xs' : vec α (succ n')) → n ≡ succ n' → xs ≡ xs' → Φ n' xs')
+    (λn' xs' eq₁ eq₂. elimEmpty (Φ n' xs') (succ≢zero n' (symm Nat zero (succ n') eq₁)))
+    (λn a xs φ n' xs' eq₁.
+      elimEq succ-inj n n' eq₁
+         for n' p. (xs' : vec α (succ n')) → vcons α n a xs ≡ xs' → Φ n' xs'
+         with (λxs' eq₂. elimEq eq₂ for xs' p. Φ n xs'
+                           with (φcons n a xs))
+       xs')
+    (succ n)
+    xs
+    n
+    xs
+    refl
+    refl;
+
+is-vcons2 :
+  (α : Set) →
+  (n : Nat) →
+  (xs : vec α (succ n)) →
+  (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs';
+is-vcons2 α =
+  elim-vecsucc α
+    (λn xs. (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs')
+    (λn a xs. «a, «xs, refl»»);
