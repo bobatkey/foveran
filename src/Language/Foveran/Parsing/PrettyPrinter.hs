@@ -29,7 +29,7 @@ pprint (Lam nms t)    = paren 10 (sep ["\x03bb" <> names nms <> ".", nest 2 t])
 pprint (App t ts)     = paren 01 (sep (t:map (nest 2 . down) ts))
 
 pprint (Prod t1 t2)      = paren 08 (down t1 <+> "×" <+> t2)
-pprint (Sigma nms t1 t2) = paren 10 (hang ("(" <> names nms <+> ":" <+> t1 <> ")" <+> "×") 0 {- <+> -} t2)
+pprint (Sigma nms t1 t2) = paren 10 (hang ("(" <> names nms <+> ":" <+> t1 <> ")" <+> "×") 0 t2)
 pprint (Proj1 t)         = paren 01 ("fst" <+> down t)
 pprint (Proj2 t)         = paren 01 ("snd" <+> down t)
 pprint (Pair t1 t2)      = "«" <> (sep $ punctuate "," [resetPrec t1, resetPrec t2]) <> "»"
@@ -75,11 +75,8 @@ pprint IDesc_Elim          = "elimID"
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
 pprint InductionI          = "inductionI"
 
-pp :: TermPos -> PrecDoc
-pp = foldAnnot pprint
-
 ppAnnotTerm :: TermPos -> PP.Doc
-ppAnnotTerm x = pp x `atPrecedenceLevel` 10
+ppAnnotTerm t = foldAnnot pprint t `atPrecedenceLevel` 10
 
-ppPlain :: Rec TermCon -> PP.Doc 
+ppPlain :: Rec TermCon -> PP.Doc
 ppPlain t = foldRec pprint t `atPrecedenceLevel` 10
