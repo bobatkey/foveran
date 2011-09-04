@@ -2,8 +2,6 @@
 
 module Language.Foveran.Typing.Conversion.Evaluation
     ( evaluate
-    , reifyType0
-    , vlift
     )
     where
 
@@ -12,16 +10,15 @@ import Data.Rec
 import Language.Foveran.Syntax.Checked
 import Language.Foveran.Typing.Conversion.Value
 
-import Debug.Trace
-
 {------------------------------------------------------------------------------}
 type Eval a = ([Value], Ident -> (Value, Maybe Value)) -> a
 
-getBound k (env, _) = env !! k -- in (trace ("env = " ++ show env ++ ", k = " ++ show k) ()) `seq` (x `seq` x)
+getBound k (env, _) = env !! k
 
-getDef nm (_, context) = case def of
-                           Nothing -> reflect ty (tmFree nm)
-                           Just d  -> d
+getDef nm (_, context) =
+    case def of
+      Nothing -> reflect ty (tmFree nm)
+      Just d  -> d
     where
       (ty, def) = context nm
 
@@ -111,6 +108,3 @@ eval InductionI         = pure (VLam "I" $ \vI ->
 {------------------------------------------------------------------------------}
 evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value
 evaluate t env defs = foldRec eval t (env,defs)
-
-reifyType0 :: Value -> Term
-reifyType0 v = reifyType v 0

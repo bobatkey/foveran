@@ -30,7 +30,7 @@ module Language.Foveran.Typing.Conversion.Value
     , vinductionI
 
     , reflect
-    , reifyType
+    , reifyType0
     , reify
     )
     where
@@ -461,6 +461,8 @@ reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VNeutral t)    = \i -> t i
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
+reifyType0 :: Value -> Term
+reifyType0 v = reifyType v 0
 
 {------------------------------------------------------------------------------}
 reify :: Value -> Value -> (Int -> Term)
