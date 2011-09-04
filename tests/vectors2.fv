@@ -78,7 +78,7 @@ vnil : (α : Set) → vec α zero;
 vnil α = construct «inl (), refl»;
 
 vcons : (α : Set) → (n : Nat) → α → vec α n → vec α (succ n);
-vcons α n a xs = construct «inr (), «n, «a, «xs, refl»»»»;
+vcons α n a xs = construct «inr (), n, a, xs, refl»;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 vecElim :
@@ -101,7 +101,7 @@ vecElim α Φ φnil φcons =
               with φnil
         ; inr u. λz φ.
             elimEq snd (snd (snd z))
-              for n p. Φ n (construct «inr (), «fst z, «fst (snd z), «fst (snd (snd z)), p»»»»)
+              for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p»)
               with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ))
         } (snd x));
 
@@ -205,7 +205,7 @@ is-vcons α n xs =
     (λn' a xs' φ eq. 
       elimEq symm Nat n n' (succ-inj n n' eq)
          for n'' p. (a' : α) × (xs'' : vec α n'') × vcons α n' a xs' ≡ vcons α n'' a' xs''
-         with «a, «xs', refl»»)
+         with «a, xs', refl»)
     (succ n)
     xs
     refl;
@@ -239,4 +239,4 @@ is-vcons2 :
 is-vcons2 α =
   elim-vecsucc α
     (λn xs. (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs')
-    (λn a xs. «a, «xs, refl»»);
+    (λn a xs. «a, xs, refl»);

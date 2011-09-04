@@ -40,10 +40,10 @@ fin : Nat → Set;
 fin = µI Nat finDesc;
 
 fz : (n : Nat) → fin (succ n);
-fz n = construct «inl (), «n, refl»»;
+fz n = construct «inl (), n, refl»;
 
 fs : (n : Nat) → fin n → fin (succ n);
-fs n i = construct «inr (), «n, «i, refl»»»;
+fs n i = construct «inr (), n, i, refl»;
 
 finElim :
   (Φ : (n : Nat) → fin n → Set 2) →
@@ -57,10 +57,10 @@ finElim Φ φz φs =
                         liftI Nat (body n b) (λn. fin n) Φ z →
                         Φ n (construct «b,z») with
         { inl u. λx u.
-            elimEq snd x for n' p. Φ n' (construct «inl (), «fst x, p»»)
+            elimEq snd x for n' p. Φ n' (construct «inl (), fst x, p»)
             with (φz (fst x))
         ; inr u. λx φ.
-            elimEq snd (snd x) for n' p. Φ n' (construct «inr (), «fst x, «fst (snd x), p»»»)
+            elimEq snd (snd x) for n' p. Φ n' (construct «inr (), fst x, fst (snd x), p»)
             with (φs (fst x) (fst (snd x)) (fst φ))
         } (snd x));
 
@@ -82,6 +82,20 @@ emp i = finElim (λn i. n ≡ zero → Empty)
                 zero
                 i
                 refl;
+
+elim-finzero :
+  (Φ : fin zero → Set) →
+  (i : fin zero) →
+  Φ i;
+elim-finzero Φ i =
+  finElim (λn i. (i' : fin zero) → n ≡ zero → i ≡ i' → Φ i')
+    (λn i' eq₁ eq₂. elimEmpty (Φ i') (succ≢zero n eq₁))
+    (λn x φ i' eq₁ eq₂. elimEmpty (Φ i') (succ≢zero n eq₁))
+    zero
+    i
+    i
+    refl
+    refl;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 one : Nat;
