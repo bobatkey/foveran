@@ -50,7 +50,7 @@ pprint UnitI               = "()"
 pprint Empty               = "𝟘"
 pprint ElimEmpty           = "elimEmpty"
 
-pprint (Eq t1 t2)          = paren 07 (down t1 <+> "≡" <+> t2)
+pprint (Eq t1 t2)          = paren 07 (sep [down t1, nest 2 "≡", t2])
 pprint Refl                = "refl"
 pprint (ElimEq t a e t1 t2) = paren 00 ("elimEq" <+> resetPrec t
                                         $$ nest 3 "for" <+> name a <+> name e <> "." <+> resetPrec t1
