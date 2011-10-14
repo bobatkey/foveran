@@ -2,9 +2,14 @@
 
 module Language.Foveran.Typing.DeclCheckMonad
     ( DeclCheckM ()
-    , checkDecl
     , extend
+    , liftTyCheck
+    , evaluate
+    , getContext -- FIXME: try to get rid of this
     , runDeclCheckM
+    , liftIO -- FIXME: should be in MonadIO class
+    , checkDefinition -- FIXME: move this
+    , checkInternalDefinition
     )
     where
 
@@ -19,14 +24,15 @@ import Language.Foveran.Util.PrettyPrinting
 
 import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
 import qualified Language.Foveran.Syntax.Display as DS
-import Language.Foveran.Syntax.LocallyNameless (Ident, toLocallyNameless)
+import Language.Foveran.Syntax.Identifier (Ident)
+import Language.Foveran.Syntax.LocallyNameless (toLocallyNamelessClosed)
+import qualified Language.Foveran.Syntax.LocallyNameless as LN
 import qualified Language.Foveran.Syntax.Checked as CS
 import Language.Foveran.Parsing.PrettyPrinter
 import Language.Foveran.Typing.Conversion (Value)
 import Language.Foveran.Typing.Context
 import Language.Foveran.Typing.Checker
 import Language.Foveran.Typing.Errors
-import Language.Foveran.Typing.DataDecl
 
 {------------------------------------------------------------------------------}
 data Error
@@ -71,49 +77,21 @@ checkDefinition :: Definition -> DeclCheckM Span ()
 checkDefinition (Definition p nm extTy nm' extTm) =
     do unless (nm == nm') $ malformedDefinition p nm nm'
        liftIO $ do putStrLn ("Checking definition: " ++ T.unpack nm)
-                   putStrLn $ render $ ("Type: " <+> ppAnnotTerm extTy
+                   putStrLn $ render $ (   "Type: " <+> ppAnnotTerm extTy
                                         $$ "Term: " <+> ppAnnotTerm extTm)
                    putStrLn ""
-       let ty = toLocallyNameless extTy
-           tm = toLocallyNameless extTm
-       (_, cTy) <- liftTyCheck $ setCheck ty
-       vTy <- evaluate cTy
-       cTm <- liftTyCheck $ flip (tyCheck tm) vTy -- FIXME: get rid of this flip
-       vTm <- evaluate cTm
-       extend p nm vTy (Just vTm)
+       let ty = toLocallyNamelessClosed extTy
+           tm = toLocallyNamelessClosed extTm
+       checkInternalDefinition p nm ty tm
 
-checkDatatype :: Datatype -> DeclCheckM Span ()
-checkDatatype d =
-    do checkDefinition (genDesc d)
-       checkDefinition (genDatatypeCarrier d)
-       mapM_ checkDefinition (genConstructors d)
-
-doNormalise :: DS.TermPos -> DeclCheckM Span ()
-doNormalise tmDS = do
-  let tm = toLocallyNameless tmDS
-  (ty,c) <- liftTyCheck $ tySynth tm
-  v <- evaluate c
-  ctxt <- getContext
-  let d  = ppTerm ctxt v ty
-      d0 = ppPlain $ contextNameSupply ctxt $ CS.toDisplaySyntax c
-  liftIO $ putStrLn $ render $ ("normalised: "
-                                $$ nest 4 d0
-                                $$ "of type"
-                                $$ nest 4 (ppType ctxt ty)
-                                $$ "to"
-                                $$ nest 4 d
-                                $$ "")
-  return ()
-
-checkDecl :: Declaration -> DeclCheckM Span ()
-checkDecl (AssumptionDecl p nm extTm) =
-  do let t = toLocallyNameless extTm
-     (_, c) <- liftTyCheck $ setCheck t
-     v <- evaluate c
-     extend p nm v Nothing
-checkDecl (DefinitionDecl d) = checkDefinition d
-checkDecl (DatatypeDecl d)   = checkDatatype d
-checkDecl (Normalise tm)     = doNormalise tm
+checkInternalDefinition :: Span -> Ident -> LN.TermPos -> LN.TermPos -> DeclCheckM Span ()
+checkInternalDefinition p nm ty tm = do
+  (_, cTy) <- liftTyCheck $ setCheck ty
+  vTy      <- evaluate cTy
+  cTm      <- liftTyCheck $ flip (tyCheck tm) vTy -- FIXME: get rid of this flip
+  vTm      <- evaluate cTm
+  extend p nm vTy (Just vTm)
+  
 
 runDeclCheckM :: DeclCheckM Span () -> IO ()
 runDeclCheckM (DM f) =

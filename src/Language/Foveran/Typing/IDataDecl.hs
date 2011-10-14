@@ -163,12 +163,10 @@ consCode d (ConsPi nm t bits) bv idxVar = do
   return (pDefault @| LN.IDesc_Sg t' (pDefault @| LN.Lam nm code))
 
 consCode d (ConsArr t bits)   bv idxVar = do
-  code <- consCode d bits bv idxVar
   let t'         = LN.toLocallyNameless t bv
-      maybeCode1 = extractRecursiveCall d t'
-  case maybeCode1 of
-    Nothing    -> return (pDefault @| LN.Desc_Prod (pDefault @| LN.Desc_K t') code)
-    Just code1 -> return (pDefault @| LN.Desc_Prod code1 code)
+  let codeDom    = (pDefault @| LN.Desc_K t') `fromMaybe` (extractRecursiveCall d t')
+  code <- consCode d bits bv idxVar
+  return (pDefault @| LN.Desc_Prod codeDom code)
 
 consCode d (ConsEnd nm ts)    bv idxVar = do
   unless (nm == dataName d) $ fail "wrong name" -- FIXME: proper error

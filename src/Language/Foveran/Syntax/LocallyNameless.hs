@@ -1,9 +1,9 @@
 {-# LANGUAGE DeriveFunctor, TypeSynonymInstances #-}
 
 module Language.Foveran.Syntax.LocallyNameless
-    ( Ident
-    , TermPos
+    ( TermPos
     , TermCon (..)
+    , toLocallyNamelessClosed
     , toLocallyNameless
     , close
     , close1
@@ -70,28 +70,31 @@ instance Show (TermPos' p) where
     show (Annot p t) = "(" ++ show t ++ ")"
 
 
-toLN :: DS.TermCon ([Ident] -> a) -> [Ident] -> FM TermCon a
-toLN (DS.Var nm)          bv = Layer $ case elemIndex nm bv of
+-- If there is a 'Nothing' in the binding list, it is a variable the
+-- term cannot name explicitly. This is used for the translation of
+-- data declarations
+toLN :: DS.TermCon ([Maybe Ident] -> a) -> [Maybe Ident] -> FM TermCon a
+toLN (DS.Var nm)          bv = Layer $ case elemIndex (Just nm) bv of
                                          Nothing -> Free nm
                                          Just i  -> Bound i
 toLN (DS.Lam nms body)    bv = doBinders nms bv
     where doBinders []       bv = Var   $ body bv
-          doBinders (nm:nms) bv = Layer $ Lam nm (doBinders nms (nm:bv))
+          doBinders (nm:nms) bv = Layer $ Lam nm (doBinders nms (Just nm:bv))
 toLN (DS.App t ts)        bv = doApplications (Var $ t bv) ts
     where doApplications tm []     = tm
           doApplications tm (t:ts) = doApplications (Layer $ App tm (Var $ t bv)) ts
 toLN (DS.Set i)           bv = Layer $ Set i
 toLN (DS.Pi bs t)         bv = doArrows bs bv
     where doArrows []            bv = Var $ t bv
-          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (Var $ t1 bv) (doArrows bs (T.empty:bv))
+          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (Var $ t1 bv) (doArrows bs (Nothing:bv))
           doArrows ((nms,t1):bs) bv = doNames nms t1 bv (doArrows bs)
 
           doNames  []       t1 bv k = k bv
-          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just nm) (Var $ t1 bv) (doNames nms t1 (nm:bv) k)
+          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just nm) (Var $ t1 bv) (doNames nms t1 (Just nm:bv) k)
 toLN (DS.Sigma nms t1 t2) bv = doBinders nms bv
     where doBinders []       bv = Var   $ t2 bv
-          doBinders (nm:nms) bv = Layer $ Sigma (Just nm) (Var $ t1 bv) (doBinders nms (nm:bv))
-toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (Var $ t1 bv) (Var $ t2 (T.empty:bv))
+          doBinders (nm:nms) bv = Layer $ Sigma (Just nm) (Var $ t1 bv) (doBinders nms (Just nm:bv))
+toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (Var $ t1 bv) (Var $ t2 (Nothing:bv))
 toLN (DS.Pair t1 t2)      bv = Layer $ Pair (Var $ t1 bv) (Var $ t2 bv)
 toLN (DS.Proj1 t)         bv = Layer $ Proj1 (Var $ t bv)
 toLN (DS.Proj2 t)         bv = Layer $ Proj2 (Var $ t bv)
@@ -100,11 +103,11 @@ toLN (DS.Inl t)           bv = Layer $ Inl (Var $ t bv)
 toLN (DS.Inr t)           bv = Layer $ Inr (Var $ t bv)
 toLN (DS.Case t1 x t2 y t3 z t4) bv = Layer $ Case (Var $ t1 bv)
                                                    x
-                                                   (Var $ t2 (x:bv))
+                                                   (Var $ t2 (Just x:bv))
                                                    y
-                                                   (Var $ t3 (y:bv))
+                                                   (Var $ t3 (Just y:bv))
                                                    z
-                                                   (Var $ t4 (z:bv))
+                                                   (Var $ t4 (Just z:bv))
 toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
@@ -114,7 +117,7 @@ toLN (DS.Eq t1 t2)        bv = Layer $ Eq (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
 toLN (DS.ElimEq t x y t1 t2) bv =
     Layer $ ElimEq (Var $ t bv)
-                   x y (Var $ t1 (y:x:bv))
+                   x y (Var $ t1 (Just y:Just x:bv))
                    (Var $ t2 bv)
 
 toLN DS.Desc              bv = Layer $ Desc
@@ -136,8 +139,11 @@ toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (Var $ t1 bv) (Var $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
-toLocallyNameless :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
-toLocallyNameless t = translateStar toLN t []
+toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
+toLocallyNamelessClosed t = translateStar toLN t []
+
+toLocallyNameless :: AnnotRec a DS.TermCon -> [Maybe Ident] -> AnnotRec a TermCon
+toLocallyNameless t = translateStar toLN t
 
 {------------------------------------------------------------------------------}
 binder :: (Int -> a) -> Int -> a

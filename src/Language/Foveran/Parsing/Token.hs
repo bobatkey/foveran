@@ -53,7 +53,8 @@ data Token
     | Number
     | Pipe
     | Data
-    | Normalise      
+    | Normalise
+    | Where
 
     | Eq
     | Refl
@@ -126,6 +127,7 @@ instance SyntaxHighlight Token where
     lexicalClass Eq          = Operator
     lexicalClass Refl        = Constructor
     lexicalClass ElimEq      = Keyword
+    lexicalClass Where       = Keyword
 
 instance Show Token where
   show Assume = "assume"
@@ -183,3 +185,4 @@ instance Show Token where
   show Refl        = "refl"
   show ElimEq      = "elimEq"
   show Normalise   = "normalise"
+  show Where       = "where"

@@ -62,6 +62,7 @@ lexicalSpec =
     , "≡" :==>               Emit Eq
     , "refl" :==>            Emit Refl
     , "elimEq" :==>          Emit ElimEq
+    , "where" :==>           Emit Where
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                            Emit Ident
     , oneOrMore (tok digit) :==>

@@ -2,7 +2,9 @@
 
 module Language.Foveran.Parsing.PrettyPrinter
     ( ppAnnotTerm 
+    , ppAnnotTermLev
     , ppPlain
+    , ppIDataDecl
     )
     where
 
@@ -78,5 +80,27 @@ pprint InductionI          = "inductionI"
 ppAnnotTerm :: TermPos -> PP.Doc
 ppAnnotTerm t = foldAnnot pprint t `atPrecedenceLevel` 10
 
+ppAnnotTermLev :: Int -> TermPos -> PP.Doc
+ppAnnotTermLev l t = foldAnnot pprint t `atPrecedenceLevel` l
+
 ppPlain :: Rec TermCon -> PP.Doc
 ppPlain t = foldRec pprint t `atPrecedenceLevel` 10
+
+--------------------------------------------------------------------------------
+ppIDataDecl :: IDataDecl -> PP.Doc
+ppIDataDecl d = doc `atPrecedenceLevel` 10
+    where
+      doc = ("data" <+>
+             name (dataName d) <+>
+             hsep [ "(" <> name nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | (nm,t) <- dataParameters d ] <+>
+             ":" <+> fromDoc (ppAnnotTermLev 9 (dataIndexType d)) <+> "→" <+> "Set" <+> "where")
+            $$ nest 2 (doConstructors (dataConstructors d))
+
+      doConstructors []     = "{ };"
+      doConstructors (c:cs) = vcat (("{" <+> doConstructor c) : map (\c -> ";" <+> doConstructor c) cs) $$ "};"
+
+      doConstructor c = name (consName c) <+> ":" <+> sep (doBits (consBits c))
+
+      doBits (ConsPi nm t xs) = ("(" <> name nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" <+> "→") : doBits xs
+      doBits (ConsArr t xs)   = (fromDoc (ppAnnotTermLev 9 t) <+> "→") : doBits xs
+      doBits (ConsEnd nm ts)  = [name nm <+> sep (map (fromDoc . ppAnnotTermLev 0) ts)]

@@ -1,5 +1,6 @@
 module Text.PrettyPrintPrec
     (PrecDoc (),
+     fromDoc,
      atPrecedenceLevel,
      resetPrec,
      text,
@@ -19,6 +20,9 @@ newtype PrecDoc = PrecDoc { atPrecedenceLevel :: Int -> Doc }
 
 instance IsString PrecDoc where
     fromString s = PrecDoc $ \lev -> PP.text s
+
+fromDoc :: Doc -> PrecDoc
+fromDoc d = PrecDoc (const d)
 
 text :: String -> PrecDoc
 text s = fromString s

@@ -6,6 +6,9 @@ module Language.Foveran.Syntax.Display
     , Datatype (..)
     , Constructor (..)
     , Declaration (..)
+    , IDataDecl (..)
+    , IConstructor (..)
+    , IConstructorBits (..)
     , Term
     , TermPos
     , TermCon (..)
@@ -26,7 +29,25 @@ data Declaration
     = AssumptionDecl Span Ident TermPos
     | DefinitionDecl Definition
     | DatatypeDecl   Datatype
+    | IDataDecl      IDataDecl
     | Normalise      TermPos
+
+data IDataDecl
+    = IData { dataName         :: Ident
+            , dataParameters   :: [(Ident,TermPos)]
+            , dataIndexType    :: TermPos
+            , dataConstructors :: [IConstructor]
+            }
+
+data IConstructor
+    = IConstructor { consName :: Ident
+                   , consBits :: IConstructorBits
+                   }
+
+data IConstructorBits
+    = ConsPi  Ident TermPos IConstructorBits
+    | ConsArr TermPos IConstructorBits
+    | ConsEnd Ident [TermPos]
 
 type Term = Rec TermCon
 type TermPos = AnnotRec Span TermCon

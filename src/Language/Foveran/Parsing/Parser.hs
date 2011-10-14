@@ -64,10 +64,11 @@ declaration =
         <*> identifierList
         <* token Tok.Equals <*> term <*> token Tok.Semicolon
     <|>
+    IDataDecl <$> idata
+    <|>
     (\p nm params constructors p' ->
          DatatypeDecl $ Datatype (makeSpan p p') nm params constructors)
         <$> token Tok.Data
-        <*  commit
         <*> identifier
         <*> dataParamList
         <*  token Tok.Colon
@@ -85,7 +86,6 @@ dataParamList :: Parser Tok.Token [(Ident,TermPos)]
 dataParamList =
     (\nm t params -> (nm, t) : params)
         <$  token Tok.LParen
-        <*  commit
         <*> identifier
         <*  token Tok.Colon
         <*> term
@@ -105,6 +105,31 @@ constructorList =
         <*> constructorList
     <|>
     pure []
+
+--------------------------------------------------------------------------------
+idata :: Parser Tok.Token IDataDecl
+idata = IData <$
+    token Tok.Data <*> identifier <*> dataParamList <* token Tok.Colon <*> term09 <* token Tok.Arrow <* token Tok.Set <* token Tok.Where
+                   <*  token Tok.LBrace <*> iconstructors <* token Tok.RBrace <* token Tok.Semicolon
+
+iconstructors :: Parser Tok.Token [IConstructor]
+iconstructors =
+  (\x xs -> x:xs) <$> iconstructor <*> many (token Tok.Semicolon *> iconstructor)
+  <|>
+  pure []
+
+iconstructor :: Parser Tok.Token IConstructor
+iconstructor =
+    IConstructor <$> identifier <* token Tok.Colon <*> constructorbits
+    where 
+      constructorbits =
+          ConsPi  <$  token Tok.LParen <*> identifier <* token Tok.Colon <*> term10 <* token Tok.RParen <* token Tok.Arrow <*> constructorbits
+          <|>
+          ConsArr <$> term09 <* token Tok.Arrow <*> constructorbits
+          <|>
+          ConsEnd <$> identifier <*> many term00
+
+--------------------------------------------------------------------------------
 
 declarations :: Parser Tok.Token [Declaration]
 declarations =
