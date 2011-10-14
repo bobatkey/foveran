@@ -1,0 +1,32 @@
+data Nat : Unit → Set where
+  { zero : Nat ()
+  ; succ : Nat () → Nat ()
+  };
+
+data Vector (A : Set) : Nat () → Set where
+  { vnil  : Vector A zero
+  ; vcons : (n : Nat ()) → A → Vector A n → Vector A (succ n)
+  };
+
+data Fin : Nat () → Set where
+  { fz : (n : Nat ()) → Fin (succ n)
+  ; fs : (n : Nat ()) → Fin n → Fin (succ n)
+  };
+
+data Foo : Unit → Set where
+  { foo1 : Foo ()
+  ; foo2 : Foo ()
+  ; foo3 : Foo ()
+  ; foo4 : Foo () → Foo ()
+  };
+
+{-
+assume lt : Nat → Nat → Set;
+
+data Acc : Nat → Set where
+  { acc : (n : Nat) → ((n' : Nat) → lt n' n → Acc n') → Acc n
+  };
+-}
+
+data Emp : Nat () → Set where
+  { };
