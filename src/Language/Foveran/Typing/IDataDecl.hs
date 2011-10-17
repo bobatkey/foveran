@@ -1,19 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Foveran.Typing.IDataDecl
-    ( checkIDataDecl )
+    ( processIDataDecl )
     where
 
-import Control.Monad (unless, guard)
-import Data.Maybe (fromMaybe, fromJust) -- FIXME: remove fromJust
-import Data.Rec (AnnotRec (Annot))
-import Language.Foveran.Typing.DeclCheckMonad
-import Language.Foveran.Syntax.Display
-import Language.Foveran.Syntax.Identifier ((<+>))
+import qualified Data.Set as S
+import           Control.Monad (unless, guard, when, foldM_)
+import           Data.Maybe (fromMaybe)
+import           Data.Rec (AnnotRec (Annot))
+import           Language.Foveran.Typing.DeclCheckMonad
+import           Language.Foveran.Typing.Errors
+import           Language.Foveran.Syntax.Display
+import           Language.Foveran.Syntax.Identifier ((<+>))
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
-import Language.Foveran.Parsing.PrettyPrinter (ppIDataDecl)
-import Text.Position (Span (..), initPos)
-import Text.PrettyPrint (render)
+import           Text.Position (Span (..), initPos)
 
 --------------------------------------------------------------------------------
 pDefault = Span initPos initPos -- FIXME: get these from the IConstructorBits
@@ -21,25 +21,78 @@ pDefault = Span initPos initPos -- FIXME: get these from the IConstructorBits
 (@|) p t = Annot p t
 
 --------------------------------------------------------------------------------
-checkIDataDecl :: IDataDecl -> DeclCheckM Span ()
-checkIDataDecl d = do
-  -- liftIO $ putStrLn (render $ ppIDataDecl d)
+processIDataDecl :: IDataDecl -> DeclCheckM Span ()
+processIDataDecl d = do
+  foldM_ checkParameterName S.empty (dataParameters d)
 
-  -- FIXME: check all the constructors and stuff for shadowing and incorrect names
+  -- Check the constructors for duplicate names, shadowing and
+  -- correctness of parameter names. Does not check for any type
+  -- correctness.
+  foldM_ (checkConstructor d) S.empty (dataConstructors d)
 
+  -- Generate the description of this datatype
   let codeName = dataName d <+> ":code"
       codeType = paramsType   (dataParameters d) [] (descType d)
       code     = paramsLambda (dataParameters d) [] (makeCode d)
   checkInternalDefinition pDefault codeName codeType code
 
+  -- Generate the type itself
   let typ = paramsType   (dataParameters d) [] (makeMuTy d)
       trm = paramsLambda (dataParameters d) [] (makeMu d)
   checkInternalDefinition pDefault (dataName d) typ trm
 
+  -- Generate the functions for each of the constructors
   makeConstructors d id (dataConstructors d)
 
 --------------------------------------------------------------------------------
--- FIXME: instead of regenerating the code, generate a call back to it
+checkParameterName :: S.Set Ident ->
+                      (Ident, TermPos) ->
+                      DeclCheckM Span (S.Set Ident)
+checkParameterName usedNames (paramName, _) = do
+  when (paramName `S.member` usedNames) $ reportError pDefault (DuplicateParameterName paramName)
+  return (S.insert paramName usedNames)
+
+--------------------------------------------------------------------------------
+checkConstructor :: IDataDecl ->
+                    S.Set Ident ->
+                    IConstructor ->
+                    DeclCheckM Span (S.Set Ident)
+checkConstructor d usedNames (IConstructor nm components) = do
+  -- FIXME: get the proper location
+  when (nm `S.member` usedNames) $ reportError pDefault (DuplicateConstructorName nm)
+  checkConstructorsBits d components
+  return (S.insert nm usedNames)
+
+checkConstructorsBits :: IDataDecl ->
+                         IConstructorBits ->
+                         DeclCheckM Span ()
+checkConstructorsBits d (ConsPi nm t bits) = do
+  when (nm == dataName d) $ reportError pDefault ShadowingDatatypeName
+  when (nm `elem` (map fst $ dataParameters d)) $ reportError pDefault ShadowingParameterName
+  checkConstructorsBits d bits
+checkConstructorsBits d (ConsArr t bits) = do
+  -- FIXME: extract the recursive call if it exists and check to see
+  -- whether it properly uses the parameter names
+  checkConstructorsBits d bits
+checkConstructorsBits d (ConsEnd nm ts) = do
+  unless (nm == dataName d) $ reportError pDefault (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
+  findNonMatching ts (map fst $ dataParameters d)
+
+findNonMatching :: [TermPos] -> [Ident] -> DeclCheckM Span ()
+findNonMatching [x]      []     = return ()
+findNonMatching [x]      _      = reportError pDefault NotEnoughArgumentsForDatatype
+findNonMatching (a:args) (p:ps) =
+    case a of
+      Annot pos (Var arg) -> do
+             when (arg /= p) $ reportError pos (NonMatchingParameterArgument arg p)
+             findNonMatching args ps
+      Annot pos _         -> do
+             reportError pos (IllFormedArgument p)
+findNonMatching _        []     = reportError pDefault TooManyArgumentsForDatatype
+findNonMatching []       _      = reportError pDefault NotEnoughArgumentsForDatatype
+
+--------------------------------------------------------------------------------
+-- FIXME: instead of regenerating the code, generate a reference to it
 makeMuTy d bv = pDefault @| LN.Pi Nothing idxType (pDefault @| LN.Set 0)
     where idxType = LN.toLocallyNameless (dataIndexType d) bv
 
@@ -75,7 +128,7 @@ codeBody d bv idxVar []       =
       descType = pDefault @| LN.App (pDefault @| LN.IDesc) idxType
       idxType  = LN.toLocallyNameless (dataIndexType d) bv
 codeBody d bv idxVar [constr] =
-    fromJust $ consCode d bits bv idxVar
+    consCode d bits bv idxVar
     where
       IConstructor nm bits = constr
 codeBody d bv idxVar (constr:constrs) =
@@ -84,8 +137,9 @@ codeBody d bv idxVar (constr:constrs) =
       IConstructor nm bits = constr
 
       discrimVar = pDefault @| LN.Bound 0
-      resultType = pDefault @| LN.App (pDefault @| LN.IDesc) (LN.toLocallyNameless (dataIndexType d) (Nothing:bv))
-      thisCase   = fromJust $ consCode d bits (Nothing:bv) (idxVar+1)
+      idxType    = LN.toLocallyNameless (dataIndexType d) (Nothing:bv)
+      resultType = pDefault @| LN.App (pDefault @| LN.IDesc) idxType
+      thisCase   = consCode d bits (Nothing:bv) (idxVar+1)
       otherCases = codeBody d (Nothing:bv) (idxVar+1) constrs
 
 --------------------------------------------------------------------------------
@@ -149,32 +203,24 @@ consType (ConsEnd nm ts)    bv = foldl doArg hd ts
           doArg t arg = pDefault @| LN.App t (LN.toLocallyNameless arg bv)
 
 --------------------------------------------------------------------------------
-consCode :: Monad m =>
-            IDataDecl
+consCode :: IDataDecl
          -> IConstructorBits
          -> [Maybe Ident]
          -> Int
-         -> m (AnnotRec Span LN.TermCon)
-consCode d (ConsPi nm t bits) bv idxVar = do
-  -- FIXME: check for shadowing of the name of the datatype, and of
-  -- the parameters
-  code <- consCode d bits (Just nm:bv) (idxVar+1)
-  let t' = LN.toLocallyNameless t bv
-  return (pDefault @| LN.IDesc_Sg t' (pDefault @| LN.Lam nm code))
+         -> AnnotRec Span LN.TermCon
+consCode d (ConsPi nm t bits) bv idxVar = pDefault @| LN.IDesc_Sg t' (pDefault @| LN.Lam nm code)
+    where t'   = LN.toLocallyNameless t bv
+          code = consCode d bits (Just nm:bv) (idxVar+1)
 
-consCode d (ConsArr t bits)   bv idxVar = do
-  let t'         = LN.toLocallyNameless t bv
-  let codeDom    = (pDefault @| LN.Desc_K t') `fromMaybe` (extractRecursiveCall d t')
-  code <- consCode d bits bv idxVar
-  return (pDefault @| LN.Desc_Prod codeDom code)
+consCode d (ConsArr t bits)   bv idxVar = pDefault @| LN.Desc_Prod codeDom code
+    where t'      = LN.toLocallyNameless t bv
+          codeDom = (pDefault @| LN.Desc_K t') `fromMaybe` (extractRecursiveCall d t')
+          code    = consCode d bits bv idxVar
 
-consCode d (ConsEnd nm ts)    bv idxVar = do
-  unless (nm == dataName d) $ fail "wrong name" -- FIXME: proper error
-  let args = reverse ts
-  -- FIXME: check all the parameters against the names
-  let idx    = pDefault @| LN.Bound idxVar
-      idxVal = LN.toLocallyNameless (head args) bv -- FIXME: handle types with no index
-  return (pDefault @| LN.Desc_K (pDefault @| LN.Eq idxVal idx))
+consCode d (ConsEnd nm ts)    bv idxVar = pDefault @| LN.Desc_K (pDefault @| LN.Eq idxVal idx)
+    where args   = reverse ts
+          idx    = pDefault @| LN.Bound idxVar
+          idxVal = LN.toLocallyNameless (head args) bv -- FIXME: handle types with no index
 
 --------------------------------------------------------------------------------
 -- Extracts a recursive call to the datatype currently being defined

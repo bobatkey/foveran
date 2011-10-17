@@ -39,6 +39,17 @@ data TypeError
     | ElimEqCanOnlyHandleHomogenousEq Context Value Value
     | ExpectingEqualityType       Context Value
 
+      -- Data declaration errors
+    | DuplicateParameterName      Ident
+    | DuplicateConstructorName    Ident
+    | ShadowingDatatypeName
+    | ShadowingParameterName
+    | ConstructorTypesMustEndWithNameOfDatatype Ident Ident
+    | NonMatchingParameterArgument Ident Ident
+    | IllFormedArgument            Ident
+    | TooManyArgumentsForDatatype
+    | NotEnoughArgumentsForDatatype
+
 ppType :: Context -> Value -> Doc
 ppType ctxt v =
   ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reifyType0 v
@@ -119,3 +130,23 @@ ppTypeError (ExpectingEqualityType ctxt ty)
     = "Expecting term to have type"
       $$ nest 4 (ppType ctxt ty)
       $$ "but this term generates equalities"
+
+-- IDataDecl errors
+ppTypeError (DuplicateConstructorName ident)
+    = "Duplicate constructor name: '" <> ppIdent ident <> "'"
+ppTypeError (DuplicateParameterName ident)
+    = "Duplicate parameter name: '" <> ppIdent ident <> "'"
+ppTypeError (ShadowingDatatypeName)
+    = "Shadowing of the data type's name in constructor definition"
+ppTypeError (ShadowingParameterName)
+    = "Shadowing of a parameter name in constructor definition"
+ppTypeError (ConstructorTypesMustEndWithNameOfDatatype givenNm expectedNm)
+    = "Constructor types must end with the name of the datatype being defined '" <> ppIdent expectedNm <> "', not '" <> ppIdent givenNm <> "'"
+ppTypeError (NonMatchingParameterArgument givenNm expectedNm)
+    = "Parameter argument has incorrect name: should be '" <> ppIdent expectedNm <> "', not '" <> ppIdent givenNm <> "'"
+ppTypeError (IllFormedArgument expectedNm)
+    = "Ill-formed parameter argument: should be '" <> ppIdent expectedNm <> "'"
+ppTypeError (TooManyArgumentsForDatatype)
+    = "Too many arguments for data type in constructor declaration"
+ppTypeError (NotEnoughArgumentsForDatatype)
+    = "Not enough arguments for data type in constructor declaration"

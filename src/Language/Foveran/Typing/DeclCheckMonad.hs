@@ -3,6 +3,7 @@
 module Language.Foveran.Typing.DeclCheckMonad
     ( DeclCheckM ()
     , extend
+    , reportError
     , liftTyCheck
     , evaluate
     , getContext -- FIXME: try to get rid of this
@@ -52,6 +53,10 @@ instance Monad (DeclCheckM p) where
 
 getContext :: DeclCheckM p Context
 getContext = DM $ \c -> return (Right (c,c))
+
+-- FIXME: consider splitting out the IDataDecl errors from the type errors
+reportError :: p -> TypeError -> DeclCheckM p a
+reportError p err = DM $ \ctxt -> return (Left (p,TypeError err))
 
 liftTyCheck :: (Context -> TypingMonad p a) -> DeclCheckM p a
 liftTyCheck f = DM $ \ctxt -> case f ctxt of

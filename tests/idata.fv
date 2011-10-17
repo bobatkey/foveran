@@ -3,11 +3,87 @@ data Nat : Unit → Set where
   ; succ : Nat () → Nat ()
   };
 
+data List (A : Set) : Unit → Set where
+  { nil  : List A ()
+  ; cons : A → List A () → List A ()
+  };
+
 data Vector (A : Set) : Nat () → Set where
   { vnil  : Vector A zero
   ; vcons : (n : Nat ()) → A → Vector A n → Vector A (succ n)
   };
 
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
+semI I D X = elimID I (λD. Set 2)
+                    (λi. X i)
+                    (λA. A)
+                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
+                    (λA D semD. (a : A) × semD a)
+                    (λA D semD. (a : A) → semD a)
+                    D;
+
+Vector:body : Set → Nat () → Unit + Unit → IDesc (Nat ());
+Vector:body α n b =
+  case b for b. IDesc (Nat ()) with
+    { inl u. “K” (zero ≡ n)
+    ; inr u. “Σ” (Nat ()) (λn'. “K”α “×” “IId” n' “×” “K”(succ n' ≡ n))
+    };
+
+h :
+  (α : Set) →
+  (Φ : (n : Nat ()) → Vector α n → Set 2) →
+  Φ zero (vnil α) →
+  ((n : Nat ()) → (a : α) → (xs : Vector α n) → Φ n xs → Φ (succ n) (vcons α n a xs)) →
+
+  (n  : Nat ()) →
+  (xs : semI (Nat ()) (Vector:code α n) (λn. Vector α n)) →
+  (φ  : liftI (Nat ()) (Vector:code α n) (λn. Vector α n) Φ xs) →
+  Φ n (construct xs);
+h α Φ φnil φcons =
+    λn x.
+      case fst x for b. (z : semI (Nat ()) (Vector:body α n b) (λn. Vector α n)) →
+                        liftI (Nat ()) (Vector:body α n b) (λn. Vector α n) Φ z →
+                        Φ n (construct «b,z») with
+        { inl u. λz φ.
+            elimEq z
+               for n p. Φ n (construct «inl (), p»)
+              with φnil
+        ; inr u. λz φ.
+            elimEq snd (snd (snd z))
+               for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p»)
+              with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst (snd φ)))
+        } (snd x);
+
+Vector:elim :
+  (α : Set) →
+  (Φ : (n : Nat ()) → Vector α n → Set 2) →
+  Φ zero (vnil α) →
+  ((n : Nat ()) → (a : α) → (xs : Vector α n) → Φ n xs → Φ (succ n) (vcons α n a xs)) →
+  (n : Nat ()) →
+  (xs : Vector α n) →
+  Φ n xs;
+Vector:elim α Φ φnil φcons n xs =
+  inductionI (Nat ()) (Vector:code α) Φ
+    (h α Φ φnil φcons)
+    n
+    xs;
+
+–normalise Vector:elim;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+data regexp : Unit -> Set where
+  { eps  : regexp ()
+  ; emp  : regexp ()
+  ; alt  : regexp () → regexp () → regexp ()
+  ; seq  : regexp () → regexp () → regexp ()
+  ; star : regexp () → regexp ()
+  ; tok  : (Unit + Unit) → regexp ()
+  };
+
+– normalise regexp:code;
+
+{-
 data Fin : Nat () → Set where
   { fz : (n : Nat ()) → Fin (succ n)
   ; fs : (n : Nat ()) → Fin n → Fin (succ n)
@@ -19,14 +95,19 @@ data Foo : Unit → Set where
   ; foo3 : Foo ()
   ; foo4 : Foo () → Foo ()
   };
-
-{-
-assume lt : Nat → Nat → Set;
-
-data Acc : Nat → Set where
-  { acc : (n : Nat) → ((n' : Nat) → lt n' n → Acc n') → Acc n
-  };
 -}
+
+assume lt : Nat () → Nat () → Set;
+
+data Acc : Nat () → Set where
+  { acc : (n : Nat ()) → ((n' : Nat ()) → lt n' n → Acc n') → Acc n
+  };
+
+data Acc2 (A : Set) (lt : A → A → Set) : A → Set where
+  { acc2 : (a : A) → ((a' : A) → lt a' a → Acc2 A lt a') → Acc2 A lt a
+  };
+
+normalise acc2;
 
 data Emp : Nat () → Set where
   { };
