@@ -16,7 +16,7 @@ import Language.Foveran.Typing.Checker
 import Language.Foveran.Typing.Errors
 import Language.Foveran.Typing.Context
 
-doNormalise :: DS.TermPos -> DeclCheckM Span ()
+doNormalise :: DS.TermPos -> DeclCheckM ()
 doNormalise tmDS = do
   let tm = toLocallyNamelessClosed tmDS
   (ty,c) <- liftTyCheck $ tySynth tm

@@ -21,7 +21,7 @@ pDefault = Span initPos initPos -- FIXME: get these from the IConstructorBits
 (@|) p t = Annot p t
 
 --------------------------------------------------------------------------------
-processIDataDecl :: IDataDecl -> DeclCheckM Span ()
+processIDataDecl :: IDataDecl -> DeclCheckM ()
 processIDataDecl d = do
   foldM_ checkParameterName S.empty (dataParameters d)
 
@@ -47,7 +47,7 @@ processIDataDecl d = do
 --------------------------------------------------------------------------------
 checkParameterName :: S.Set Ident ->
                       (Ident, TermPos) ->
-                      DeclCheckM Span (S.Set Ident)
+                      DeclCheckM (S.Set Ident)
 checkParameterName usedNames (paramName, _) = do
   when (paramName `S.member` usedNames) $ reportError pDefault (DuplicateParameterName paramName)
   return (S.insert paramName usedNames)
@@ -56,7 +56,7 @@ checkParameterName usedNames (paramName, _) = do
 checkConstructor :: IDataDecl ->
                     S.Set Ident ->
                     IConstructor ->
-                    DeclCheckM Span (S.Set Ident)
+                    DeclCheckM (S.Set Ident)
 checkConstructor d usedNames (IConstructor nm components) = do
   -- FIXME: get the proper location
   when (nm `S.member` usedNames) $ reportError pDefault (DuplicateConstructorName nm)
@@ -65,7 +65,7 @@ checkConstructor d usedNames (IConstructor nm components) = do
 
 checkConstructorsBits :: IDataDecl ->
                          IConstructorBits ->
-                         DeclCheckM Span ()
+                         DeclCheckM ()
 checkConstructorsBits d (ConsPi nm t bits) = do
   when (nm == dataName d) $ reportError pDefault ShadowingDatatypeName
   when (nm `elem` (map fst $ dataParameters d)) $ reportError pDefault ShadowingParameterName
@@ -78,7 +78,7 @@ checkConstructorsBits d (ConsEnd nm ts) = do
   unless (nm == dataName d) $ reportError pDefault (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
   findNonMatching ts (map fst $ dataParameters d)
 
-findNonMatching :: [TermPos] -> [Ident] -> DeclCheckM Span ()
+findNonMatching :: [TermPos] -> [Ident] -> DeclCheckM ()
 findNonMatching [x]      []     = return ()
 findNonMatching [x]      _      = reportError pDefault NotEnoughArgumentsForDatatype
 findNonMatching (a:args) (p:ps) =

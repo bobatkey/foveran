@@ -4,8 +4,6 @@ module Language.Foveran.Typing
     ( checkDeclarations )
     where
 
-import Text.Position (Span)
-
 import Language.Foveran.Syntax.Display (Declaration (..), Datatype (..))
 import Language.Foveran.Typing.DeclCheckMonad
 import Language.Foveran.Typing.Assume ( processAssumeDecl )
@@ -24,14 +22,14 @@ checkDeclarations decls =
       mapM_ checkDecl decls
 
 -- FIXME: move this (or make it obsolete)
-checkDatatype :: Datatype -> DeclCheckM Span ()
+checkDatatype :: Datatype -> DeclCheckM ()
 checkDatatype d =
     do checkDefinition (genDesc d)
        checkDefinition (genDatatypeCarrier d)
        mapM_ checkDefinition (genConstructors d)
 
 
-checkDecl :: Declaration -> DeclCheckM Span ()
+checkDecl :: Declaration -> DeclCheckM ()
 checkDecl (AssumptionDecl a) = processAssumeDecl a
 checkDecl (DefinitionDecl d) = checkDefinition d
 checkDecl (DatatypeDecl d)   = checkDatatype d
