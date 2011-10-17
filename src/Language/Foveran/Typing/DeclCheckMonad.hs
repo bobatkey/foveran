@@ -14,8 +14,9 @@ module Language.Foveran.Typing.DeclCheckMonad
     )
     where
 
-import Control.Monad (unless)
-
+import Control.Applicative
+import Control.Monad (unless, ap)
+import Data.Traversable (traverse)
 import Data.Text as T (unpack)
 import Text.Position
 
@@ -50,6 +51,13 @@ instance Monad (DeclCheckM p) where
                                   Left error      -> return $ Left error
                                   Right (a,ctxt') -> let DM t' = f a
                                                      in t' ctxt'
+
+instance Functor (DeclCheckM p) where
+    fmap = liftA
+
+instance Applicative (DeclCheckM p) where
+    pure  = return
+    (<*>) = ap
 
 getContext :: DeclCheckM p Context
 getContext = DM $ \c -> return (Right (c,c))
@@ -87,15 +95,15 @@ checkDefinition (Definition p nm extTy nm' extTm) =
                    putStrLn ""
        let ty = toLocallyNamelessClosed extTy
            tm = toLocallyNamelessClosed extTm
-       checkInternalDefinition p nm ty tm
+       checkInternalDefinition p nm ty (Just tm)
 
-checkInternalDefinition :: Span -> Ident -> LN.TermPos -> LN.TermPos -> DeclCheckM Span ()
+checkInternalDefinition :: Span -> Ident -> LN.TermPos -> Maybe LN.TermPos -> DeclCheckM Span ()
 checkInternalDefinition p nm ty tm = do
   (_, cTy) <- liftTyCheck $ setCheck ty
   vTy      <- evaluate cTy
-  cTm      <- liftTyCheck $ flip (tyCheck tm) vTy -- FIXME: get rid of this flip
-  vTm      <- evaluate cTm
-  extend p nm vTy (Just vTm)
+  cTm      <- traverse (\tm -> liftTyCheck $ flip (tyCheck tm) vTy) tm -- FIXME: get rid of this flip
+  vTm      <- traverse evaluate cTm
+  extend p nm vTy vTm
   
 
 runDeclCheckM :: DeclCheckM Span () -> IO ()

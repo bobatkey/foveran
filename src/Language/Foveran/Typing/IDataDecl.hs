@@ -34,12 +34,12 @@ processIDataDecl d = do
   let codeName = dataName d <+> ":code"
       codeType = paramsType   (dataParameters d) [] (descType d)
       code     = paramsLambda (dataParameters d) [] (makeCode d)
-  checkInternalDefinition pDefault codeName codeType code
+  checkInternalDefinition pDefault codeName codeType (Just code)
 
   -- Generate the type itself
   let typ = paramsType   (dataParameters d) [] (makeMuTy d)
       trm = paramsLambda (dataParameters d) [] (makeMu d)
-  checkInternalDefinition pDefault (dataName d) typ trm
+  checkInternalDefinition pDefault (dataName d) typ (Just trm)
 
   -- Generate the functions for each of the constructors
   makeConstructors d id (dataConstructors d)
@@ -170,7 +170,7 @@ makeConstructor d nameCode constr = do
   let IConstructor nm xs = constr
       typ = paramsType   (dataParameters d) [] (consType xs)
       trm = paramsLambda (dataParameters d) [] (const $ consTerm nameCode xs)
-  checkInternalDefinition pDefault nm typ trm
+  checkInternalDefinition pDefault nm typ (Just trm)
 
 --------------------------------------------------------------------------------
 consTerm :: LN.TermPos

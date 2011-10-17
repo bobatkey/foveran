@@ -2,6 +2,7 @@
 
 module Language.Foveran.Syntax.Display
     ( Ident
+    , AssumeDecl (..)
     , Definition (..)
     , Datatype (..)
     , Constructor (..)
@@ -26,11 +27,16 @@ data Datatype =
     Datatype Span Ident [(Ident,TermPos)] [Constructor]
 
 data Declaration
-    = AssumptionDecl Span Ident TermPos
+    = AssumptionDecl AssumeDecl
     | DefinitionDecl Definition
     | DatatypeDecl   Datatype
     | IDataDecl      IDataDecl
     | Normalise      TermPos
+
+data AssumeDecl = Assume { assumePos   :: Span
+                         , assumeIdent :: Ident
+                         , assumeTerm  :: TermPos
+                         }
 
 data IDataDecl
     = IData { dataName         :: Ident

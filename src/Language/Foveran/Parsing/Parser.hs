@@ -49,7 +49,7 @@ file = declarations <* eos
 
 declaration :: Parser Tok.Token Declaration
 declaration =
-    (\p nm t p' -> AssumptionDecl (makeSpan p p') nm t)
+    (\p nm t p' -> AssumptionDecl (Assume (makeSpan p p') nm t))
         <$> token Tok.Assume
         <*  commit
         <*> identifier
