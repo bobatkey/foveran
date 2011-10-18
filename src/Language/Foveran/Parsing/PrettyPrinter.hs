@@ -94,7 +94,7 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
     where
       doc = ("data" <+>
              ppIdent (dataName d) <+>
-             hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | (_,nm,t) <- dataParameters d ] <+>
+             hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | DataParameter _ nm t <- dataParameters d ] <+>
              ":" <+> fromDoc (ppAnnotTermLev 9 (dataIndexType d)) <+> "→" <+> "Set" <+> "where")
             $$ nest 2 (doConstructors (dataConstructors d))
 

@@ -14,7 +14,7 @@ import           Language.Foveran.Typing.Errors
 import           Language.Foveran.Syntax.Display
 import           Language.Foveran.Syntax.Identifier ((<+>))
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
-import           Text.Position (Span (..), initPos, makeSpan)
+import           Text.Position (Span (..), makeSpan)
 
 --------------------------------------------------------------------------------
 (@|) p t = Annot p t
@@ -44,9 +44,9 @@ processIDataDecl d = do
   makeConstructors d id (dataConstructors d)
 
 --------------------------------------------------------------------------------
-checkParameterName :: (Span, Ident, TermPos) ->
+checkParameterName :: DataParameter ->
                       StateT (S.Set Ident) DeclCheckM ()
-checkParameterName (pos, paramName, _) = do
+checkParameterName (DataParameter pos paramName _) = do
   usedNames <- get
   when (paramName `S.member` usedNames) $ lift $ reportError pos (DuplicateParameterName paramName)
   put (S.insert paramName usedNames)
@@ -68,7 +68,7 @@ checkConstructorsBits :: IDataDecl ->
                          DeclCheckM ()
 checkConstructorsBits d (Annot p (ConsPi nm t bits)) = do
   when (nm == dataName d) $ reportError p ShadowingDatatypeName
-  when (nm `elem` (map snd3 $ dataParameters d)) $ reportError p ShadowingParameterName
+  when (nm `elem` (map paramIdent $ dataParameters d)) $ reportError p ShadowingParameterName
   checkConstructorsBits d bits
 checkConstructorsBits d (Annot p (ConsArr t bits)) = do
   -- FIXME: extract the recursive call if it exists and check to see
@@ -76,7 +76,7 @@ checkConstructorsBits d (Annot p (ConsArr t bits)) = do
   checkConstructorsBits d bits
 checkConstructorsBits d (Annot p (ConsEnd nm ts)) = do
   unless (nm == dataName d) $ reportError p (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
-  checkParameters p ts (map snd3 $ dataParameters d)
+  checkParameters p ts (map paramIdent $ dataParameters d)
 
 checkParameters :: Span -> [TermPos] -> [Ident] -> DeclCheckM ()
 checkParameters pos [x]      []     = return ()
@@ -178,22 +178,24 @@ makeConstructors d consNameCode (constr:constrs) = do
   makeConstructors d (consNameCode . (\x -> consPos constr @| LN.Inr x)) constrs
 
 --------------------------------------------------------------------------------
-paramsType :: [(Span,Ident,TermPos)] ->
+paramsType :: [DataParameter] ->
               [Maybe Ident] ->
               ([Maybe Ident] -> LN.TermPos) ->
               LN.TermPos
-paramsType []               bv tm = tm bv
-paramsType ((pos,nm,ty):xs) bv tm = pos @| LN.Pi (Just nm) tyDom tyCod
-    where tyDom = LN.toLocallyNameless ty bv
-          tyCod = paramsType xs (Just nm:bv) tm
+paramsType []             bv tm = tm bv
+paramsType (param:params) bv tm = pos @| LN.Pi (Just nm) tyDom tyCod
+    where DataParameter pos nm ty = param
+          tyDom = LN.toLocallyNameless ty bv
+          tyCod = paramsType params (Just nm:bv) tm
 
-paramsLambda :: [(Span,Ident,TermPos)] ->
+paramsLambda :: [DataParameter] ->
                 [Maybe Ident] ->
                 ([Maybe Ident] -> LN.TermPos) ->
                 LN.TermPos
-paramsLambda []               bv tm = tm bv
-paramsLambda ((pos,nm,ty):xs) bv tm = pos @| LN.Lam nm tmCod
-    where tmCod = paramsLambda xs (Just nm:bv) tm
+paramsLambda []             bv tm = tm bv
+paramsLambda (param:params) bv tm = pos @| LN.Lam nm tmCod
+    where DataParameter pos nm ty = param
+          tmCod = paramsLambda params (Just nm:bv) tm
 
 --------------------------------------------------------------------------------
 makeConstructor :: IDataDecl ->

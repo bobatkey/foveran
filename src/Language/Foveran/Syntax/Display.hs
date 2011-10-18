@@ -12,6 +12,7 @@ module Language.Foveran.Syntax.Display
     , Constructor (..)
 
     , IDataDecl (..)
+    , DataParameter (..)
     , IConstructor (..)
     , IConstructorBitsPos
     , IConstructorBitsCon (..)
@@ -61,10 +62,16 @@ data Definition =
 data IDataDecl =
     IData { dataPos          :: Span
           , dataName         :: Ident
-          , dataParameters   :: [(Span, Ident,TermPos)]
+          , dataParameters   :: [DataParameter]
           , dataIndexType    :: TermPos
           , dataConstructors :: [IConstructor]
           }
+
+data DataParameter =
+    DataParameter { paramPos   :: Span
+                  , paramIdent :: Ident
+                  , paramType  :: TermPos
+                  }
 
 data IConstructor =
     IConstructor { consPos  :: Span

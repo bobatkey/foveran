@@ -70,7 +70,7 @@ declaration =
          DatatypeDecl $ Datatype (makeSpan p p') nm params constructors)
         <$> token Tok.Data
         <*> identifier
-        <*> ((map (\(_,nm,t) -> (nm,t))) <$> dataParamList)
+        <*> ((map (\p -> (paramIdent p,paramType p))) <$> dataParamList)
         <*  token Tok.Colon
         <*  token Tok.Set
         <*  token Tok.ColonEquals
@@ -82,9 +82,9 @@ declaration =
     <*> term
     <*> token Tok.Semicolon
 
-dataParamList :: Parser Tok.Token [(Span,Ident,TermPos)]
+dataParamList :: Parser Tok.Token [DataParameter]
 dataParamList =
-    (\pl nm t pr params -> (makeSpan pl pr, nm, t) : params)
+    (\pl nm t pr params -> DataParameter (makeSpan pl pr) nm t : params)
         <$> token Tok.LParen
         <*> identifier
         <*  token Tok.Colon
