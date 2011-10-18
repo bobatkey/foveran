@@ -14,11 +14,9 @@ import           Language.Foveran.Typing.Errors
 import           Language.Foveran.Syntax.Display
 import           Language.Foveran.Syntax.Identifier ((<+>))
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
-import           Text.Position (Span (..), initPos)
+import           Text.Position (Span (..), initPos, makeSpan)
 
 --------------------------------------------------------------------------------
-pDefault = Span initPos initPos -- FIXME: get these from the IConstructorBits
-
 (@|) p t = Annot p t
 
 --------------------------------------------------------------------------------
@@ -35,98 +33,104 @@ processIDataDecl d = do
   let codeName = dataName d <+> ":code"
       codeType = paramsType   (dataParameters d) [] (descType d)
       code     = paramsLambda (dataParameters d) [] (makeCode d)
-  checkInternalDefinition pDefault codeName codeType (Just code)
+  checkInternalDefinition (dataPos d) codeName codeType (Just code)
 
   -- Generate the type itself
   let typ = paramsType   (dataParameters d) [] (makeMuTy d)
       trm = paramsLambda (dataParameters d) [] (makeMu d)
-  checkInternalDefinition pDefault (dataName d) typ (Just trm)
+  checkInternalDefinition (dataPos d) (dataName d) typ (Just trm)
 
   -- Generate the functions for each of the constructors
   makeConstructors d id (dataConstructors d)
 
 --------------------------------------------------------------------------------
-checkParameterName :: (Ident, TermPos) ->
+checkParameterName :: (Span, Ident, TermPos) ->
                       StateT (S.Set Ident) DeclCheckM ()
-checkParameterName (paramName, _) = do
+checkParameterName (pos, paramName, _) = do
   usedNames <- get
-  when (paramName `S.member` usedNames) $ lift $ reportError pDefault (DuplicateParameterName paramName)
+  when (paramName `S.member` usedNames) $ lift $ reportError pos (DuplicateParameterName paramName)
   put (S.insert paramName usedNames)
 
 --------------------------------------------------------------------------------
 checkConstructor :: IDataDecl ->
                     IConstructor ->
                     StateT (S.Set Ident) DeclCheckM ()
-checkConstructor d (IConstructor nm components) = do
+checkConstructor d (IConstructor p nm components) = do
   usedNames <- get
-  when (nm `S.member` usedNames) $ lift $ reportError pDefault (DuplicateConstructorName nm)
+  when (nm `S.member` usedNames) $ lift $ reportError p (DuplicateConstructorName nm)
   lift $ checkConstructorsBits d components
   put (S.insert nm usedNames)
 
+snd3 (_,b,_) = b -- FIXME: remove this
+
 checkConstructorsBits :: IDataDecl ->
-                         IConstructorBits ->
+                         IConstructorBitsPos ->
                          DeclCheckM ()
-checkConstructorsBits d (ConsPi nm t bits) = do
-  when (nm == dataName d) $ reportError pDefault ShadowingDatatypeName
-  when (nm `elem` (map fst $ dataParameters d)) $ reportError pDefault ShadowingParameterName
+checkConstructorsBits d (Annot p (ConsPi nm t bits)) = do
+  when (nm == dataName d) $ reportError p ShadowingDatatypeName
+  when (nm `elem` (map snd3 $ dataParameters d)) $ reportError p ShadowingParameterName
   checkConstructorsBits d bits
-checkConstructorsBits d (ConsArr t bits) = do
+checkConstructorsBits d (Annot p (ConsArr t bits)) = do
   -- FIXME: extract the recursive call if it exists and check to see
   -- whether it properly uses the parameter names
   checkConstructorsBits d bits
-checkConstructorsBits d (ConsEnd nm ts) = do
-  unless (nm == dataName d) $ reportError pDefault (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
-  checkParameters ts (map fst $ dataParameters d)
+checkConstructorsBits d (Annot p (ConsEnd nm ts)) = do
+  unless (nm == dataName d) $ reportError p (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
+  checkParameters p ts (map snd3 $ dataParameters d)
 
-checkParameters :: [TermPos] -> [Ident] -> DeclCheckM ()
-checkParameters [x]      []     = return ()
-checkParameters [x]      _      = reportError pDefault NotEnoughArgumentsForDatatype
-checkParameters (a:args) (p:ps) =
+checkParameters :: Span -> [TermPos] -> [Ident] -> DeclCheckM ()
+checkParameters pos [x]      []     = return ()
+checkParameters pos [x]      _      = reportError pos NotEnoughArgumentsForDatatype
+checkParameters pos (a:args) (p:ps) =
     case a of
-      Annot pos (Var arg) -> do
-             when (arg /= p) $ reportError pos (NonMatchingParameterArgument arg p)
-             checkParameters args ps
-      Annot pos _         -> do
-             reportError pos (IllFormedArgument p)
-checkParameters _        []     = reportError pDefault TooManyArgumentsForDatatype
-checkParameters []       _      = reportError pDefault NotEnoughArgumentsForDatatype
+      Annot pos' (Var arg) -> do
+             when (arg /= p) $ reportError pos' (NonMatchingParameterArgument arg p)
+             checkParameters pos args ps
+      Annot pos' _         -> do
+             reportError pos' (IllFormedArgument p)
+checkParameters pos _        []     = reportError pos TooManyArgumentsForDatatype
+checkParameters pos []       _      = reportError pos NotEnoughArgumentsForDatatype
 
 --------------------------------------------------------------------------------
 makeMuTy :: IDataDecl ->
             [Maybe Ident] ->
             LN.TermPos
-makeMuTy d bv = pDefault @| LN.Pi Nothing idxType (pDefault @| LN.Set 0)
-    where idxType = LN.toLocallyNameless (dataIndexType d) bv
+makeMuTy d bv = pos @| LN.Pi Nothing idxType (pos @| LN.Set 0)
+    where pos     = dataPos d
+          idxType = LN.toLocallyNameless (dataIndexType d) bv
 
 -- FIXME: instead of regenerating the code, generate a reference to it
 makeMu :: IDataDecl ->
           [Maybe Ident] ->
           LN.TermPos
-makeMu d bv = pDefault @| LN.MuI idxType code
-    where idxType = LN.toLocallyNameless (dataIndexType d) bv
+makeMu d bv = pos @| LN.MuI idxType code
+    where pos     = dataPos d
+          idxType = LN.toLocallyNameless (dataIndexType d) bv
           code    = makeCode d bv
 
 --------------------------------------------------------------------------------
 descType :: IDataDecl -> [Maybe Ident] -> LN.TermPos
-descType d bv = pDefault @| LN.Pi Nothing idxType1 (pDefault @| LN.App (pDefault @| LN.IDesc) idxType2)
-    where idxType1 = LN.toLocallyNameless (dataIndexType d) bv
+descType d bv = pos @| LN.Pi Nothing idxType1 (pos @| LN.App (pos @| LN.IDesc) idxType2)
+    where pos      = dataPos d
+          idxType1 = LN.toLocallyNameless (dataIndexType d) bv
           idxType2 = LN.toLocallyNameless (dataIndexType d) (Nothing:bv)
 
 --------------------------------------------------------------------------------
 -- generate the big sum type to name the constructors
-namesSumType :: [IConstructor] -> LN.TermPos
-namesSumType []     = pDefault @| LN.Empty
-namesSumType [x]    = pDefault @| LN.Unit
-namesSumType (x:xs) = pDefault @| LN.Sum (pDefault @| LN.Unit) (namesSumType xs)
+namesSumType :: Span -> [IConstructor] -> LN.TermPos
+namesSumType pos []     = pos @| LN.Empty
+namesSumType pos [x]    = pos @| LN.Unit
+namesSumType pos (x:xs) = pos @| LN.Sum (pos @| LN.Unit) (namesSumType pos xs)
 
 --------------------------------------------------------------------------------
 makeCode :: IDataDecl ->
             [Maybe Ident] ->
             LN.TermPos
-makeCode d bv = pDefault @| LN.Lam "i" (pDefault @| LN.IDesc_Sg namesTy body)
+makeCode d bv = pos @| LN.Lam "i" (pos @| LN.IDesc_Sg namesTy body)
     where
-      namesTy = namesSumType (dataConstructors d)
-      body    = pDefault @| LN.Lam "d" (codeBody d (Nothing:Nothing:bv) 1 (dataConstructors d))
+      pos     = dataPos d
+      namesTy = namesSumType pos (dataConstructors d)
+      body    = pos @| LN.Lam "d" (codeBody d (Nothing:Nothing:bv) 1 (dataConstructors d))
 
 -- expects that the bound variables include the parameters, the index
 -- variable and the discriminator at position 0
@@ -136,23 +140,25 @@ codeBody :: IDataDecl ->
             [IConstructor] ->
             LN.TermPos
 codeBody d bv idxVar []       =
-    pDefault @| LN.App (pDefault @| LN.App (pDefault @| LN.ElimEmpty) descType)
-                       (pDefault @| LN.Bound 0)
+    -- Special case when we have no constructors
+    pos @| LN.App (pos @| LN.App (pos @| LN.ElimEmpty) descType)
+                  (pos @| LN.Bound 0)
     where
-      descType = pDefault @| LN.App (pDefault @| LN.IDesc) idxType
+      pos      = dataPos d
+      descType = pos @| LN.App (pos @| LN.IDesc) idxType
       idxType  = LN.toLocallyNameless (dataIndexType d) bv
 codeBody d bv idxVar [constr] =
     consCode d bits bv idxVar
     where
-      IConstructor nm bits = constr
+      IConstructor p nm bits = constr
 codeBody d bv idxVar (constr:constrs) =
-    pDefault @| LN.Case discrimVar "x" resultType "a" thisCase "b" otherCases
+    p @| LN.Case discrimVar "x" resultType "a" thisCase "b" otherCases
     where
-      IConstructor nm bits = constr
+      IConstructor p nm bits = constr
 
-      discrimVar = pDefault @| LN.Bound 0
+      discrimVar = p @| LN.Bound 0
       idxType    = LN.toLocallyNameless (dataIndexType d) (Nothing:bv)
-      resultType = pDefault @| LN.App (pDefault @| LN.IDesc) idxType
+      resultType = p @| LN.App (p @| LN.IDesc) idxType
       thisCase   = consCode d bits (Nothing:bv) (idxVar+1)
       otherCases = codeBody d (Nothing:bv) (idxVar+1) constrs
 
@@ -164,29 +170,29 @@ makeConstructors :: IDataDecl ->
 makeConstructors d consNameCode []               = do
   return ()
 makeConstructors d consNameCode [constr]         = do
-  let nameCode = consNameCode (pDefault @| LN.UnitI)
+  let nameCode = consNameCode (consPos constr @| LN.UnitI)
   makeConstructor d nameCode constr
 makeConstructors d consNameCode (constr:constrs) = do
-  let nameCode = consNameCode (pDefault @| LN.Inl (pDefault @| LN.UnitI))
+  let nameCode = consNameCode (consPos constr @| LN.Inl (consPos constr @| LN.UnitI))
   makeConstructor d nameCode constr 
-  makeConstructors d (consNameCode . (\x -> pDefault @| LN.Inr x)) constrs
+  makeConstructors d (consNameCode . (\x -> consPos constr @| LN.Inr x)) constrs
 
 --------------------------------------------------------------------------------
-paramsType :: [(Ident,TermPos)] ->
+paramsType :: [(Span,Ident,TermPos)] ->
               [Maybe Ident] ->
               ([Maybe Ident] -> LN.TermPos) ->
               LN.TermPos
-paramsType []           bv tm = tm bv
-paramsType ((nm,ty):xs) bv tm = pDefault @| LN.Pi (Just nm) tyDom tyCod
+paramsType []               bv tm = tm bv
+paramsType ((pos,nm,ty):xs) bv tm = pos @| LN.Pi (Just nm) tyDom tyCod
     where tyDom = LN.toLocallyNameless ty bv
           tyCod = paramsType xs (Just nm:bv) tm
 
-paramsLambda :: [(Ident,TermPos)] ->
+paramsLambda :: [(Span,Ident,TermPos)] ->
                 [Maybe Ident] ->
                 ([Maybe Ident] -> LN.TermPos) ->
                 LN.TermPos
-paramsLambda []           bv tm = tm bv
-paramsLambda ((nm,ty):xs) bv tm = pDefault @| LN.Lam nm tmCod
+paramsLambda []               bv tm = tm bv
+paramsLambda ((pos,nm,ty):xs) bv tm = pos @| LN.Lam nm tmCod
     where tmCod = paramsLambda xs (Just nm:bv) tm
 
 --------------------------------------------------------------------------------
@@ -195,42 +201,42 @@ makeConstructor :: IDataDecl ->
                    IConstructor ->
                    DeclCheckM ()
 makeConstructor d nameCode constr = do
-  let IConstructor nm xs = constr
+  let IConstructor p nm xs = constr
       typ = paramsType   (dataParameters d) [] (consType xs)
       trm = paramsLambda (dataParameters d) [] (const $ consTerm nameCode xs)
-  checkInternalDefinition pDefault nm typ (Just trm)
+  checkInternalDefinition p nm typ (Just trm)
 
 --------------------------------------------------------------------------------
 consTerm :: LN.TermPos
-         -> IConstructorBits
+         -> IConstructorBitsPos
          -> LN.TermPos
 consTerm consNameCode constr = lambdas constr 0
     where
-      lambdas (ConsPi nm t bits) bv = pDefault @| LN.Lam nm (lambdas bits (bv+1))
-      lambdas (ConsArr t bits)   bv = pDefault @| LN.Lam "x" (lambdas bits (bv+1))
-      lambdas (ConsEnd _ _)      bv = pDefault @| LN.Construct (tuple bv)
+      lambdas (Annot p (ConsPi nm t bits)) bv = p @| LN.Lam nm (lambdas bits (bv+1))
+      lambdas (Annot p (ConsArr t bits))   bv = p @| LN.Lam "x" (lambdas bits (bv+1))
+      lambdas (Annot p (ConsEnd _ _))      bv = p @| LN.Construct (tuple p bv)
 
-      tuple bv = pDefault @| LN.Pair consNameCode (term constr bv)
+      tuple p bv = p @| LN.Pair consNameCode (term constr bv)
 
-      term (ConsPi _ _ bits) bv = pDefault @| LN.Pair (pDefault @| LN.Bound (bv-1)) (term bits (bv-1))
-      term (ConsArr _ bits)  bv = pDefault @| LN.Pair (pDefault @| LN.Bound (bv-1)) (term bits (bv-1))
-      term (ConsEnd _ _)     bv = pDefault @| LN.Refl
+      term (Annot p (ConsPi _ _ bits)) bv = p @| LN.Pair (p @| LN.Bound (bv-1)) (term bits (bv-1))
+      term (Annot p (ConsArr _ bits))  bv = p @| LN.Pair (p @| LN.Bound (bv-1)) (term bits (bv-1))
+      term (Annot p (ConsEnd _ _))     bv = p @| LN.Refl
 
 --------------------------------------------------------------------------------
 -- Given a display-level constructor description and a list of binding
 -- names, generate the locally-nameless type of the constructor.
-consType :: IConstructorBits
+consType :: IConstructorBitsPos
          -> [Maybe Ident]
          -> LN.TermPos
-consType (ConsPi nm t bits) bv = pDefault @| LN.Pi (Just nm) tyDom tyBits
+consType (Annot p (ConsPi nm t bits)) bv = p @| LN.Pi (Just nm) tyDom tyBits
     where tyBits = consType bits (Just nm:bv)
           tyDom  = LN.toLocallyNameless t bv
-consType (ConsArr t bits)   bv = pDefault @| LN.Pi Nothing tyDom tyBits
+consType (Annot p (ConsArr t bits))   bv = p @| LN.Pi Nothing tyDom tyBits
     where tyBits = consType bits (Nothing:bv)
           tyDom  = LN.toLocallyNameless t bv
-consType (ConsEnd nm ts)    bv = foldl doArg hd ts
-    where hd          = pDefault @| LN.Free nm
-          doArg t arg = pDefault @| LN.App t (LN.toLocallyNameless arg bv)
+consType (Annot p (ConsEnd nm ts))    bv = foldl doArg hd ts
+    where hd          = p @| LN.Free nm
+          doArg t arg = p @| LN.App t (LN.toLocallyNameless arg bv)
 
 --------------------------------------------------------------------------------
 -- Given the full datatype declaration, the display-level constructor
@@ -238,22 +244,23 @@ consType (ConsEnd nm ts)    bv = foldl doArg hd ts
 -- index variable, generate the locallynameless term for the
 -- description of this constructor.
 consCode :: IDataDecl
-         -> IConstructorBits
+         -> IConstructorBitsPos
          -> [Maybe Ident]
          -> Int
          -> LN.TermPos
-consCode d (ConsPi nm t bits) bv idxVar = pDefault @| LN.IDesc_Sg t' (pDefault @| LN.Lam nm code)
+consCode d (Annot p (ConsPi nm t bits)) bv idxVar = p @| LN.IDesc_Sg t' (p @| LN.Lam nm code)
     where t'   = LN.toLocallyNameless t bv
           code = consCode d bits (Just nm:bv) (idxVar+1)
 
-consCode d (ConsArr t bits)   bv idxVar = pDefault @| LN.Desc_Prod codeDom code
+consCode d (Annot p (ConsArr t bits))   bv idxVar = p @| LN.Desc_Prod codeDom code
     where t'      = LN.toLocallyNameless t bv
-          codeDom = (pDefault @| LN.Desc_K t') `fromMaybe` (extractRecursiveCall d t')
+          p'      = makeSpan t' t'
+          codeDom = (p' @| LN.Desc_K t') `fromMaybe` (extractRecursiveCall d t')
           code    = consCode d bits bv idxVar
 
-consCode d (ConsEnd nm ts)    bv idxVar = pDefault @| LN.Desc_K (pDefault @| LN.Eq idxVal idx)
+consCode d (Annot p (ConsEnd nm ts))    bv idxVar = p @| LN.Desc_K (p @| LN.Eq idxVal idx)
     where args   = reverse ts
-          idx    = pDefault @| LN.Bound idxVar
+          idx    = p @| LN.Bound idxVar
           idxVal = LN.toLocallyNameless (head args) bv -- FIXME: handle types with no index
 
 --------------------------------------------------------------------------------

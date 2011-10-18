@@ -70,7 +70,7 @@ declaration =
          DatatypeDecl $ Datatype (makeSpan p p') nm params constructors)
         <$> token Tok.Data
         <*> identifier
-        <*> dataParamList
+        <*> ((map (\(_,nm,t) -> (nm,t))) <$> dataParamList)
         <*  token Tok.Colon
         <*  token Tok.Set
         <*  token Tok.ColonEquals
@@ -82,14 +82,14 @@ declaration =
     <*> term
     <*> token Tok.Semicolon
 
-dataParamList :: Parser Tok.Token [(Ident,TermPos)]
+dataParamList :: Parser Tok.Token [(Span,Ident,TermPos)]
 dataParamList =
-    (\nm t params -> (nm, t) : params)
-        <$  token Tok.LParen
+    (\pl nm t pr params -> (makeSpan pl pr, nm, t) : params)
+        <$> token Tok.LParen
         <*> identifier
         <*  token Tok.Colon
         <*> term
-        <*  token Tok.RParen
+        <*> token Tok.RParen
         <*> dataParamList
     <|>
     pure []
@@ -108,9 +108,14 @@ constructorList =
 
 --------------------------------------------------------------------------------
 idata :: Parser Tok.Token IDataDecl
-idata = IData <$
-    token Tok.Data <*> identifier <*> dataParamList <* token Tok.Colon <*> term09 <* token Tok.Arrow <* token Tok.Set <* token Tok.Where
-                   <*  token Tok.LBrace <*> iconstructors <* token Tok.RBrace <* token Tok.Semicolon
+idata =
+    (\pl nm params idxType constrs pr -> IData (makeSpan pl pr) nm params idxType constrs) <$>
+    token Tok.Data <*> identifier
+                   <*> dataParamList
+                   <*  token Tok.Colon <*> term09 <* token Tok.Arrow <* token Tok.Set
+                   <*  token Tok.Where
+                   <*  token Tok.LBrace <*> iconstructors <*> token Tok.RBrace
+                   <*  token Tok.Semicolon
 
 iconstructors :: Parser Tok.Token [IConstructor]
 iconstructors =
@@ -120,14 +125,24 @@ iconstructors =
 
 iconstructor :: Parser Tok.Token IConstructor
 iconstructor =
-    IConstructor <$> identifier <* token Tok.Colon <*> constructorbits
+    (\(nm,p) bits -> IConstructor (makeSpan p bits) nm bits)
+    <$> tokenWithText Tok.Ident
+    <*  token Tok.Colon
+    <*> constructorbits
     where 
       constructorbits =
-          ConsPi  <$  token Tok.LParen <*> identifier <* token Tok.Colon <*> term10 <* token Tok.RParen <* token Tok.Arrow <*> constructorbits
+          (\p ident t1 t2 -> Annot (makeSpan p t2) (ConsPi ident t1 t2))
+            <$> token Tok.LParen
+            <*> identifier
+            <*  token Tok.Colon
+            <*> term10
+            <*  token Tok.RParen
+            <*  token Tok.Arrow
+            <*> constructorbits
           <|>
-          ConsArr <$> term09 <* token Tok.Arrow <*> constructorbits
+          binary ConsArr <$> term09 <* token Tok.Arrow <*> constructorbits
           <|>
-          ConsEnd <$> identifier <*> many term00
+          (\(nm,p) ts -> Annot (makeSpan p ts) (ConsEnd nm ts)) <$> tokenWithText Tok.Ident <*> many term00
 
 --------------------------------------------------------------------------------
 

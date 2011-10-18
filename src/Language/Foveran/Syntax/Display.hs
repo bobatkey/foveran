@@ -2,14 +2,20 @@
 
 module Language.Foveran.Syntax.Display
     ( Ident
+
+    , Declaration (..)
+
     , AssumeDecl (..)
     , Definition (..)
+
     , Datatype (..)
     , Constructor (..)
-    , Declaration (..)
+
     , IDataDecl (..)
     , IConstructor (..)
-    , IConstructorBits (..)
+    , IConstructorBitsPos
+    , IConstructorBitsCon (..)
+
     , Term
     , TermPos
     , TermCon (..)
@@ -53,20 +59,24 @@ data Definition =
 
 --------------------------------------------------------------------------------
 data IDataDecl =
-    IData { dataName         :: Ident
-          , dataParameters   :: [(Ident,TermPos)]
+    IData { dataPos          :: Span
+          , dataName         :: Ident
+          , dataParameters   :: [(Span, Ident,TermPos)]
           , dataIndexType    :: TermPos
           , dataConstructors :: [IConstructor]
           }
 
 data IConstructor =
-    IConstructor { consName :: Ident
-                 , consBits :: IConstructorBits
+    IConstructor { consPos  :: Span
+                 , consName :: Ident
+                 , consBits :: IConstructorBitsPos
                  }
 
-data IConstructorBits
-    = ConsPi  Ident TermPos IConstructorBits
-    | ConsArr TermPos IConstructorBits
+type IConstructorBitsPos = AnnotRec Span IConstructorBitsCon
+
+data IConstructorBitsCon x
+    = ConsPi  Ident TermPos x
+    | ConsArr TermPos x
     | ConsEnd Ident [TermPos]
 
 --------------------------------------------------------------------------------

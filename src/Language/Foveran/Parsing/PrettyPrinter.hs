@@ -10,7 +10,7 @@ module Language.Foveran.Parsing.PrettyPrinter
     where
 
 import           Data.String
-import           Data.Rec (foldAnnot, Rec, foldRec)
+import           Data.Rec (foldAnnot, Rec, foldRec, AnnotRec (..))
 import           Text.PrettyPrintPrec
 import qualified Text.PrettyPrint as PP
 import           Language.Foveran.Syntax.Display
@@ -94,7 +94,7 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
     where
       doc = ("data" <+>
              ppIdent (dataName d) <+>
-             hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | (nm,t) <- dataParameters d ] <+>
+             hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | (_,nm,t) <- dataParameters d ] <+>
              ":" <+> fromDoc (ppAnnotTermLev 9 (dataIndexType d)) <+> "→" <+> "Set" <+> "where")
             $$ nest 2 (doConstructors (dataConstructors d))
 
@@ -103,6 +103,6 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
 
       doConstructor c = ppIdent (consName c) <+> ":" <+> sep (doBits (consBits c))
 
-      doBits (ConsPi nm t xs) = ("(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" <+> "→") : doBits xs
-      doBits (ConsArr t xs)   = (fromDoc (ppAnnotTermLev 9 t) <+> "→") : doBits xs
-      doBits (ConsEnd nm ts)  = [ppIdent nm <+> sep (map (fromDoc . ppAnnotTermLev 0) ts)]
+      doBits (Annot p (ConsPi nm t xs)) = ("(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" <+> "→") : doBits xs
+      doBits (Annot p (ConsArr t xs))   = (fromDoc (ppAnnotTermLev 9 t) <+> "→") : doBits xs
+      doBits (Annot p (ConsEnd nm ts))  = [ppIdent nm <+> sep (map (fromDoc . ppAnnotTermLev 0) ts)]
