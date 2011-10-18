@@ -8,7 +8,6 @@ module Language.Foveran.Typing.DeclCheckMonad
     , evaluate
     , getContext -- FIXME: try to get rid of this
     , runDeclCheckM
-    , liftIO -- FIXME: should be in MonadIO class
     , checkDefinition -- FIXME: move this
     , checkInternalDefinition
     )
@@ -16,6 +15,7 @@ module Language.Foveran.Typing.DeclCheckMonad
 
 import Control.Applicative
 import Control.Monad (unless, ap)
+import Control.Monad.IO.Class (MonadIO (..))
 import Data.Traversable (traverse)
 import Data.Text as T (unpack)
 import Text.Position
@@ -59,6 +59,10 @@ instance Applicative DeclCheckM where
     pure  = return
     (<*>) = ap
 
+instance MonadIO DeclCheckM where
+    liftIO c = DM $ \ctxt -> do r <- c
+                                return $ Right (r, ctxt)
+
 getContext :: DeclCheckM Context
 getContext = DM $ \c -> return (Right (c,c))
 
@@ -83,10 +87,6 @@ evaluate t = DM $ \ctxt -> return $ Right (t `evalIn` ctxt, ctxt)
 
 malformedDefinition :: Span -> Ident -> Ident -> DeclCheckM ()
 malformedDefinition p nm1 nm2 = DM $ \_ -> return $ Left (p, MalformedDefn nm1 nm2)
-
-liftIO :: IO a -> DeclCheckM a
-liftIO c = DM $ \ctxt -> do r <- c
-                            return $ Right (r, ctxt)
 
 checkDefinition :: Definition -> DeclCheckM ()
 checkDefinition (Definition p nm extTy nm' extTm) =

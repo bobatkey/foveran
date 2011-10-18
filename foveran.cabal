@@ -15,7 +15,8 @@ Executable foveran
                  bytestring >= 0.9.1.5,
                  template-haskell,
                  dlist >= 0.5,
-                 mtl >= 1.1.0.2,
+                 transformers >= 0.2.2.0,
+                 mtl >= 2.0.1.0,
                  forvie >= 0.1,
                  blaze-html >= 0.3.2.0
   Main-Is:       Language/Foveran/Main.hs

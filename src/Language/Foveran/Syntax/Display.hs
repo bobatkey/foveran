@@ -17,15 +17,10 @@ module Language.Foveran.Syntax.Display
     where
 
 import Language.Foveran.Syntax.Identifier (Ident)
-import Text.Position
+import Text.Position (Span)
 import Data.Rec
 
-data Definition =
-    Definition Span Ident TermPos Ident TermPos
-
-data Datatype =
-    Datatype Span Ident [(Ident,TermPos)] [Constructor]
-
+--------------------------------------------------------------------------------
 data Declaration
     = AssumptionDecl AssumeDecl
     | DefinitionDecl Definition
@@ -33,28 +28,48 @@ data Declaration
     | IDataDecl      IDataDecl
     | Normalise      TermPos
 
-data AssumeDecl = Assume { assumePos   :: Span
-                         , assumeIdent :: Ident
-                         , assumeTerm  :: TermPos
-                         }
+--------------------------------------------------------------------------------
+data Datatype =
+    Datatype Span Ident [(Ident,TermPos)] [Constructor]
 
-data IDataDecl
-    = IData { dataName         :: Ident
-            , dataParameters   :: [(Ident,TermPos)]
-            , dataIndexType    :: TermPos
-            , dataConstructors :: [IConstructor]
-            }
+data Constructor
+    = Constructor Ident [TermPos]
 
-data IConstructor
-    = IConstructor { consName :: Ident
-                   , consBits :: IConstructorBits
-                   }
+--------------------------------------------------------------------------------
+data AssumeDecl =
+    Assume { assumePos   :: Span
+           , assumeIdent :: Ident
+           , assumeTerm  :: TermPos
+           }
+
+--------------------------------------------------------------------------------
+data Definition =
+    Definition { defnPos   :: Span
+               , defnName  :: Ident
+               , defnType  :: TermPos
+               , defnName2 :: Ident
+               , defnTerm  :: TermPos
+               }
+
+--------------------------------------------------------------------------------
+data IDataDecl =
+    IData { dataName         :: Ident
+          , dataParameters   :: [(Ident,TermPos)]
+          , dataIndexType    :: TermPos
+          , dataConstructors :: [IConstructor]
+          }
+
+data IConstructor =
+    IConstructor { consName :: Ident
+                 , consBits :: IConstructorBits
+                 }
 
 data IConstructorBits
     = ConsPi  Ident TermPos IConstructorBits
     | ConsArr TermPos IConstructorBits
     | ConsEnd Ident [TermPos]
 
+--------------------------------------------------------------------------------
 type Term = Rec TermCon
 type TermPos = AnnotRec Span TermCon
 
@@ -103,6 +118,3 @@ data TermCon tm
     | MuI        tm tm
     | InductionI
     deriving (Show, Functor)
-
-data Constructor
-    = Constructor Ident [TermPos]

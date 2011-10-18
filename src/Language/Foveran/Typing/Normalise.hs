@@ -2,17 +2,18 @@
 -- | The interface to the normaliser
 
 module Language.Foveran.Typing.Normalise
+    ( doNormalise )
     where
 
+import Control.Monad.IO.Class (liftIO)
 import Text.PrettyPrint
 import Text.PrettyPrint.IsString ()
-import Text.Position
 import qualified Language.Foveran.Syntax.Display as DS
 import qualified Language.Foveran.Syntax.Checked as CS
 import Language.Foveran.Parsing.PrettyPrinter
 import Language.Foveran.Syntax.LocallyNameless (toLocallyNamelessClosed)
 import Language.Foveran.Typing.DeclCheckMonad
-import Language.Foveran.Typing.Checker
+import Language.Foveran.Typing.Checker (tySynth)
 import Language.Foveran.Typing.Errors
 import Language.Foveran.Typing.Context
 

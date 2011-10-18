@@ -5,7 +5,8 @@ module Language.Foveran.Typing.IDataDecl
     where
 
 import qualified Data.Set as S
-import           Control.Monad (unless, guard, when, foldM_)
+import           Control.Monad (unless, guard, when, forM_)
+import           Control.Monad.State (StateT, evalStateT, get, put, lift)
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot))
 import           Language.Foveran.Typing.DeclCheckMonad
@@ -23,12 +24,12 @@ pDefault = Span initPos initPos -- FIXME: get these from the IConstructorBits
 --------------------------------------------------------------------------------
 processIDataDecl :: IDataDecl -> DeclCheckM ()
 processIDataDecl d = do
-  foldM_ checkParameterName S.empty (dataParameters d)
+  evalStateT (forM_ (dataParameters d) checkParameterName) S.empty
 
   -- Check the constructors for duplicate names, shadowing and
   -- correctness of parameter names. Does not check for any type
   -- correctness.
-  foldM_ (checkConstructor d) S.empty (dataConstructors d)
+  evalStateT (forM_ (dataConstructors d) (checkConstructor d)) S.empty
 
   -- Generate the description of this datatype
   let codeName = dataName d <+> ":code"
@@ -45,23 +46,22 @@ processIDataDecl d = do
   makeConstructors d id (dataConstructors d)
 
 --------------------------------------------------------------------------------
-checkParameterName :: S.Set Ident ->
-                      (Ident, TermPos) ->
-                      DeclCheckM (S.Set Ident)
-checkParameterName usedNames (paramName, _) = do
-  when (paramName `S.member` usedNames) $ reportError pDefault (DuplicateParameterName paramName)
-  return (S.insert paramName usedNames)
+checkParameterName :: (Ident, TermPos) ->
+                      StateT (S.Set Ident) DeclCheckM ()
+checkParameterName (paramName, _) = do
+  usedNames <- get
+  when (paramName `S.member` usedNames) $ lift $ reportError pDefault (DuplicateParameterName paramName)
+  put (S.insert paramName usedNames)
 
 --------------------------------------------------------------------------------
 checkConstructor :: IDataDecl ->
-                    S.Set Ident ->
                     IConstructor ->
-                    DeclCheckM (S.Set Ident)
-checkConstructor d usedNames (IConstructor nm components) = do
-  -- FIXME: get the proper location
-  when (nm `S.member` usedNames) $ reportError pDefault (DuplicateConstructorName nm)
-  checkConstructorsBits d components
-  return (S.insert nm usedNames)
+                    StateT (S.Set Ident) DeclCheckM ()
+checkConstructor d (IConstructor nm components) = do
+  usedNames <- get
+  when (nm `S.member` usedNames) $ lift $ reportError pDefault (DuplicateConstructorName nm)
+  lift $ checkConstructorsBits d components
+  put (S.insert nm usedNames)
 
 checkConstructorsBits :: IDataDecl ->
                          IConstructorBits ->
@@ -76,26 +76,32 @@ checkConstructorsBits d (ConsArr t bits) = do
   checkConstructorsBits d bits
 checkConstructorsBits d (ConsEnd nm ts) = do
   unless (nm == dataName d) $ reportError pDefault (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
-  findNonMatching ts (map fst $ dataParameters d)
+  checkParameters ts (map fst $ dataParameters d)
 
-findNonMatching :: [TermPos] -> [Ident] -> DeclCheckM ()
-findNonMatching [x]      []     = return ()
-findNonMatching [x]      _      = reportError pDefault NotEnoughArgumentsForDatatype
-findNonMatching (a:args) (p:ps) =
+checkParameters :: [TermPos] -> [Ident] -> DeclCheckM ()
+checkParameters [x]      []     = return ()
+checkParameters [x]      _      = reportError pDefault NotEnoughArgumentsForDatatype
+checkParameters (a:args) (p:ps) =
     case a of
       Annot pos (Var arg) -> do
              when (arg /= p) $ reportError pos (NonMatchingParameterArgument arg p)
-             findNonMatching args ps
+             checkParameters args ps
       Annot pos _         -> do
              reportError pos (IllFormedArgument p)
-findNonMatching _        []     = reportError pDefault TooManyArgumentsForDatatype
-findNonMatching []       _      = reportError pDefault NotEnoughArgumentsForDatatype
+checkParameters _        []     = reportError pDefault TooManyArgumentsForDatatype
+checkParameters []       _      = reportError pDefault NotEnoughArgumentsForDatatype
 
 --------------------------------------------------------------------------------
--- FIXME: instead of regenerating the code, generate a reference to it
+makeMuTy :: IDataDecl ->
+            [Maybe Ident] ->
+            LN.TermPos
 makeMuTy d bv = pDefault @| LN.Pi Nothing idxType (pDefault @| LN.Set 0)
     where idxType = LN.toLocallyNameless (dataIndexType d) bv
 
+-- FIXME: instead of regenerating the code, generate a reference to it
+makeMu :: IDataDecl ->
+          [Maybe Ident] ->
+          LN.TermPos
 makeMu d bv = pDefault @| LN.MuI idxType code
     where idxType = LN.toLocallyNameless (dataIndexType d) bv
           code    = makeCode d bv
@@ -114,6 +120,9 @@ namesSumType [x]    = pDefault @| LN.Unit
 namesSumType (x:xs) = pDefault @| LN.Sum (pDefault @| LN.Unit) (namesSumType xs)
 
 --------------------------------------------------------------------------------
+makeCode :: IDataDecl ->
+            [Maybe Ident] ->
+            LN.TermPos
 makeCode d bv = pDefault @| LN.Lam "i" (pDefault @| LN.IDesc_Sg namesTy body)
     where
       namesTy = namesSumType (dataConstructors d)
@@ -121,6 +130,11 @@ makeCode d bv = pDefault @| LN.Lam "i" (pDefault @| LN.IDesc_Sg namesTy body)
 
 -- expects that the bound variables include the parameters, the index
 -- variable and the discriminator at position 0
+codeBody :: IDataDecl ->
+            [Maybe Ident] ->
+            Int ->
+            [IConstructor] ->
+            LN.TermPos
 codeBody d bv idxVar []       =
     pDefault @| LN.App (pDefault @| LN.App (pDefault @| LN.ElimEmpty) descType)
                        (pDefault @| LN.Bound 0)
@@ -143,6 +157,10 @@ codeBody d bv idxVar (constr:constrs) =
       otherCases = codeBody d (Nothing:bv) (idxVar+1) constrs
 
 --------------------------------------------------------------------------------
+makeConstructors :: IDataDecl ->
+                    (LN.TermPos -> LN.TermPos) ->
+                    [IConstructor] ->
+                    DeclCheckM ()
 makeConstructors d consNameCode []               = do
   return ()
 makeConstructors d consNameCode [constr]         = do
@@ -154,18 +172,28 @@ makeConstructors d consNameCode (constr:constrs) = do
   makeConstructors d (consNameCode . (\x -> pDefault @| LN.Inr x)) constrs
 
 --------------------------------------------------------------------------------
-paramsType :: [(Ident,TermPos)] -> [Maybe Ident] -> ([Maybe Ident] -> LN.TermPos) -> LN.TermPos
+paramsType :: [(Ident,TermPos)] ->
+              [Maybe Ident] ->
+              ([Maybe Ident] -> LN.TermPos) ->
+              LN.TermPos
 paramsType []           bv tm = tm bv
 paramsType ((nm,ty):xs) bv tm = pDefault @| LN.Pi (Just nm) tyDom tyCod
     where tyDom = LN.toLocallyNameless ty bv
           tyCod = paramsType xs (Just nm:bv) tm
 
-paramsLambda :: [(Ident,TermPos)] -> [Maybe Ident] -> ([Maybe Ident] -> LN.TermPos) -> LN.TermPos
+paramsLambda :: [(Ident,TermPos)] ->
+                [Maybe Ident] ->
+                ([Maybe Ident] -> LN.TermPos) ->
+                LN.TermPos
 paramsLambda []           bv tm = tm bv
 paramsLambda ((nm,ty):xs) bv tm = pDefault @| LN.Lam nm tmCod
     where tmCod = paramsLambda xs (Just nm:bv) tm
 
 --------------------------------------------------------------------------------
+makeConstructor :: IDataDecl ->
+                   LN.TermPos ->
+                   IConstructor ->
+                   DeclCheckM ()
 makeConstructor d nameCode constr = do
   let IConstructor nm xs = constr
       typ = paramsType   (dataParameters d) [] (consType xs)
@@ -189,6 +217,8 @@ consTerm consNameCode constr = lambdas constr 0
       term (ConsEnd _ _)     bv = pDefault @| LN.Refl
 
 --------------------------------------------------------------------------------
+-- Given a display-level constructor description and a list of binding
+-- names, generate the locally-nameless type of the constructor.
 consType :: IConstructorBits
          -> [Maybe Ident]
          -> LN.TermPos
@@ -203,11 +233,15 @@ consType (ConsEnd nm ts)    bv = foldl doArg hd ts
           doArg t arg = pDefault @| LN.App t (LN.toLocallyNameless arg bv)
 
 --------------------------------------------------------------------------------
+-- Given the full datatype declaration, the display-level constructor
+-- description, a binding environment, and the de Bruijn index of the
+-- index variable, generate the locallynameless term for the
+-- description of this constructor.
 consCode :: IDataDecl
          -> IConstructorBits
          -> [Maybe Ident]
          -> Int
-         -> AnnotRec Span LN.TermCon
+         -> LN.TermPos
 consCode d (ConsPi nm t bits) bv idxVar = pDefault @| LN.IDesc_Sg t' (pDefault @| LN.Lam nm code)
     where t'   = LN.toLocallyNameless t bv
           code = consCode d bits (Just nm:bv) (idxVar+1)
@@ -225,8 +259,8 @@ consCode d (ConsEnd nm ts)    bv idxVar = pDefault @| LN.Desc_K (pDefault @| LN.
 --------------------------------------------------------------------------------
 -- Extracts a recursive call to the datatype currently being defined
 extractRecursiveCall :: IDataDecl
-                     -> AnnotRec a LN.TermCon
-                     -> Maybe (AnnotRec a LN.TermCon)
+                     -> LN.TermPos
+                     -> Maybe LN.TermPos
 extractRecursiveCall d t = loop t
     where
       loop (Annot p (LN.Pi nm t t')) =
@@ -245,15 +279,11 @@ extractRecursiveCall d t = loop t
 --     nm @ t1 @ ... @ t2
 -- then return the position of nm, nm, and the ti in reverse order
 -- otherwise return 'Nothing'
-extractApplication :: AnnotRec t LN.TermCon
-                   -> Maybe (t, Ident, [AnnotRec t LN.TermCon])
-extractApplication t = do
-  (p, nm, args) <- loop t
-  return (p, nm, args)
+extractApplication :: LN.TermPos
+                   -> Maybe (Span, Ident, [LN.TermPos])
+extractApplication t = loop t
     where
-      loop (Annot p (LN.Free nm))  = 
-          return (p, nm, [])
-      loop (Annot p (LN.App t t')) =
-          do (p, nm, l) <- loop t
-             return (p, nm, t':l)
-      loop _ = Nothing
+      loop (Annot p (LN.Free nm))  = return (p, nm, [])
+      loop (Annot p (LN.App t t')) = do (p, nm, l) <- loop t
+                                        return (p, nm, t':l)
+      loop _                       = Nothing
