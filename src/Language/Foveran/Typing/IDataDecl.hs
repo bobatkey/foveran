@@ -17,27 +17,31 @@ import qualified Language.Foveran.Syntax.LocallyNameless as LN
 import           Text.Position (Span (..), makeSpan)
 
 --------------------------------------------------------------------------------
+evalStateTWith = flip evalStateT
+
 (@|) p t = Annot p t
 
 --------------------------------------------------------------------------------
 processIDataDecl :: IDataDecl -> DeclCheckM ()
 processIDataDecl d = do
-  evalStateT (forM_ (dataParameters d) checkParameterName) S.empty
+  evalStateTWith S.empty $ do
+   forM_ (dataParameters d) checkParameterName
 
   -- Check the constructors for duplicate names, shadowing and
   -- correctness of parameter names. Does not check for any type
   -- correctness.
-  evalStateT (forM_ (dataConstructors d) (checkConstructor d)) S.empty
+  evalStateTWith S.empty $ do
+    forM_ (dataConstructors d) (checkConstructor d)
 
   -- Generate the description of this datatype
   let codeName = dataName d <+> ":code"
-      codeType = paramsType   (dataParameters d) [] (descType d)
-      code     = paramsLambda (dataParameters d) [] (makeCode d)
+      codeType = paramsType   (dataParameters d) (descType d) []
+      code     = paramsLambda (dataParameters d) (makeCode d) []
   checkInternalDefinition (dataPos d) codeName codeType (Just code)
 
   -- Generate the type itself
-  let typ = paramsType   (dataParameters d) [] (makeMuTy d)
-      trm = paramsLambda (dataParameters d) [] (makeMu d)
+  let typ = paramsType   (dataParameters d) (makeMuTy d) []
+      trm = paramsLambda (dataParameters d) (makeMu d) []
   checkInternalDefinition (dataPos d) (dataName d) typ (Just trm)
 
   -- Generate the functions for each of the constructors
@@ -48,7 +52,8 @@ checkParameterName :: DataParameter ->
                       StateT (S.Set Ident) DeclCheckM ()
 checkParameterName (DataParameter pos paramName _) = do
   usedNames <- get
-  when (paramName `S.member` usedNames) $ lift $ reportError pos (DuplicateParameterName paramName)
+  when (paramName `S.member` usedNames) $ do
+    lift $ reportError pos (DuplicateParameterName paramName)
   put (S.insert paramName usedNames)
 
 --------------------------------------------------------------------------------
@@ -57,24 +62,23 @@ checkConstructor :: IDataDecl ->
                     StateT (S.Set Ident) DeclCheckM ()
 checkConstructor d (IConstructor p nm components) = do
   usedNames <- get
-  when (nm `S.member` usedNames) $ lift $ reportError p (DuplicateConstructorName nm)
-  lift $ checkConstructorsBits d components
+  when (nm `S.member` usedNames) $ do
+    lift $ reportError p (DuplicateConstructorName nm)
+  lift $ checkConstructorBits d components
   put (S.insert nm usedNames)
 
-snd3 (_,b,_) = b -- FIXME: remove this
-
-checkConstructorsBits :: IDataDecl ->
-                         IConstructorBitsPos ->
-                         DeclCheckM ()
-checkConstructorsBits d (Annot p (ConsPi nm t bits)) = do
+checkConstructorBits :: IDataDecl ->
+                        IConstructorBitsPos ->
+                        DeclCheckM ()
+checkConstructorBits d (Annot p (ConsPi nm t bits)) = do
   when (nm == dataName d) $ reportError p ShadowingDatatypeName
   when (nm `elem` (map paramIdent $ dataParameters d)) $ reportError p ShadowingParameterName
-  checkConstructorsBits d bits
-checkConstructorsBits d (Annot p (ConsArr t bits)) = do
+  checkConstructorBits d bits
+checkConstructorBits d (Annot p (ConsArr t bits)) = do
   -- FIXME: extract the recursive call if it exists and check to see
   -- whether it properly uses the parameter names
-  checkConstructorsBits d bits
-checkConstructorsBits d (Annot p (ConsEnd nm ts)) = do
+  checkConstructorBits d bits
+checkConstructorBits d (Annot p (ConsEnd nm ts)) = do
   unless (nm == dataName d) $ reportError p (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
   checkParameters p ts (map paramIdent $ dataParameters d)
 
@@ -109,6 +113,8 @@ makeMu d bv = pos @| LN.MuI idxType code
           code    = makeCode d bv
 
 --------------------------------------------------------------------------------
+-- Generates the type of the code for the datatype, given a binding
+-- environment for the parameters
 descType :: IDataDecl -> [Maybe Ident] -> LN.TermPos
 descType d bv = pos @| LN.Pi Nothing idxType1 (pos @| LN.App (pos @| LN.IDesc) idxType2)
     where pos      = dataPos d
@@ -179,23 +185,22 @@ makeConstructors d consNameCode (constr:constrs) = do
 
 --------------------------------------------------------------------------------
 paramsType :: [DataParameter] ->
-              [Maybe Ident] ->
               ([Maybe Ident] -> LN.TermPos) ->
+              [Maybe Ident] ->
               LN.TermPos
-paramsType []             bv tm = tm bv
-paramsType (param:params) bv tm = pos @| LN.Pi (Just nm) tyDom tyCod
+paramsType []             tm bv = tm bv
+paramsType (param:params) tm bv = pos @| LN.Pi (Just nm) tyDom tyCod
     where DataParameter pos nm ty = param
           tyDom = LN.toLocallyNameless ty bv
-          tyCod = paramsType params (Just nm:bv) tm
+          tyCod = paramsType params tm (Just nm:bv)
 
 paramsLambda :: [DataParameter] ->
-                [Maybe Ident] ->
                 ([Maybe Ident] -> LN.TermPos) ->
-                LN.TermPos
-paramsLambda []             bv tm = tm bv
-paramsLambda (param:params) bv tm = pos @| LN.Lam nm tmCod
+                [Maybe Ident] -> LN.TermPos
+paramsLambda []             tm bv = tm bv
+paramsLambda (param:params) tm bv = pos @| LN.Lam nm tmCod
     where DataParameter pos nm ty = param
-          tmCod = paramsLambda params (Just nm:bv) tm
+          tmCod = paramsLambda params tm (Just nm:bv)
 
 --------------------------------------------------------------------------------
 makeConstructor :: IDataDecl ->
@@ -204,8 +209,8 @@ makeConstructor :: IDataDecl ->
                    DeclCheckM ()
 makeConstructor d nameCode constr = do
   let IConstructor p nm xs = constr
-      typ = paramsType   (dataParameters d) [] (consType xs)
-      trm = paramsLambda (dataParameters d) [] (const $ consTerm nameCode xs)
+      typ = paramsType   (dataParameters d) (consType xs) []
+      trm = paramsLambda (dataParameters d) (const $ consTerm nameCode xs) []
   checkInternalDefinition p nm typ (Just trm)
 
 --------------------------------------------------------------------------------
