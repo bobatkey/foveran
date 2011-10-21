@@ -23,8 +23,9 @@ import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
 
 -- The only difference between this and InternalSyntax is the
--- appearance of explicit types in the “Case” expression. This is
--- needed for correct reflection of the variables during NBE.
+-- appearance of explicit types in the “Case” expression, and explicit
+-- types on the “Eq” type former. This is needed for correct
+-- reflection of the variables during NBE.
 
 type Term = Rec TermCon
 
