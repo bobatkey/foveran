@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, DeriveFunctor #-}
+{-# LANGUAGE TypeSynonymInstances, DeriveFunctor, FlexibleInstances #-}
 
 module Language.Foveran.Syntax.Checked
     ( Ident
@@ -13,12 +13,14 @@ module Language.Foveran.Syntax.Checked
       
     , bindFree
     , bindFree1
+    , generalise
     , toDisplaySyntax
     )
     where
 
 import           Control.Applicative
 import           Data.Rec
+import           Data.List (elemIndex)
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
 
@@ -77,64 +79,86 @@ data TermCon tm
     deriving (Show, Functor)
 
 --------------------------------------------------------------------------------
-binder :: (Int -> a) -> Int -> a
-binder f i = f (i+1)
+class Applicative f => Binding f where
+    binder :: f a -> f a
 
-bind' :: Ident -> TermCon (Int -> a) -> Int -> TermCon a
-bind' fnm (Free nm')       = \i -> if fnm == nm' then Bound i else Free nm'
-bind' fnm (Bound k)        = pure $ Bound k
-bind' fnm (Lam nm body)    = Lam nm <$> binder body
-bind' fnm (App t t')       = App <$> t <*> t'
-bind' fnm (Set l)          = pure $ Set l
-bind' fnm (Pi nm t1 t2)    = Pi nm <$> t1 <*> binder t2
-bind' fnm (Sigma nm t1 t2) = Sigma nm <$> t1 <*> binder t2
-bind' fnm (Pair t1 t2)     = Pair <$> t1 <*> t2
-bind' fnm (Proj1 t)        = Proj1 <$> t
-bind' fnm (Proj2 t)        = Proj2 <$> t
-bind' fnm (Sum t1 t2)      = Sum <$> t1 <*> t2
-bind' fnm (Inl t)          = Inl <$> t
-bind' fnm (Inr t)          = Inr <$> t
-bind' fnm (Case t1 tA tB x t2 y t3 z t4)
-                          = Case <$> t1
-                                 <*> tA <*> tB
-                                 <*> pure x <*> binder t2
-                                 <*> pure y <*> binder t3
-                                 <*> pure z <*> binder t4
-bind' fnm Unit             = pure Unit
-bind' fnm UnitI            = pure UnitI
-bind' fnm Empty            = pure Empty
-bind' fnm ElimEmpty        = pure ElimEmpty
+instance Binding ((->) Int) where
+    binder f i = f (i+1)
 
-bind' fnm (Eq tA tB t1 t2) = Eq <$> tA <*> tB <*> t1 <*> t2
-bind' fnm Refl             = pure Refl
-bind' fnm (ElimEq tA ta tb t a e t1 t2) = ElimEq <$> tA <*> ta <*> tb <*> t <*> pure a <*> pure e <*> binder (binder t1) <*> t2
+traverseSyn :: Binding f => TermCon (f a) -> f (TermCon a)
+traverseSyn (Free nm')       = pure $ Free nm'
+traverseSyn (Bound k)        = pure $ Bound k
+traverseSyn (Lam nm body)    = Lam nm <$> binder body
+traverseSyn (App t t')       = App <$> t <*> t'
+traverseSyn (Set l)          = pure $ Set l
+traverseSyn (Pi nm t1 t2)    = Pi nm <$> t1 <*> binder t2
+traverseSyn (Sigma nm t1 t2) = Sigma nm <$> t1 <*> binder t2
+traverseSyn (Pair t1 t2)     = Pair <$> t1 <*> t2
+traverseSyn (Proj1 t)        = Proj1 <$> t
+traverseSyn (Proj2 t)        = Proj2 <$> t
+traverseSyn (Sum t1 t2)      = Sum <$> t1 <*> t2
+traverseSyn (Inl t)          = Inl <$> t
+traverseSyn (Inr t)          = Inr <$> t
+traverseSyn (Case t1 tA tB x t2 y t3 z t4)
+    = Case <$> t1
+           <*> tA <*> tB
+           <*> pure x <*> binder t2
+           <*> pure y <*> binder t3
+           <*> pure z <*> binder t4
+traverseSyn Unit             = pure Unit
+traverseSyn UnitI            = pure UnitI
+traverseSyn Empty            = pure Empty
+traverseSyn ElimEmpty        = pure ElimEmpty
 
-bind' fnm Desc             = pure Desc
-bind' fnm (Desc_K t)       = Desc_K <$> t
-bind' fnm Desc_Id          = pure Desc_Id
-bind' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
-bind' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
-bind' fnm Desc_Elim        = pure Desc_Elim
-bind' fnm Sem              = pure Sem
-bind' fnm (Mu t)           = Mu <$> t
-bind' fnm (Construct t)    = Construct <$> t
-bind' fnm Induction        = pure Induction
+traverseSyn (Eq tA tB t1 t2) = Eq <$> tA <*> tB <*> t1 <*> t2
+traverseSyn Refl             = pure Refl
+traverseSyn (ElimEq tA ta tb t a e t1 t2) =
+    ElimEq <$> tA <*> ta <*> tb <*> t <*> pure a <*> pure e <*> binder (binder t1) <*> t2
 
-bind' fnm IDesc            = pure IDesc
-bind' fnm (IDesc_K t)      = IDesc_K <$> t
-bind' fnm (IDesc_Id t)     = IDesc_Id <$> t
-bind' fnm (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
-bind' fnm (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
-bind' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
-bind' fnm IDesc_Elim       = pure IDesc_Elim
-bind' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
-bind' fnm InductionI       = pure InductionI
+traverseSyn Desc             = pure Desc
+traverseSyn (Desc_K t)       = Desc_K <$> t
+traverseSyn Desc_Id          = pure Desc_Id
+traverseSyn (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
+traverseSyn (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
+traverseSyn Desc_Elim        = pure Desc_Elim
+traverseSyn Sem              = pure Sem
+traverseSyn (Mu t)           = Mu <$> t
+traverseSyn (Construct t)    = Construct <$> t
+traverseSyn Induction        = pure Induction
+
+traverseSyn IDesc            = pure IDesc
+traverseSyn (IDesc_K t)      = IDesc_K <$> t
+traverseSyn (IDesc_Id t)     = IDesc_Id <$> t
+traverseSyn (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
+traverseSyn (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
+traverseSyn (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
+traverseSyn IDesc_Elim       = pure IDesc_Elim
+traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
+traverseSyn InductionI       = pure InductionI
+
+--------------------------------------------------------------------------------
+generaliseAlg :: [Term] -> Term -> TermCon (Int -> a) -> Int -> TermCon a
+generaliseAlg searchTerms currentTerm x =
+    case elemIndex currentTerm searchTerms of
+      Nothing -> traverseSyn x
+      Just k -> \i -> Bound (i+k)
+
+-- return an open term where substituting subterm in will give the originalterm
+generalise :: [Term] -> Term -> Term
+generalise searchTerms originalTerm = go originalTerm 0
+    where
+      go t@(In x) = In <$> generaliseAlg searchTerms t (go <$> x)
+
+--------------------------------------------------------------------------------
+bindAlg :: Ident -> TermCon (Int -> a) -> Int -> TermCon a
+bindAlg fnm (Free nm')       = \i -> if fnm == nm' then Bound i else Free nm'
+bindAlg fnm x                = traverseSyn x
 
 bindFree :: Ident -> Term -> Term
-bindFree nm x = translateRec (bind' nm) x 0
+bindFree nm x = translateRec (bindAlg nm) x 0
 
 bindFree1 :: Ident -> Term -> Term
-bindFree1 nm x = translateRec (bind' nm) x 1
+bindFree1 nm x = translateRec (bindAlg nm) x 1
 
 --------------------------------------------------------------------------------
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term
