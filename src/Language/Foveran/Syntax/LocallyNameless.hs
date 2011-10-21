@@ -15,7 +15,6 @@ import           Control.Applicative
 import           Data.Rec
 import           Text.Position (Span)
 import           Data.FreeMonad
-import qualified Data.Text as T
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier (Ident)
 
@@ -78,65 +77,65 @@ toLN (DS.Var nm)          bv = Layer $ case elemIndex (Just nm) bv of
                                          Nothing -> Free nm
                                          Just i  -> Bound i
 toLN (DS.Lam nms body)    bv = doBinders nms bv
-    where doBinders []       bv = Var   $ body bv
+    where doBinders []       bv = return   $ body bv
           doBinders (nm:nms) bv = Layer $ Lam nm (doBinders nms (Just nm:bv))
-toLN (DS.App t ts)        bv = doApplications (Var $ t bv) ts
+toLN (DS.App t ts)        bv = doApplications (return $ t bv) ts
     where doApplications tm []     = tm
-          doApplications tm (t:ts) = doApplications (Layer $ App tm (Var $ t bv)) ts
+          doApplications tm (t:ts) = doApplications (Layer $ App tm (return $ t bv)) ts
 toLN (DS.Set i)           bv = Layer $ Set i
 toLN (DS.Pi bs t)         bv = doArrows bs bv
-    where doArrows []            bv = Var $ t bv
-          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (Var $ t1 bv) (doArrows bs (Nothing:bv))
+    where doArrows []            bv = return $ t bv
+          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (return $ t1 bv) (doArrows bs (Nothing:bv))
           doArrows ((nms,t1):bs) bv = doNames nms t1 bv (doArrows bs)
 
           doNames  []       t1 bv k = k bv
-          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just nm) (Var $ t1 bv) (doNames nms t1 (Just nm:bv) k)
+          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just nm) (return $ t1 bv) (doNames nms t1 (Just nm:bv) k)
 toLN (DS.Sigma nms t1 t2) bv = doBinders nms bv
-    where doBinders []       bv = Var   $ t2 bv
-          doBinders (nm:nms) bv = Layer $ Sigma (Just nm) (Var $ t1 bv) (doBinders nms (Just nm:bv))
-toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (Var $ t1 bv) (Var $ t2 (Nothing:bv))
-toLN (DS.Pair t1 t2)      bv = Layer $ Pair (Var $ t1 bv) (Var $ t2 bv)
-toLN (DS.Proj1 t)         bv = Layer $ Proj1 (Var $ t bv)
-toLN (DS.Proj2 t)         bv = Layer $ Proj2 (Var $ t bv)
-toLN (DS.Sum t1 t2)       bv = Layer $ Sum (Var $ t1 bv) (Var $ t2 bv)
-toLN (DS.Inl t)           bv = Layer $ Inl (Var $ t bv)
-toLN (DS.Inr t)           bv = Layer $ Inr (Var $ t bv)
-toLN (DS.Case t1 x t2 y t3 z t4) bv = Layer $ Case (Var $ t1 bv)
+    where doBinders []       bv = return   $ t2 bv
+          doBinders (nm:nms) bv = Layer $ Sigma (Just nm) (return $ t1 bv) (doBinders nms (Just nm:bv))
+toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ t2 (Nothing:bv))
+toLN (DS.Pair t1 t2)      bv = Layer $ Pair (return $ t1 bv) (return $ t2 bv)
+toLN (DS.Proj1 t)         bv = Layer $ Proj1 (return $ t bv)
+toLN (DS.Proj2 t)         bv = Layer $ Proj2 (return $ t bv)
+toLN (DS.Sum t1 t2)       bv = Layer $ Sum (return $ t1 bv) (return $ t2 bv)
+toLN (DS.Inl t)           bv = Layer $ Inl (return $ t bv)
+toLN (DS.Inr t)           bv = Layer $ Inr (return $ t bv)
+toLN (DS.Case t1 x t2 y t3 z t4) bv = Layer $ Case (return $ t1 bv)
                                                    x
-                                                   (Var $ t2 (Just x:bv))
+                                                   (return $ t2 (Just x:bv))
                                                    y
-                                                   (Var $ t3 (Just y:bv))
+                                                   (return $ t3 (Just y:bv))
                                                    z
-                                                   (Var $ t4 (Just z:bv))
+                                                   (return $ t4 (Just z:bv))
 toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
 toLN DS.ElimEmpty         bv = Layer $ ElimEmpty
 
-toLN (DS.Eq t1 t2)        bv = Layer $ Eq (Var $ t1 bv) (Var $ t2 bv)
+toLN (DS.Eq t1 t2)        bv = Layer $ Eq (return $ t1 bv) (return $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
 toLN (DS.ElimEq t x y t1 t2) bv =
-    Layer $ ElimEq (Var $ t bv)
-                   x y (Var $ t1 (Just y:Just x:bv))
-                   (Var $ t2 bv)
+    Layer $ ElimEq (return $ t bv)
+                   x y (return $ t1 (Just y:Just x:bv))
+                   (return $ t2 bv)
 
 toLN DS.Desc              bv = Layer $ Desc
-toLN (DS.Desc_K t)        bv = Layer $ Desc_K (Var $ t bv)
+toLN (DS.Desc_K t)        bv = Layer $ Desc_K (return $ t bv)
 toLN DS.Desc_Id           bv = Layer $ Desc_Id
-toLN (DS.Desc_Prod t1 t2) bv = Layer $ Desc_Prod (Var $ t1 bv) (Var $ t2 bv)
-toLN (DS.Desc_Sum t1 t2)  bv = Layer $ Desc_Sum (Var $ t1 bv) (Var $ t2 bv)
+toLN (DS.Desc_Prod t1 t2) bv = Layer $ Desc_Prod (return $ t1 bv) (return $ t2 bv)
+toLN (DS.Desc_Sum t1 t2)  bv = Layer $ Desc_Sum (return $ t1 bv) (return $ t2 bv)
 toLN DS.Desc_Elim         bv = Layer $ Desc_Elim
 toLN DS.Sem               bv = Layer $ Sem
-toLN (DS.Mu t)            bv = Layer $ Mu (Var $ t bv)
-toLN (DS.Construct t)     bv = Layer $ Construct (Var $ t bv)
+toLN (DS.Mu t)            bv = Layer $ Mu (return $ t bv)
+toLN (DS.Construct t)     bv = Layer $ Construct (return $ t bv)
 toLN DS.Induction         bv = Layer $ Induction
 
 toLN DS.IDesc             bv = Layer $ IDesc
-toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (Var $ t bv)
-toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (Var $ t1 bv) (Var $ t2 bv)
-toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (Var $ t1 bv) (Var $ t2 bv)
+toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (return $ t bv)
+toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (return $ t1 bv) (return $ t2 bv)
+toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (return $ t1 bv) (return $ t2 bv)
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
-toLN (DS.MuI t1 t2)       bv = Layer $ MuI (Var $ t1 bv) (Var $ t2 bv)
+toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
 toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
