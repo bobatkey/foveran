@@ -32,4 +32,3 @@ doNormalise tmDS = do
                               $$ "to"
                               $$ nest 4 d
                               $$ "")
-  return ()
