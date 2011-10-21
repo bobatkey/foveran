@@ -2,39 +2,35 @@
 
 module Language.Foveran.Typing.DeclCheckMonad
     ( DeclCheckM ()
-    , extend
+    , extend -- FIXME: try to get rid of this
     , reportError
+    , malformedDefinition
     , liftTyCheck
     , evaluate
     , getContext -- FIXME: try to get rid of this
-    , runDeclCheckM
-    , checkDefinition -- FIXME: move this
+    , runDeclCheck
     , checkInternalDefinition
     )
     where
 
-import Control.Applicative
-import Control.Monad (unless, ap)
-import Control.Monad.IO.Class (MonadIO (..))
-import Data.Traversable (traverse)
-import Data.Text as T (unpack)
-import Text.Position
+import           Control.Applicative
+import           Control.Monad (unless, ap)
+import           Control.Monad.IO.Class (MonadIO (..))
+import           Data.Traversable (traverse)
+import           Text.Position (Span)
 
-import Text.PrettyPrint
-import Text.PrettyPrint.IsString ()
-import Language.Foveran.Util.PrettyPrinting
+import           Text.PrettyPrint
+import           Text.PrettyPrint.IsString ()
+import           Language.Foveran.Util.PrettyPrinting
 
-import Language.Foveran.Syntax.Display (Declaration (..), Definition (..), Datatype (..))
-import qualified Language.Foveran.Syntax.Display as DS
-import Language.Foveran.Syntax.Identifier (Ident)
-import Language.Foveran.Syntax.LocallyNameless (toLocallyNamelessClosed)
-import qualified Language.Foveran.Syntax.LocallyNameless as LN
+import           Language.Foveran.Syntax.Identifier (Ident)
+import           Language.Foveran.Syntax.LocallyNameless (toLocallyNamelessClosed, TermPos)
 import qualified Language.Foveran.Syntax.Checked as CS
-import Language.Foveran.Parsing.PrettyPrinter
-import Language.Foveran.Typing.Conversion (Value)
-import Language.Foveran.Typing.Context
-import Language.Foveran.Typing.Checker
-import Language.Foveran.Typing.Errors
+import           Language.Foveran.Parsing.PrettyPrinter
+import           Language.Foveran.Typing.Conversion (Value)
+import           Language.Foveran.Typing.Context
+import           Language.Foveran.Typing.Checker
+import           Language.Foveran.Typing.Errors
 
 {------------------------------------------------------------------------------}
 data Error
@@ -88,28 +84,17 @@ evaluate t = DM $ \ctxt -> return $ Right (t `evalIn` ctxt, ctxt)
 malformedDefinition :: Span -> Ident -> Ident -> DeclCheckM ()
 malformedDefinition p nm1 nm2 = DM $ \_ -> return $ Left (p, MalformedDefn nm1 nm2)
 
-checkDefinition :: Definition -> DeclCheckM ()
-checkDefinition (Definition p nm extTy nm' extTm) =
-    do unless (nm == nm') $ malformedDefinition p nm nm'
-       liftIO $ do putStrLn ("Checking definition: " ++ T.unpack nm)
-                   putStrLn $ render $ (   "Type: " <+> ppAnnotTerm extTy
-                                        $$ "Term: " <+> ppAnnotTerm extTm)
-                   putStrLn ""
-       let ty = toLocallyNamelessClosed extTy
-           tm = toLocallyNamelessClosed extTm
-       checkInternalDefinition p nm ty (Just tm)
-
-checkInternalDefinition :: Span -> Ident -> LN.TermPos -> Maybe LN.TermPos -> DeclCheckM ()
+checkInternalDefinition :: Span -> Ident -> TermPos -> Maybe TermPos -> DeclCheckM ()
 checkInternalDefinition p nm ty tm = do
+  -- FIXME: check for duplicate names before we bother type checking
   (_, cTy) <- liftTyCheck $ setCheck ty
   vTy      <- evaluate cTy
   cTm      <- traverse (\tm -> liftTyCheck $ flip (tyCheck tm) vTy) tm -- FIXME: get rid of this flip
   vTm      <- traverse evaluate cTm
   extend p nm vTy vTm
-  
 
-runDeclCheckM :: DeclCheckM () -> IO ()
-runDeclCheckM (DM f) =
+runDeclCheck :: DeclCheckM () -> IO ()
+runDeclCheck (DM f) =
     do r <- f emptyContext
        case r of
          Right ((), _)   -> return ()
@@ -117,6 +102,6 @@ runDeclCheckM (DM f) =
              putStrLn $ render $ text "Type error in term" <+> ppSpan p
                                  $$ nest 2 (ppTypeError e)
          Left (p, RepeatedIdent nm) ->
-             putStrLn $ render $ "Repeated binding" <+> "“" <> text (T.unpack nm) <> "”" <+> "at" <+> ppSpan p
+             putStrLn $ render $ "Repeated binding" <+> "“" <> ppIdent nm <> "”" <+> "at" <+> ppSpan p
          Left (p, MalformedDefn nm1 nm2) ->
              putStrLn $ "Malformed definition at " ++ show p

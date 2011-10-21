@@ -1,15 +1,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Foveran.Typing.DataDecl where
+module Language.Foveran.Typing.DataDecl
+    ( checkDatatype )
+    where
 
 import Data.Functor
 import Data.Monoid
 import Data.Rec
 import Language.Foveran.Syntax.Display
-import Language.Foveran.Typing.Context
-import Language.Foveran.Typing.Checker
+import Language.Foveran.Typing.DeclCheckMonad
+import Language.Foveran.Typing.Definition (processDefinition)
 import Text.Position (Span)
 import qualified Data.Text as T
+
+checkDatatype :: Datatype -> DeclCheckM ()
+checkDatatype d =
+    do processDefinition (genDesc d)
+       processDefinition (genDatatypeCarrier d)
+       mapM_ processDefinition (genConstructors d)
 
 -- step 1: create a description for the given declaration
 --  step 1a: create a type for the description of the given declaration
