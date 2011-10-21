@@ -44,6 +44,17 @@ identifierList = (:) <$> identifier <*> identifierList
                  <|>
                  pure []
 
+pattern :: Parser Tok.Token Pattern
+pattern = PatVar <$> identifier
+          <|>
+          DontCare <$ token Tok.Underscore
+
+patternList :: Parser Tok.Token [Pattern]
+patternList =
+    (:) <$> pattern <*> patternList
+    <|>
+    pure []
+
 file :: Parser Tok.Token [Declaration]
 file = declarations <* eos
 
@@ -61,8 +72,8 @@ declaration =
          DefinitionDecl $ Definition (makeSpan p p') nm1 t1 nm2 (case nms of [] -> t2; nms -> Annot (makeSpan p2 t2) (Lam nms t2)))
         <$> tokenWithText Tok.Ident <* commit <* token Tok.Colon  <*> term <*  token Tok.Semicolon
         <*> tokenWithText Tok.Ident                       
-        <*> identifierList
-        <* token Tok.Equals <*> term <*> token Tok.Semicolon
+        <*> patternList
+        <*  token Tok.Equals <*> term <*> token Tok.Semicolon
     <|>
     IDataDecl <$> idata
     <|>
@@ -157,7 +168,7 @@ term = term10
 
 term10 :: Parser Tok.Token TermPos
 term10 =
-    leftDelimited Lam <$> token Tok.Lambda <* commit <*> identifierList <* token Tok.FullStop <*> term10
+    leftDelimited Lam <$> token Tok.Lambda <* commit <*> patternList <* token Tok.FullStop <*> term10
     <|>
     (\p idents t1 con t2 -> Annot (makeSpan p t2) (con idents t1 t2))
        <$> token Tok.LParen
@@ -253,9 +264,9 @@ term00 =
               <*> (Case <$> term10
                         <* token Tok.For <*> identifier <* token Tok.FullStop <*> term10 <* token Tok.With
                         <* token Tok.LBrace
-                        <* token Tok.Inl <*> identifier <* token Tok.FullStop <*> term10
+                        <* token Tok.Inl <*> pattern <* token Tok.FullStop <*> term10
                         <* token Tok.Semicolon
-                        <* token Tok.Inr <*> identifier <* token Tok.FullStop <*> term10)
+                        <* token Tok.Inr <*> pattern <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
     (\p t t1 t2 -> Annot (makeSpan p t2)

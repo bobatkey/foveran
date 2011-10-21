@@ -162,8 +162,8 @@ bindFree1 nm x = translateRec (bindAlg nm) x 1
 
 --------------------------------------------------------------------------------
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term
-gatheringLam nm (In (DS.Lam nms body)) = DS.Lam (nm:nms) body
-gatheringLam nm body                   = DS.Lam [nm] body
+gatheringLam nm (In (DS.Lam nms body)) = DS.Lam (DS.PatVar nm:nms) body
+gatheringLam nm body                   = DS.Lam [DS.PatVar nm] body
 
 gatheringApp :: DS.Term -> DS.Term -> DS.TermCon DS.Term
 gatheringApp (In (DS.App t1 t2)) t3 = DS.App t1 (t2 ++ [t3])
@@ -194,8 +194,8 @@ toDisplay (Case t1 _ _ x t2 y t3 z t4)
       bindK y t3 $ \y t3 ->
       bindK z t4 $ \z t4 -> DS.Case <$> t1
                                     <*> pure x <*> pure t2
-                                    <*> pure y <*> pure t3
-                                    <*> pure z <*> pure t4
+                                    <*> pure (DS.PatVar y) <*> pure t3
+                                    <*> pure (DS.PatVar z) <*> pure t4
 toDisplay Unit                    = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty

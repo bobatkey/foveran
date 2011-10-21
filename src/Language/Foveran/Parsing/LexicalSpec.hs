@@ -64,6 +64,7 @@ lexicalSpec =
     , "rewriteBy" :==>       Emit RewriteBy
     , "elimEq" :==>          Emit ElimEq
     , "where" :==>           Emit Where
+    , "_" :==>               Emit Underscore
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                            Emit Ident
     , oneOrMore (tok digit) :==>

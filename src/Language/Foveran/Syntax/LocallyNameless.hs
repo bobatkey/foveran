@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TypeSynonymInstances #-}
+{-# LANGUAGE DeriveFunctor, TypeSynonymInstances, OverloadedStrings #-}
 
 module Language.Foveran.Syntax.LocallyNameless
     ( TermPos
@@ -68,6 +68,11 @@ data TermCon tm
 instance Show (TermPos' p) where
     show (Annot p t) = "(" ++ show t ++ ")"
 
+identOfPattern (DS.PatVar nm) = nm
+identOfPattern DS.DontCare    = "x"
+
+binderOfPattern (DS.PatVar nm) = Just nm
+binderOfPattern DS.DontCare    = Nothing
 
 -- If there is a 'Nothing' in the binding list, it is a variable the
 -- term cannot name explicitly. This is used for the translation of
@@ -77,8 +82,10 @@ toLN (DS.Var nm)          bv = Layer $ case elemIndex (Just nm) bv of
                                          Nothing -> Free nm
                                          Just i  -> Bound i
 toLN (DS.Lam nms body)    bv = doBinders nms bv
-    where doBinders []       bv = return   $ body bv
-          doBinders (nm:nms) bv = Layer $ Lam nm (doBinders nms (Just nm:bv))
+    where
+      doBinders []                 bv = return $ body bv
+      doBinders (DS.PatVar nm:nms) bv = Layer $ Lam nm (doBinders nms (Just nm:bv))
+      doBinders (DS.DontCare:nms)  bv = Layer $ Lam "x" (doBinders nms (Nothing:bv))
 toLN (DS.App t ts)        bv = doApplications (return $ t bv) ts
     where doApplications tm []     = tm
           doApplications tm (t:ts) = doApplications (Layer $ App tm (return $ t bv)) ts
@@ -100,13 +107,14 @@ toLN (DS.Proj2 t)         bv = Layer $ Proj2 (return $ t bv)
 toLN (DS.Sum t1 t2)       bv = Layer $ Sum (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Inl t)           bv = Layer $ Inl (return $ t bv)
 toLN (DS.Inr t)           bv = Layer $ Inr (return $ t bv)
-toLN (DS.Case t1 x t2 y t3 z t4) bv = Layer $ Case (return $ t1 bv)
-                                                   x
-                                                   (return $ t2 (Just x:bv))
-                                                   y
-                                                   (return $ t3 (Just y:bv))
-                                                   z
-                                                   (return $ t4 (Just z:bv))
+toLN (DS.Case t1 x t2 y t3 z t4) bv =
+    Layer $ Case (return $ t1 bv)
+                 x
+                 (return $ t2 (Just x:bv))
+                 (identOfPattern y)
+                 (return $ t3 (binderOfPattern y:bv))
+                 (identOfPattern z)
+                 (return $ t4 (binderOfPattern z:bv))
 toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty

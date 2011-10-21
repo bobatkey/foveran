@@ -17,6 +17,7 @@ module Language.Foveran.Syntax.Display
     , IConstructorBitsPos
     , IConstructorBitsCon (..)
 
+    , Pattern (..)
     , Term
     , TermPos
     , TermCon (..)
@@ -90,9 +91,14 @@ data IConstructorBitsCon x
 type Term = Rec TermCon
 type TermPos = AnnotRec Span TermCon
 
+data Pattern
+    = PatVar   Ident
+    | DontCare
+    deriving (Show)
+
 data TermCon tm
     = Var   Ident
-    | Lam   [Ident] tm
+    | Lam   [Pattern] tm
     | App   tm [tm]
     | Set   Int
     | Pi    [([Ident], tm)] tm
@@ -104,7 +110,7 @@ data TermCon tm
     | Sum   tm tm
     | Inl   tm
     | Inr   tm
-    | Case  tm Ident tm Ident tm Ident tm
+    | Case  tm Ident tm Pattern tm Pattern tm
     | Unit
     | UnitI
     | Empty

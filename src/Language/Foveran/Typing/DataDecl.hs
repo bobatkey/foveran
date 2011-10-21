@@ -33,7 +33,7 @@ paramsType p []               t = t
 paramsType p ((nm,ty):params) t = Annot p $ Pi [([nm], ty)] (paramsType p params t)
 
 paramsLam :: Span -> [(Ident,TermPos)] -> TermPos -> TermPos
-paramsLam p params t = Annot p $ Lam (fst <$> params) t
+paramsLam p params t = Annot p $ Lam ((PatVar . fst) <$> params) t
 
 data ConsElem = Recursive
               | Fixed     TermPos
@@ -104,7 +104,7 @@ genConstructors (Datatype p nm params constructors) = genConsLoop id constructor
       elemVarNms elems = map (\(i,_) -> "__x" `mappend` (T.pack $ show i)) $ zip [1..] elems
 
       consLam []    t = t
-      consLam elems t = Annot p $ Lam (elemVarNms elems) t
+      consLam elems t = Annot p $ Lam (map PatVar $ elemVarNms elems) t
       consArg []      = Annot p $ UnitI
       consArg elems   = foldr1 (makePair p) $ map (Annot p . Var) $ elemVarNms elems 
 

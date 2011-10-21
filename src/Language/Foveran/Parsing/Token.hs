@@ -68,6 +68,8 @@ data Token
     | IDesc_Elim
     | MuI
     | InductionI
+
+    | Underscore
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -130,6 +132,7 @@ instance SyntaxHighlight Token where
     lexicalClass ElimEq      = Keyword
     lexicalClass RewriteBy   = Keyword
     lexicalClass Where       = Keyword
+    lexicalClass Underscore  = Punctuation
 
 instance Show Token where
   show Assume = "assume"
@@ -189,3 +192,4 @@ instance Show Token where
   show RewriteBy   = "rewriteBy"
   show Normalise   = "normalise"
   show Where       = "where"
+  show Underscore  = "_"
