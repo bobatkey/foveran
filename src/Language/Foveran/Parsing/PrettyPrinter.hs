@@ -56,9 +56,10 @@ pprint ElimEmpty           = "elimEmpty"
 
 pprint (Eq t1 t2)          = paren 07 (sep [down t1, nest 2 "≡", t2])
 pprint Refl                = "refl"
-pprint (ElimEq t a e t1 t2) = paren 00 ("elimEq" <+> resetPrec t
-                                        $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
-                                        $$ nest 2 "with" <+> t2)
+pprint (ElimEq t Nothing t2) = paren 00 ("rewriteBy" <+> resetPrec t <+> "with" <+> t2)
+pprint (ElimEq t (Just (a, e, t1)) t2) = paren 00 ("rewriteBy" <+> resetPrec t
+                                                   $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
+                                                   $$ nest 2 "with" <+> t2)
 
 pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("“K”" <+> down t)

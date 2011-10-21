@@ -258,9 +258,13 @@ term00 =
                         <* token Tok.Inr <*> identifier <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
-    (\p t a e t1 t2 -> Annot (makeSpan p t2)
-                             (ElimEq t a e t1 t2)) <$>
-      token Tok.ElimEq <*> term10 <* token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10 <* token Tok.With <*> term00
+    (\p t t1 t2 -> Annot (makeSpan p t2)
+                         (ElimEq t t1 t2)) <$>
+      (token Tok.ElimEq <|> token Tok.RewriteBy)
+      <*> term10
+      <*> optional ((\a x t -> (a,x,t)) <$ token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10)
+      <*  token Tok.With
+      <*> term00
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
                        Just (l,p') -> Annot (makeSpan p p') (Set l)) <$> token Tok.Set <*> optional number

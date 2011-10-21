@@ -61,6 +61,7 @@ lexicalSpec =
     , "inductionI" :==>      Emit InductionI
     , "≡" :==>               Emit Eq
     , "refl" :==>            Emit Refl
+    , "rewriteBy" :==>       Emit RewriteBy
     , "elimEq" :==>          Emit ElimEq
     , "where" :==>           Emit Where
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>

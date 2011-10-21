@@ -43,7 +43,7 @@ data TermCon tm
 
   | Eq        tm tm
   | Refl
-  | ElimEq    tm Ident Ident tm tm
+  | ElimEq    tm (Maybe (Ident, Ident, tm)) tm
 
   | Desc
   | Desc_K    tm
@@ -114,9 +114,9 @@ toLN DS.ElimEmpty         bv = Layer $ ElimEmpty
 
 toLN (DS.Eq t1 t2)        bv = Layer $ Eq (return $ t1 bv) (return $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
-toLN (DS.ElimEq t x y t1 t2) bv =
+toLN (DS.ElimEq t t1 t2) bv =
     Layer $ ElimEq (return $ t bv)
-                   x y (return $ t1 (Just y:Just x:bv))
+                   ((\(x,y,t1) -> (x, y, return $ t1 (Just y:Just x:bv))) <$> t1)
                    (return $ t2 bv)
 
 toLN DS.Desc              bv = Layer $ Desc
@@ -173,7 +173,8 @@ close' fnm ElimEmpty        = pure ElimEmpty
 
 close' fnm (Eq t1 t2)       = Eq <$> t1 <*> t2
 close' fnm Refl             = pure Refl
-close' fnm (ElimEq t x y t1 t2) = ElimEq <$> t <*> pure x <*> pure y <*> binder (binder t1) <*> t2
+close' fnm (ElimEq t Nothing t2) = ElimEq <$> t <*> pure Nothing <*> t2
+close' fnm (ElimEq t (Just (x,y,t1)) t2) = ElimEq <$> t <*> ((\t1 -> Just (x,y,t1)) <$> binder (binder t1)) <*> t2
 
 close' fnm Desc             = pure Desc
 close' fnm (Desc_K t)       = Desc_K <$> t

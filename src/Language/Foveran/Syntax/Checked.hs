@@ -205,7 +205,7 @@ toDisplay (Eq _ _ t1 t2)          = DS.Eq <$> t1 <*> t2
 toDisplay Refl                    = pure DS.Refl
 toDisplay (ElimEq _ _ _ t a e t1 t2) =
     do (a', (e', t1')) <- bind a (bind e t1)
-       DS.ElimEq <$> t <*> pure a' <*> pure e' <*> pure t1' <*> t2
+       DS.ElimEq <$> t <*> ((\x y t -> Just (x,y,t)) <$> pure a' <*> pure e' <*> pure t1') <*> t2
 
 toDisplay Desc                    = pure DS.Desc
 toDisplay (Desc_K t)              = DS.Desc_K <$> t

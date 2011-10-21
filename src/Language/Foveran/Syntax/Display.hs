@@ -112,7 +112,7 @@ data TermCon tm
 
     | Eq     tm tm
     | Refl
-    | ElimEq tm Ident Ident tm tm
+    | ElimEq tm (Maybe (Ident, Ident, tm)) tm
 
     {- Descriptions of non-indexed types -}
     | Desc

@@ -59,6 +59,7 @@ data Token
     | Eq
     | Refl
     | ElimEq
+    | RewriteBy
 
     | IDesc
     | Quote_IId
@@ -127,6 +128,7 @@ instance SyntaxHighlight Token where
     lexicalClass Eq          = Operator
     lexicalClass Refl        = Constructor
     lexicalClass ElimEq      = Keyword
+    lexicalClass RewriteBy   = Keyword
     lexicalClass Where       = Keyword
 
 instance Show Token where
@@ -184,5 +186,6 @@ instance Show Token where
   show Eq          = "≡"
   show Refl        = "refl"
   show ElimEq      = "elimEq"
+  show RewriteBy   = "rewriteBy"
   show Normalise   = "normalise"
   show Where       = "where"

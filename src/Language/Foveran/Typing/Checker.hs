@@ -166,6 +166,24 @@ tyCheck (Annot p Refl) ctxt (VEq vA vB va vb) =
 tyCheck (Annot p Refl) ctxt v =
     Error p (ReflExpectingEqualityType ctxt v)
 
+tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
+    do (ty, tm) <- tySynth t ctxt
+       case ty of
+         VEq vA vB va vb ->
+             do let tA = reifyType0 vA
+                    tB = reifyType0 vB
+                unless (tA == tB) $ Error p (ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
+                let ta   = reify vA va 0
+                    tb   = reify vB vb 0
+                    eq   = reify ty (evaluate tm [] (lookupDef ctxt)) 0 -- normalise the equality proof
+                    tmP  = reifyType0 tP
+                    tmPg = CS.generalise [eq,tb] tmP
+                let vP' = evaluate tmPg [VRefl, va] (lookupDef ctxt)
+                tm_p <- tyCheck tp ctxt vP'
+                return (In $ CS.ElimEq tA ta tb tm "a" "eq" tmPg tm_p)
+         ty ->
+             Error p (ExpectingEqualityType ctxt ty)
+
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
@@ -245,7 +263,7 @@ tySynth (Annot p ElimEmpty) ctxt =
     return ( forall "A" (VSet 10) $ \a -> VEmpty .->. a
            , In $ CS.ElimEmpty)
 
-tySynth (Annot p (ElimEq t a e tP tp)) ctxt =
+tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
     do (ty, tm) <- tySynth t ctxt
        case ty of
          VEq vA vB va vb -> do
