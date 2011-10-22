@@ -184,6 +184,11 @@ tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
          ty ->
              Error p (ExpectingEqualityType ctxt ty)
 
+tyCheck (Annot p (ElimEmpty t1 Nothing)) ctxt v =
+    do tm1     <- tyCheck t1 ctxt VEmpty
+       let tm2 = reifyType0 v
+       return (In $ CS.ElimEmpty tm1 tm2)
+
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
@@ -258,10 +263,16 @@ tySynth (Annot p UnitI) ctxt =
 
 tySynth (Annot p Empty) ctxt =
     return (VSet 0, In $ CS.Empty)
-tySynth (Annot p ElimEmpty) ctxt =
+tySynth (Annot p (ElimEmpty t1 (Just t2))) ctxt =
+    do tm1     <- tyCheck t1 ctxt VEmpty
+       (_,tm2) <- setCheck t2 ctxt
+       let vtm2 = evaluate tm2 [] (lookupDef ctxt)
+       return (vtm2, In $ CS.ElimEmpty tm1 tm2)
+{-
     -- FIXME: make this have a mandatory argument so we can use an arbitrary level
     return ( forall "A" (VSet 10) $ \a -> VEmpty .->. a
            , In $ CS.ElimEmpty)
+-}
 
 tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
     do (ty, tm) <- tySynth t ctxt

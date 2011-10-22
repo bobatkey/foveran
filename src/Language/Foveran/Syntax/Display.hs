@@ -114,7 +114,7 @@ data TermCon tm
     | Unit
     | UnitI
     | Empty
-    | ElimEmpty
+    | ElimEmpty tm (Maybe tm)
 
     | Eq     tm tm
     | Refl

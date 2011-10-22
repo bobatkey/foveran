@@ -140,9 +140,7 @@ vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when elimi
 
 {------------------------------------------------------------------------------}
 velimEmpty :: Value -> Value -> Value
-velimEmpty a (VNeutral n) = reflect a (pure (In ElimEmpty)
-                                       `tmApp` reifyType a
-                                       `tmApp` n)
+velimEmpty (VNeutral n) a = reflect a (In <$> (ElimEmpty <$> n <*> reifyType a))
 
 {------------------------------------------------------------------------------}
 velimeq tA ta tb VRefl a e tP tp = tp

@@ -49,7 +49,7 @@ data TermCon tm
     | Unit
     | UnitI
     | Empty
-    | ElimEmpty
+    | ElimEmpty tm tm
 
     | Eq     tm tm tm tm
     | Refl
@@ -108,7 +108,7 @@ traverseSyn (Case t1 tA tB x t2 y t3 z t4)
 traverseSyn Unit             = pure Unit
 traverseSyn UnitI            = pure UnitI
 traverseSyn Empty            = pure Empty
-traverseSyn ElimEmpty        = pure ElimEmpty
+traverseSyn (ElimEmpty t1 t2) = ElimEmpty <$> t1 <*> t2
 
 traverseSyn (Eq tA tB t1 t2) = Eq <$> tA <*> tB <*> t1 <*> t2
 traverseSyn Refl             = pure Refl
@@ -199,7 +199,7 @@ toDisplay (Case t1 _ _ x t2 y t3 z t4)
 toDisplay Unit                    = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty
-toDisplay ElimEmpty               = pure DS.ElimEmpty
+toDisplay (ElimEmpty t1 t2)       = DS.ElimEmpty <$> t1 <*> (Just <$> t2)
 
 toDisplay (Eq _ _ t1 t2)          = DS.Eq <$> t1 <*> t2
 toDisplay Refl                    = pure DS.Refl
@@ -280,7 +280,7 @@ instance Eq Term where
   In Unit       == In Unit           = True
   In UnitI      == In UnitI          = True
   In Empty      == In Empty          = True
-  In ElimEmpty  == In ElimEmpty      = True
+  In (ElimEmpty t1 t2) == In (ElimEmpty t1' t2') = t1 == t1'
 
   In (Eq _ _ ta tb) == In (Eq _ _ ta' tb') = ta == ta' && tb == tb'
   In Refl           == In Refl             = True

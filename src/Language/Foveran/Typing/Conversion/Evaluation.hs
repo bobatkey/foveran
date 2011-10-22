@@ -53,7 +53,7 @@ eval (Case t tA tB x tP y tL z tR) = vcase <$> t
 eval Unit      = pure VUnit
 eval UnitI     = pure VUnitI
 eval Empty     = pure VEmpty
-eval ElimEmpty = pure $ VLam "A" $ \a -> VLam "x" $ \x -> velimEmpty a x
+eval (ElimEmpty x a) = velimEmpty <$> x <*> a
 
 eval (Eq tA tB ta tb) = VEq <$> tA <*> tB <*> ta <*> tb
 eval Refl             = pure VRefl

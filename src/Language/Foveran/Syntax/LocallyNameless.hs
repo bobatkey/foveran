@@ -11,6 +11,7 @@ module Language.Foveran.Syntax.LocallyNameless
     where
 
 import           Data.List (elemIndex)
+import           Data.Traversable (sequenceA)
 import           Control.Applicative
 import           Data.Rec
 import           Text.Position (Span)
@@ -39,7 +40,7 @@ data TermCon tm
   | Unit
   | UnitI
   | Empty
-  | ElimEmpty
+  | ElimEmpty tm (Maybe tm)
 
   | Eq        tm tm
   | Refl
@@ -118,7 +119,8 @@ toLN (DS.Case t1 x t2 y t3 z t4) bv =
 toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
-toLN DS.ElimEmpty         bv = Layer $ ElimEmpty
+toLN (DS.ElimEmpty t1 Nothing)   bv = Layer $ ElimEmpty (return $ t1 bv) Nothing
+toLN (DS.ElimEmpty t1 (Just t2)) bv = Layer $ ElimEmpty (return $ t1 bv) (Just (return $ t2 bv))
 
 toLN (DS.Eq t1 t2)        bv = Layer $ Eq (return $ t1 bv) (return $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
@@ -177,7 +179,7 @@ close' fnm (Case t1 x t2 y t3 z t4) = Case <$> t1
 close' fnm Unit             = pure Unit
 close' fnm UnitI            = pure UnitI
 close' fnm Empty            = pure Empty
-close' fnm ElimEmpty        = pure ElimEmpty
+close' fnm (ElimEmpty t1 t2) = ElimEmpty <$> t1 <*> sequenceA t2
 
 close' fnm (Eq t1 t2)       = Eq <$> t1 <*> t2
 close' fnm Refl             = pure Refl

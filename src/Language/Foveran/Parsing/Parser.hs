@@ -282,7 +282,11 @@ term00 =
     <|>
     keyword Empty <$> token Tok.EmptyType
     <|>
-    keyword ElimEmpty <$> token Tok.ElimEmpty
+    (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
+      <$> token Tok.ElimEmpty <*> term10 <* token Tok.For <*> term10
+    <|>
+    (\p t1 -> Annot (makeSpan p t1) (ElimEmpty t1 Nothing))
+      <$> token Tok.ElimEmpty <*> term10
     <|>
     keyword Unit <$> token Tok.UnitType
     <|>
