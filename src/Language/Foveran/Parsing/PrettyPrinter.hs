@@ -41,7 +41,7 @@ pprint (App t ts)     = paren 01 (sep (t:map (nest 2 . down) ts))
 
 pprint (Prod t1 t2)      = paren 08 (down t1 <+> "×" <+> t2)
 pprint (Sigma nms t1 t2) = paren 10 (hang ("(" <> ppIdents nms <+> ":" <+> t1 <> ")" <+> "×") 0 t2)
-pprint (Proj1 t)         = paren 01 ("fst" <+> down t)
+pprint (Proj1 t)         = paren 01 ("fst" <+> down t) -- These precs are a hack to make the output look less weird
 pprint (Proj2 t)         = paren 01 ("snd" <+> down t)
 pprint (Pair t1 t2)      = "«" <> (sep $ punctuate "," [resetPrec t1, resetPrec t2]) <> "»"
 
@@ -49,7 +49,7 @@ pprint (Sum t1 t2)             = paren 09 (down t1 <+> "+" <+> t2)
 pprint (Inl t)                 = paren 01 ("inl" <+> down t)
 pprint (Inr t)                 = paren 01 ("inr" <+> down t)
 pprint (Case t x tP y tL z tR) =
-    ("case" <+> t <+> "for" <+> ppIdent x <> "." <+> tP <+> "with")
+    ("case" <+> t <+> "for" <+> ppIdent x <> "." <+> resetPrec tP <+> "with")
     $$
     nest 2 (("{" <+> hang ("inl" <+> ppPattern y <> ".") 3 (resetPrec tL))
             $$
@@ -64,10 +64,10 @@ pprint (ElimEmpty t1 (Just t2)) = paren 01 ("elimEmpty" <+> resetPrec t1 $$ nest
 
 pprint (Eq t1 t2)          = paren 07 (sep [down t1, nest 2 "≡", t2])
 pprint Refl                = "refl"
-pprint (ElimEq t Nothing t2) = paren 00 ("rewriteBy" <+> resetPrec t <+> "with" <+> t2)
-pprint (ElimEq t (Just (a, e, t1)) t2) = paren 00 ("rewriteBy" <+> resetPrec t
+pprint (ElimEq t Nothing t2) = paren 01 ("rewriteBy" <+> resetPrec t <+> "then" $$ resetPrec t2)
+pprint (ElimEq t (Just (a, e, t1)) t2) = paren 01 ("rewriteBy" <+> resetPrec t
                                                    $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
-                                                   $$ nest 2 "with" <+> t2)
+                                                   $$ nest 2 "then" <+> resetPrec t2)
 
 pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("“K”" <+> down t)

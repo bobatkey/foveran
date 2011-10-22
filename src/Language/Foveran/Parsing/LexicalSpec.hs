@@ -65,6 +65,7 @@ lexicalSpec =
     , "elimEq" :==>          Emit ElimEq
     , "where" :==>           Emit Where
     , "_" :==>               Emit Underscore
+    , "then" :==>            Emit Then
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                            Emit Ident
     , oneOrMore (tok digit) :==>

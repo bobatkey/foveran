@@ -968,9 +968,9 @@ equal-to-leibniz =
   natInduction (λn₁. (n₂ : Nat) → equalNat n₁ n₂ → nat-equal n₁ n₂)
                (caseNat (λn₂. equalNat zero n₂ → nat-equal zero n₂)
                         (λu. nat-refl zero)
-                        (λn₂ e. elimEmpty (nat-equal zero (succ n₂)) e))
+                        (λn₂ e. elimEmpty e))
                (λn₁ ih. caseNat (λn₂. equalNat (succ n₁) n₂ → nat-equal (succ n₁) n₂)
-                                (λe. elimEmpty (nat-equal (succ n₁) zero) e)
+                                (λe. elimEmpty e)
                                 (λn₂ eq. λF f₁. ih n₂ eq (λn. F (succ n)) f₁));
 
 compareView : Nat → Nat → Set;

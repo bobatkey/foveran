@@ -226,6 +226,20 @@ term01 =
     <|>
     binaryPrefix IDesc_Pi <$> token Tok.Quote_Pi <*> term00 <*> term00
     <|>
+    (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
+      <$> token Tok.ElimEmpty <*> term10 <* token Tok.For <*> term10
+    <|>
+    (\p t1 -> Annot (makeSpan p t1) (ElimEmpty t1 Nothing))
+      <$> token Tok.ElimEmpty <*> term10
+    <|>
+    (\p t t1 t2 -> Annot (makeSpan p t2)
+                         (ElimEq t t1 t2)) <$>
+      (token Tok.ElimEq <|> token Tok.RewriteBy)
+      <*> term10
+      <*> optional ((\a x t -> (a,x,t)) <$ token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10)
+      <*  (token Tok.With <|> token Tok.Then)
+      <*> term10
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
@@ -269,24 +283,10 @@ term00 =
                         <* token Tok.Inr <*> pattern <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
-    (\p t t1 t2 -> Annot (makeSpan p t2)
-                         (ElimEq t t1 t2)) <$>
-      (token Tok.ElimEq <|> token Tok.RewriteBy)
-      <*> term10
-      <*> optional ((\a x t -> (a,x,t)) <$ token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10)
-      <*  token Tok.With
-      <*> term00
-    <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
                        Just (l,p') -> Annot (makeSpan p p') (Set l)) <$> token Tok.Set <*> optional number
     <|>
     keyword Empty <$> token Tok.EmptyType
-    <|>
-    (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
-      <$> token Tok.ElimEmpty <*> term10 <* token Tok.For <*> term10
-    <|>
-    (\p t1 -> Annot (makeSpan p t1) (ElimEmpty t1 Nothing))
-      <$> token Tok.ElimEmpty <*> term10
     <|>
     keyword Unit <$> token Tok.UnitType
     <|>

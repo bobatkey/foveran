@@ -95,14 +95,9 @@ vecElim α Φ φnil φcons =
       case fst x for b. (z : semI Nat (body α n b) (λn. vec α n)) →
                         liftI Nat (body α n b) (λn. vec α n) Φ z →
                         Φ n (construct «b,z») with
-        { inl u. λz u.
-            elimEq z
-              for n' p. Φ n' (construct «inl (), p»)
-              with φnil
-        ; inr u. λz φ.
-            elimEq snd (snd (snd z))
-              for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p»)
-              with (φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ))
+        { inl u. λz u. rewriteBy z then φnil
+        ; inr u. λz φ. rewriteBy snd (snd (snd z)) then
+                       φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ)
         } (snd x));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -164,7 +159,7 @@ is-vnil : (α : Set) → (xs : vec α zero) → xs ≡ vnil α;
 is-vnil α xs =
   vecElim α (λn xs. n ≡ zero → xs ≡ vnil α)
     (λeq. refl)
-    (λn a xs φ eq. elimEmpty (vcons α n a xs ≡ vnil α) (succ≢zero n eq))
+    (λn a xs φ eq. elimEmpty succ≢zero n eq)
     zero
     xs
     refl;
@@ -178,7 +173,7 @@ elim-veczero :
 elim-veczero α Φ φnil xs =
   vecElim α (λn xs. n ≡ zero → Φ n xs)
     (λeq. φnil)
-    (λn a xs φ eq. elimEmpty (Φ (succ n) (vcons α n a xs)) (succ≢zero n eq))
+    (λn a xs φ eq. elimEmpty succ≢zero n eq)
     zero
     xs
     refl;
@@ -191,8 +186,8 @@ elim-veczero2 :
   Φ xs;
 elim-veczero2 α Φ φnil xs =
   vecElim α (λn xs. n ≡ zero → (xs' : vec α zero) → xs ≡ xs' → Φ xs')
-    (λeq₁ xs' eq₂. rewriteBy eq₂ with φnil)
-    (λn a xs φ eq₁ xs' eq₂. elimEmpty (Φ xs') (succ≢zero n eq₁))
+    (λeq₁ xs' eq₂. rewriteBy eq₂ then φnil)
+    (λn a xs φ eq₁ xs' eq₂. elimEmpty succ≢zero n eq₁)
     zero
     xs
     refl
@@ -205,8 +200,8 @@ is-vcons : (α : Set) →
            (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs';
 is-vcons α n xs =
   vecElim α (λn' xs. succ n ≡ n' → (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs')
-    (λeq. elimEmpty ((a : α) × (xs' : vec α n) × vnil α ≡ vcons α n a xs') (succ≢zero n eq))
-    (λn' a xs' φ eq. rewriteBy symm Nat n n' (succ-inj n n' eq) with «a, xs', refl»)
+    (λeq. elimEmpty succ≢zero n eq)
+    (λn' a xs' φ eq. rewriteBy symm Nat n n' (succ-inj n n' eq) then «a, xs', refl»)
     (succ n)
     xs
     refl;
@@ -219,12 +214,12 @@ elim-vecsucc :
 elim-vecsucc α Φ φcons n xs =
   vecElim α (λn xs. (n' : Nat) → n ≡ succ n' → (xs' : vec α (succ n')) → xs ≡ xs' → Φ n' xs')
     (λn' eq₁ xs' eq₂.
-      elimEmpty (Φ n' xs') (succ≢zero n' (rewriteBy eq₁ with refl)))
+      elimEmpty succ≢zero n' (rewriteBy eq₁ then refl))
     (λn a xs φ n' eq₁.
-      rewriteBy succ-inj n n' eq₁ with
-      (λxs' eq₂.
-        rewriteBy eq₂ with
-        (φcons n a xs)))
+      rewriteBy succ-inj n n' eq₁ then
+      λxs' eq₂.
+       rewriteBy eq₂ then
+       φcons n a xs)
     (succ n)
     xs
     n
