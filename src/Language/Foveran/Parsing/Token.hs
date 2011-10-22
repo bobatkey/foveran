@@ -71,6 +71,7 @@ data Token
 
     | Underscore
     | Then
+    | AbsurdBy
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -135,6 +136,7 @@ instance SyntaxHighlight Token where
     lexicalClass Where       = Keyword
     lexicalClass Underscore  = Punctuation
     lexicalClass Then        = Keyword
+    lexicalClass AbsurdBy    = Keyword
 
 instance Show Token where
   show Assume = "assume"
@@ -196,3 +198,4 @@ instance Show Token where
   show Where       = "where"
   show Underscore  = "_"
   show Then        = "then"
+  show AbsurdBy    = "absurdBy"

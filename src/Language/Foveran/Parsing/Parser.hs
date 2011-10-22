@@ -227,10 +227,14 @@ term01 =
     binaryPrefix IDesc_Pi <$> token Tok.Quote_Pi <*> term00 <*> term00
     <|>
     (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
-      <$> token Tok.ElimEmpty <*> term10 <* token Tok.For <*> term10
+      <$> (token Tok.ElimEmpty <|> token Tok.AbsurdBy)
+      <*> term10
+      <*  token Tok.For
+      <*> term10
     <|>
     (\p t1 -> Annot (makeSpan p t1) (ElimEmpty t1 Nothing))
-      <$> token Tok.ElimEmpty <*> term10
+      <$> (token Tok.ElimEmpty <|> token Tok.AbsurdBy)
+      <*> term10
     <|>
     (\p t t1 t2 -> Annot (makeSpan p t2)
                          (ElimEq t t1 t2)) <$>
