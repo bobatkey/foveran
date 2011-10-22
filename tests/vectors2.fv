@@ -95,8 +95,8 @@ vecElim α Φ φnil φcons =
       case fst x for b. (z : semI Nat (body α n b) (λn. vec α n)) →
                         liftI Nat (body α n b) (λn. vec α n) Φ z →
                         Φ n (construct «b,z») with
-        { inl u. λz u. rewriteBy z then φnil
-        ; inr u. λz φ. rewriteBy snd (snd (snd z)) then
+        { inl _. λz _. rewriteBy z then φnil
+        ; inr _. λz φ. rewriteBy snd (snd (snd z)) then
                        φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ)
         } (snd x));
 
@@ -117,10 +117,27 @@ vecappend α n₁ n₂ xs ys =
     n₁
     xs;
 
--- vecreverse :
---   (α : Set) →
---   (n : Nat) →
---   vec α n → 
+singleton : (α : Set) → α → vec α (succ zero);
+singleton α a = vcons α zero a (vnil α);
+
+add_succ :
+  (n : Nat) →
+  add n (succ zero) ≡ succ n;
+add_succ = natInduction (λn. add n (succ zero) ≡ succ n)
+  refl
+  (λn p. rewriteBy p then refl);
+
+vecreverse :
+   (α : Set) →
+   (n : Nat) →
+   vec α n →
+   vec α n;
+vecreverse α =
+  vecElim α (λn xs. vec α n)
+    (vnil α)
+    (λn a xs rev_xs.
+      rewriteBy add_succ n then
+      vecappend α n (succ zero) rev_xs (singleton α a));
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 assume A : Set;
@@ -132,15 +149,17 @@ v = vcons A one a (vcons A zero b (vnil A));
 
 normalise vecappend A two two v v;
 
+normalise vecreverse A two v;
+
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 not : Set → Set;
 not A = A → Empty;
 
-succ≢zero : (n : Nat) → not (succ n ≡ zero);
-succ≢zero n eq =
+succ_ne_zero : (n : Nat) → not (succ n ≡ zero);
+succ_ne_zero n eq =
   elimEq eq for n p. natCase (λn. Set) Empty (λu. Unit) n with ();
 
-normalise succ≢zero;
+– normalise succ_ne_zero;
 
 symm :
   (α : Set) →
@@ -148,6 +167,12 @@ symm :
   a₁ ≡ a₂ →
   a₂ ≡ a₁;
 symm α a₁ a₂ eq = rewriteBy eq with refl;
+
+trans :
+  (α : Set) →
+  (a₁ a₂ a₃ : α) →
+  a₁ ≡ a₂ → a₂ ≡ a₃ → a₁ ≡ a₃;
+trans α a₁ a₂ a₃ eq₁ = rewriteBy eq₁ then λeq₂. eq₂;
 
 succ-inj : (n₁ n₂ : Nat) → succ n₁ ≡ succ n₂ → n₁ ≡ n₂;
 succ-inj n₁ n₂ eq =
@@ -159,7 +184,7 @@ is-vnil : (α : Set) → (xs : vec α zero) → xs ≡ vnil α;
 is-vnil α xs =
   vecElim α (λn xs. n ≡ zero → xs ≡ vnil α)
     (λeq. refl)
-    (λn a xs φ eq. absurdBy succ≢zero n eq)
+    (λn a xs φ eq. absurdBy succ_ne_zero n eq)
     zero
     xs
     refl;
@@ -173,7 +198,7 @@ elim-veczero :
 elim-veczero α Φ φnil xs =
   vecElim α (λn xs. n ≡ zero → Φ n xs)
     (λeq. φnil)
-    (λn a xs φ eq. absurdBy succ≢zero n eq)
+    (λn a xs φ eq. absurdBy succ_ne_zero n eq)
     zero
     xs
     refl;
@@ -187,7 +212,7 @@ elim-veczero2 :
 elim-veczero2 α Φ φnil xs =
   vecElim α (λn xs. n ≡ zero → (xs' : vec α zero) → xs ≡ xs' → Φ xs')
     (λeq₁ xs' eq₂. rewriteBy eq₂ then φnil)
-    (λn a xs φ eq₁ xs' eq₂. absurdBy succ≢zero n eq₁)
+    (λn a xs φ eq₁ xs' eq₂. absurdBy succ_ne_zero n eq₁)
     zero
     xs
     refl
@@ -200,7 +225,7 @@ is-vcons : (α : Set) →
            (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs';
 is-vcons α n xs =
   vecElim α (λn' xs. succ n ≡ n' → (a : α) × (xs' : vec α n) × xs ≡ vcons α n a xs')
-    (λeq. absurdBy succ≢zero n eq)
+    (λeq. absurdBy succ_ne_zero n eq)
     (λn' a xs' φ eq. rewriteBy symm Nat n n' (succ-inj n n' eq) then «a, xs', refl»)
     (succ n)
     xs
@@ -214,7 +239,7 @@ elim-vecsucc :
 elim-vecsucc α Φ φcons n xs =
   vecElim α (λn xs. (n' : Nat) → n ≡ succ n' → (xs' : vec α (succ n')) → xs ≡ xs' → Φ n' xs')
     (λn' eq₁ xs' eq₂.
-      absurdBy succ≢zero n' (rewriteBy eq₁ then refl))
+      absurdBy succ_ne_zero n' (rewriteBy eq₁ then refl))
     (λn a xs φ n' eq₁.
       rewriteBy succ-inj n n' eq₁ then
       λxs' eq₂.
