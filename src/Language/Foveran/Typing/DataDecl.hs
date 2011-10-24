@@ -30,7 +30,7 @@ timesDesc p x y = Annot p $ Desc_Prod x y
 
 paramsType :: Span -> [(Ident,TermPos)] -> TermPos -> TermPos
 paramsType p []               t = t
-paramsType p ((nm,ty):params) t = Annot p $ Pi [([nm], ty)] (paramsType p params t)
+paramsType p ((nm,ty):params) t = Annot p $ Pi [([PatVar nm], ty)] (paramsType p params t)
 
 paramsLam :: Span -> [(Ident,TermPos)] -> TermPos -> TermPos
 paramsLam p params t = Annot p $ Lam ((PatVar . fst) <$> params) t

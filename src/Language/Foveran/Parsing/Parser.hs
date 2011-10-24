@@ -39,15 +39,12 @@ number = (\(x,y) -> (read $ T.unpack x,y)) <$> tokenWithText Tok.Number
 identifier :: Parser Tok.Token Ident
 identifier = fst <$> tokenWithText Tok.Ident
 
-identifierList :: Parser Tok.Token [Ident]
-identifierList = (:) <$> identifier <*> identifierList
-                 <|>
-                 pure []
-
 pattern :: Parser Tok.Token Pattern
-pattern = PatVar <$> identifier
+pattern = PatVar   <$> identifier
           <|>
-          DontCare <$ token Tok.Underscore
+          PatTuple <$  token Tok.LDoubleAngle <*> ((:) <$> pattern <*> (many (token Tok.Comma *> pattern))) <* token Tok.RDoubleAngle
+          <|>
+          PatNull  <$  token Tok.Underscore
 
 patternList :: Parser Tok.Token [Pattern]
 patternList =
@@ -163,9 +160,9 @@ term10 :: Parser Tok.Token TermPos
 term10 =
     leftDelimited Lam <$> token Tok.Lambda <* commit <*> patternList <* token Tok.FullStop <*> term10
     <|>
-    (\p idents t1 con t2 -> Annot (makeSpan p t2) (con idents t1 t2))
+    (\p patterns t1 con t2 -> Annot (makeSpan p t2) (con patterns t1 t2))
        <$> token Tok.LParen
-       <*> identifierList
+       <*> patternList
        <*  token Tok.Colon
        <*  commit
        <*> term10

@@ -93,7 +93,8 @@ type TermPos = AnnotRec Span TermCon
 
 data Pattern
     = PatVar   Ident
-    | DontCare
+    | PatTuple [Pattern]
+    | PatNull
     deriving (Show)
 
 data TermCon tm
@@ -101,8 +102,8 @@ data TermCon tm
     | Lam   [Pattern] tm
     | App   tm [tm]
     | Set   Int
-    | Pi    [([Ident], tm)] tm
-    | Sigma [Ident] tm tm
+    | Pi    [([Pattern], tm)] tm
+    | Sigma [Pattern] tm tm
     | Prod  tm tm
     | Pair  tm tm
     | Proj1 tm

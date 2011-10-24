@@ -69,39 +69,50 @@ data TermCon tm
 instance Show (TermPos' p) where
     show (Annot p t) = "(" ++ show t ++ ")"
 
-identOfPattern (DS.PatVar nm) = nm
-identOfPattern DS.DontCare    = "x"
+identOfPattern (DS.PatVar nm)  = nm
+identOfPattern (DS.PatTuple _) = "p" -- FIXME: concatenate all the names, or something
+identOfPattern DS.PatNull      = "x"
 
-binderOfPattern (DS.PatVar nm) = Just nm
-binderOfPattern DS.DontCare    = Nothing
+lookupVarInPattern :: Ident -> DS.Pattern -> Int -> Maybe (FM TermCon a)
+lookupVarInPattern nm (DS.PatVar nm') k | nm == nm' = Just (Layer $ Bound k)
+                                        | otherwise = Nothing
+lookupVarInPattern nm (DS.PatTuple l) k = do
+  (t, isLast) <- lookupVarInTuplePattern l
+  return $ if isLast then t else (Layer $ Proj1 t)
+    where lookupVarInTuplePattern []     = Nothing
+          lookupVarInTuplePattern [p]    = do t <- lookupVarInPattern nm p k; return (t,True)
+          lookupVarInTuplePattern (p:ps) = do t <- lookupVarInPattern nm p k; return (t, False)
+                                           <|>
+                                           do (t,isLast) <- lookupVarInTuplePattern ps; return (Layer $ Proj2 t, isLast)
+lookupVarInPattern nm (DS.PatNull)    k = Nothing
 
--- If there is a 'Nothing' in the binding list, it is a variable the
--- term cannot name explicitly. This is used for the translation of
--- data declarations
-toLN :: DS.TermCon ([Maybe Ident] -> a) -> [Maybe Ident] -> FM TermCon a
-toLN (DS.Var nm)          bv = Layer $ case elemIndex (Just nm) bv of
-                                         Nothing -> Free nm
-                                         Just i  -> Bound i
+lookupVar :: Ident -> [DS.Pattern] -> Int -> Maybe (FM TermCon a)
+lookupVar nm []     k = Nothing
+lookupVar nm (p:ps) k = lookupVarInPattern nm p k <|> lookupVar nm ps (k+1)
+
+toLN :: DS.TermCon ([DS.Pattern] -> a) -> [DS.Pattern] -> FM TermCon a
+toLN (DS.Var nm)          bv = case lookupVar nm bv 0 of
+                                 Nothing -> Layer $ Free nm
+                                 Just t  -> t
 toLN (DS.Lam nms body)    bv = doBinders nms bv
     where
       doBinders []                 bv = return $ body bv
-      doBinders (DS.PatVar nm:nms) bv = Layer $ Lam nm (doBinders nms (Just nm:bv))
-      doBinders (DS.DontCare:nms)  bv = Layer $ Lam "x" (doBinders nms (Nothing:bv))
+      doBinders (p:nms) bv = Layer $ Lam (identOfPattern p) (doBinders nms (p:bv))
 toLN (DS.App t ts)        bv = doApplications (return $ t bv) ts
     where doApplications tm []     = tm
           doApplications tm (t:ts) = doApplications (Layer $ App tm (return $ t bv)) ts
 toLN (DS.Set i)           bv = Layer $ Set i
 toLN (DS.Pi bs t)         bv = doArrows bs bv
     where doArrows []            bv = return $ t bv
-          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (return $ t1 bv) (doArrows bs (Nothing:bv))
+          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (return $ t1 bv) (doArrows bs (DS.PatNull:bv))
           doArrows ((nms,t1):bs) bv = doNames nms t1 bv (doArrows bs)
 
           doNames  []       t1 bv k = k bv
-          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just nm) (return $ t1 bv) (doNames nms t1 (Just nm:bv) k)
+          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just $ identOfPattern nm) (return $ t1 bv) (doNames nms t1 (nm:bv) k)
 toLN (DS.Sigma nms t1 t2) bv = doBinders nms bv
     where doBinders []       bv = return   $ t2 bv
-          doBinders (nm:nms) bv = Layer $ Sigma (Just nm) (return $ t1 bv) (doBinders nms (Just nm:bv))
-toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ t2 (Nothing:bv))
+          doBinders (nm:nms) bv = Layer $ Sigma (Just $ identOfPattern nm) (return $ t1 bv) (doBinders nms (nm:bv))
+toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ t2 (DS.PatNull:bv))
 toLN (DS.Pair t1 t2)      bv = Layer $ Pair (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Proj1 t)         bv = Layer $ Proj1 (return $ t bv)
 toLN (DS.Proj2 t)         bv = Layer $ Proj2 (return $ t bv)
@@ -111,11 +122,11 @@ toLN (DS.Inr t)           bv = Layer $ Inr (return $ t bv)
 toLN (DS.Case t1 x t2 y t3 z t4) bv =
     Layer $ Case (return $ t1 bv)
                  x
-                 (return $ t2 (Just x:bv))
+                 (return $ t2 (DS.PatVar x:bv))
                  (identOfPattern y)
-                 (return $ t3 (binderOfPattern y:bv))
+                 (return $ t3 (y:bv))
                  (identOfPattern z)
-                 (return $ t4 (binderOfPattern z:bv))
+                 (return $ t4 (z:bv))
 toLN DS.Unit              bv = Layer $ Unit
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
@@ -126,7 +137,7 @@ toLN (DS.Eq t1 t2)        bv = Layer $ Eq (return $ t1 bv) (return $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
 toLN (DS.ElimEq t t1 t2) bv =
     Layer $ ElimEq (return $ t bv)
-                   ((\(x,y,t1) -> (x, y, return $ t1 (Just y:Just x:bv))) <$> t1)
+                   ((\(x,y,t1) -> (x, y, return $ t1 (DS.PatVar y:DS.PatVar x:bv))) <$> t1)
                    (return $ t2 bv)
 
 toLN DS.Desc              bv = Layer $ Desc
@@ -151,7 +162,7 @@ toLN DS.InductionI        bv = Layer $ InductionI
 toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
 toLocallyNamelessClosed t = translateStar toLN t []
 
-toLocallyNameless :: AnnotRec a DS.TermCon -> [Maybe Ident] -> AnnotRec a TermCon
+toLocallyNameless :: AnnotRec a DS.TermCon -> [DS.Pattern] -> AnnotRec a TermCon
 toLocallyNameless t = translateStar toLN t
 
 {------------------------------------------------------------------------------}

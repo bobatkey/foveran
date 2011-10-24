@@ -63,7 +63,7 @@ checkParameterName (DataParameter pos paramName _) = do
 -- translate them to multiple binding contexts.
 data ConstructorArg
     = ConsArg  Span (Maybe Ident) TermPos
-    | ConsCall Span (Maybe Ident) [(Maybe Ident, TermPos)] TermPos
+    | ConsCall Span (Maybe Ident) [(Pattern, TermPos)] TermPos
 
 data Constructor =
     Constructor { consPos       :: Span
@@ -119,12 +119,12 @@ checkParameters pos needIdx (a:args) (p:ps) =
 
 extractRecursiveCall :: IDataDecl
                      -> TermPos
-                     -> Maybe ([(Maybe Ident, TermPos)], [TermPos])
+                     -> Maybe ([(Pattern, TermPos)], [TermPos])
 extractRecursiveCall d t = loop t
     where
       loop (Annot p (Pi bindings t)) =
-          do let args = [ (nm, t) | (nms, t) <- bindings
-                                  , nm <- case nms of [] -> [Nothing]; nms -> map Just nms]
+          do let args = [ (pat, t) | (pats, t) <- bindings
+                                   , pat <- case pats of [] -> [PatNull]; nms -> nms]
              (args', tms) <- loop t
              return (args ++ args', tms)
       loop (Annot p (App (Annot p' (Var nm)) tms)) =
@@ -137,26 +137,26 @@ extractRecursiveCall d t = loop t
 
 --------------------------------------------------------------------------------
 paramsType :: [DataParameter] ->
-              ([Maybe Ident] -> LN.TermPos) ->
-              [Maybe Ident] ->
+              ([Pattern] -> LN.TermPos) ->
+              [Pattern] ->
               LN.TermPos
 paramsType []             tm bv = tm bv
 paramsType (param:params) tm bv = pos @| LN.Pi (Just nm) tyDom tyCod
     where DataParameter pos nm ty = param
           tyDom = LN.toLocallyNameless ty bv
-          tyCod = paramsType params tm (Just nm:bv)
+          tyCod = paramsType params tm (PatVar nm:bv)
 
 paramsLambda :: [DataParameter] ->
-                ([Maybe Ident] -> LN.TermPos) ->
-                [Maybe Ident] -> LN.TermPos
+                ([Pattern] -> LN.TermPos) ->
+                [Pattern] -> LN.TermPos
 paramsLambda []             tm bv = tm bv
 paramsLambda (param:params) tm bv = pos @| LN.Lam nm tmCod
     where DataParameter pos nm ty = param
-          tmCod = paramsLambda params tm (Just nm:bv)
+          tmCod = paramsLambda params tm (PatVar nm:bv)
 
 --------------------------------------------------------------------------------
 makeMuTy :: IDataDecl
-         -> [Maybe Ident]
+         -> [Pattern]
          -> LN.TermPos
 makeMuTy d bv =
     case dataIndexType d of
@@ -167,7 +167,7 @@ makeMuTy d bv =
 -- FIXME: instead of regenerating the code, generate a reference to it
 makeMu :: IDataDecl
        -> [Constructor]
-       -> [Maybe Ident]
+       -> [Pattern]
        -> LN.TermPos
 makeMu d constrs bv =
     case dataIndexType d of
@@ -179,7 +179,7 @@ makeMu d constrs bv =
 --------------------------------------------------------------------------------
 -- Generates the type of the code for the datatype, given a binding
 -- environment for the parameters
-codeType :: IDataDecl -> [Maybe Ident] -> LN.TermPos
+codeType :: IDataDecl -> [Pattern] -> LN.TermPos
 codeType d bv = pos @| LN.Pi Nothing idxType1 (pos @| LN.App (pos @| LN.IDesc) idxType2)
     where pos      = dataPos d
           idxType1 = case dataIndexType d of
@@ -187,7 +187,7 @@ codeType d bv = pos @| LN.Pi Nothing idxType1 (pos @| LN.App (pos @| LN.IDesc) i
                        Just idxTy -> LN.toLocallyNameless idxTy bv
           idxType2 = case dataIndexType d of
                        Nothing    -> pos @| LN.Unit
-                       Just idxTy -> LN.toLocallyNameless idxTy (Nothing:bv)
+                       Just idxTy -> LN.toLocallyNameless idxTy (PatNull:bv)
 
 --------------------------------------------------------------------------------
 -- generate the big sum type to name the constructors
@@ -199,18 +199,18 @@ namesSumType pos (x:xs) = pos @| LN.Sum (pos @| LN.Unit) (namesSumType pos xs)
 --------------------------------------------------------------------------------
 makeCode :: IDataDecl
          -> [Constructor]
-         -> [Maybe Ident]
+         -> [Pattern]
          -> LN.TermPos
 makeCode d constrs bv = pos @| LN.Lam "i" (pos @| LN.IDesc_Sg namesTy body)
     where
       pos     = dataPos d
       namesTy = namesSumType pos constrs
-      body    = pos @| LN.Lam "d" (codeBody d (Nothing:Nothing:bv) 1 constrs)
+      body    = pos @| LN.Lam "d" (codeBody d (PatNull:PatNull:bv) 1 constrs)
 
 -- expects that the bound variables include the parameters, the index
 -- variable and the discriminator at position 0
 codeBody :: IDataDecl
-         -> [Maybe Ident]
+         -> [Pattern]
          -> Int
          -> [Constructor]
          -> LN.TermPos
@@ -229,15 +229,15 @@ codeBody d bv idxVar (constr:constrs) =
       discrimVar = p @| LN.Bound 0
       idxType    = case dataIndexType d of
                      Nothing    -> p @| LN.Unit
-                     Just idxTy -> LN.toLocallyNameless idxTy (Nothing:bv)
+                     Just idxTy -> LN.toLocallyNameless idxTy (PatNull:bv)
       resultType = p @| LN.App (p @| LN.IDesc) idxType
-      thisCase   = consCode d constr (Nothing:bv) (idxVar+1)
-      otherCases = codeBody d (Nothing:bv) (idxVar+1) constrs
+      thisCase   = consCode d constr (PatNull:bv) (idxVar+1)
+      otherCases = codeBody d (PatNull:bv) (idxVar+1) constrs
 
 --------------------------------------------------------------------------------
 consCode :: IDataDecl
          -> Constructor
-         -> [Maybe Ident]
+         -> [Pattern]
          -> Int
          -> LN.TermPos
 consCode d constr =
@@ -245,7 +245,7 @@ consCode d constr =
 
 consEndCode :: IDataDecl
             -> TermPos
-            -> [Maybe Ident] -> Int -> LN.TermPos
+            -> [Pattern] -> Int -> LN.TermPos
 consEndCode d idxTm bv idxVar =
     p @| LN.Desc_K (p @| LN.Eq idxTm' idx)
     where
@@ -255,14 +255,15 @@ consEndCode d idxTm bv idxVar =
 
 consBitCode :: IDataDecl
             -> ConstructorArg
-            -> ([Maybe Ident] -> Int -> LN.TermPos)
-            -> [Maybe Ident] -> Int -> LN.TermPos
+            -> ([Pattern] -> Int -> LN.TermPos)
+            -> [Pattern] -> Int -> LN.TermPos
 consBitCode d (ConsArg pos maybeNm t) rest bv idxVar =
     pos @| LN.IDesc_Sg t' (pos @| LN.Lam nm code)
     where
       nm   = fromMaybe "x" maybeNm
+      pat  = case maybeNm of Nothing -> PatNull; Just nm -> PatVar nm
       t'   = LN.toLocallyNameless t bv
-      code = rest (maybeNm:bv) (idxVar+1)
+      code = rest (pat:bv) (idxVar+1)
 consBitCode d (ConsCall pos maybeNm hyps idxTm) rest bv idxVar =
     pos @| LN.Desc_Prod codeCall code
     where
@@ -274,9 +275,8 @@ consBitCode d (ConsCall pos maybeNm hyps idxTm) rest bv idxVar =
           -- FIXME: get the position from idxTm'
           in pos @| LN.IDesc_Id idxTm'
 
-      makeHyp (nm, t) rest bv =
+      makeHyp (pat, t) rest bv =
           let t'   = LN.toLocallyNameless t bv
-              nm'  = fromMaybe "x" nm
-              code = rest (nm:bv)
+              code = rest (pat:bv)
           -- FIXME: get the position from t'
-          in pos @| LN.IDesc_Pi t' (pos @| LN.Lam nm' code)
+          in pos @| LN.IDesc_Pi t' (pos @| LN.Lam "x" code)
