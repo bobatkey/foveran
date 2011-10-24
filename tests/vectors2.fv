@@ -159,8 +159,6 @@ succ_ne_zero : (n : Nat) → not (succ n ≡ zero);
 succ_ne_zero n eq =
   elimEq eq for n p. natCase (λn. Set) Empty (λu. Unit) n with ();
 
-– normalise succ_ne_zero;
-
 symm :
   (α : Set) →
   (a₁ a₂ : α) →

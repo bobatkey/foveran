@@ -123,7 +123,7 @@ idata =
     (\pl nm params idxType constrs pr -> IData (makeSpan pl pr) nm params idxType constrs) <$>
     token Tok.Data <*> identifier
                    <*> dataParamList
-                   <*  token Tok.Colon <*> term09 <* token Tok.Arrow <* token Tok.Set
+                   <*  token Tok.Colon <*> optional (term09 <* token Tok.Arrow) <* token Tok.Set
                    <*  token Tok.Where
                    <*  token Tok.LBrace <*> iconstructors <*> token Tok.RBrace
                    <*  token Tok.Semicolon
@@ -152,8 +152,8 @@ iconstructor =
             <*> constructorbits
           <|>
           binary ConsArr <$> term09 <* token Tok.Arrow <*> constructorbits
-          <|>
-          (\(nm,p) ts -> Annot (makeSpan p ts) (ConsEnd nm ts)) <$> tokenWithText Tok.Ident <*> many term00
+          <|> -- FIXME: better source position here
+          (\(nm,p) ts -> Annot (makeSpan p p) (ConsEnd nm ts)) <$> tokenWithText Tok.Ident <*> many term00
 
 --------------------------------------------------------------------------------
 
@@ -247,7 +247,7 @@ term01 =
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
-                         ts -> binary App t ts) <$> term00 <*> many term00
+                         ts -> Annot (makeSpan t (last ts)) (App t ts)) <$> term00 <*> many term00
 
 term00 :: Parser Tok.Token TermPos
 term00 =

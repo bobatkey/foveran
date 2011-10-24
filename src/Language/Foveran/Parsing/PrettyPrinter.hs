@@ -10,6 +10,8 @@ module Language.Foveran.Parsing.PrettyPrinter
     where
 
 import           Data.String
+import           Data.Functor ((<$>))
+import           Data.Maybe (fromMaybe)
 import           Data.Rec (foldAnnot, Rec, foldRec, AnnotRec (..))
 import           Text.PrettyPrintPrec
 import qualified Text.PrettyPrint as PP
@@ -104,7 +106,7 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
       doc = ("data" <+>
              ppIdent (dataName d) <+>
              hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | DataParameter _ nm t <- dataParameters d ] <+>
-             ":" <+> fromDoc (ppAnnotTermLev 9 (dataIndexType d)) <+> "→" <+> "Set" <+> "where")
+             ":" <+> fromMaybe "" (fromDoc . ppAnnotTermLev 9 <$> dataIndexType d) <+> "→" <+> "Set" <+> "where")
             $$ nest 2 (doConstructors (dataConstructors d))
 
       doConstructors []     = "{ };"

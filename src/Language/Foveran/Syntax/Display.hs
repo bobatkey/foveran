@@ -64,7 +64,7 @@ data IDataDecl =
     IData { dataPos          :: Span
           , dataName         :: Ident
           , dataParameters   :: [DataParameter]
-          , dataIndexType    :: TermPos
+          , dataIndexType    :: Maybe TermPos
           , dataConstructors :: [IConstructor]
           }
 
