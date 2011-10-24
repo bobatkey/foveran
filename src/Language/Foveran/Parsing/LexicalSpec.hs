@@ -5,79 +5,83 @@ module Language.Foveran.Parsing.LexicalSpec
     where
 
 import Language.Forvie.Lexing.Spec
+import Language.Forvie.Layout
 import Language.Foveran.Parsing.Token
 
-lexicalSpec :: LexicalSpecification (Action Token)
-lexicalSpec = 
-    [ "assume" :==>          Emit Assume
-    , "normalise" :==>       Emit Normalise
-    , ":" :==>               Emit Colon
-    , ":=" :==>              Emit ColonEquals
-    , ";" :==>               Emit Semicolon
-    , "=" :==>               Emit Equals
-    , "\\" .|. "\x03bb" :==> Emit Lambda
-    , "->" .|. "→" :==>      Emit Arrow
-    , "(" :==>               Emit LParen
-    , ")" :==>               Emit RParen
-    , "“→”" :==>             Emit QuoteArrow
-    , "×" :==>               Emit Times
-    , "“×”" :==>             Emit QuoteTimes
-    , "+" :==>               Emit Plus
-    , "“+”" :==>             Emit QuotePlus
-    , "fst" :==>             Emit Fst
-    , "snd" :==>             Emit Snd
-    , "inl" :==>             Emit Inl
-    , "inr" :==>             Emit Inr
-    , "“K”" :==>             Emit QuoteK
-    , "µ" :==>               Emit Mu
-    , "construct" :==>       Emit Construct
-    , "induction" :==>       Emit Induction
-    , "elimD" :==>           Emit ElimD
-    , "sem" :==>             Emit Sem
-    , "()" .|. "⋄" :==>      Emit UnitValue
-    , "«" :==>               Emit LDoubleAngle
-    , "»" :==>               Emit RDoubleAngle
-    , "," :==>               Emit Comma
-    , "case" :==>            Emit Case
-    , "for" :==>             Emit For
-    , "." :==>               Emit FullStop
-    , "with" :==>            Emit With
-    , "{" :==>               Emit LBrace
-    , "}" :==>               Emit RBrace
-    , "Set" :==>             Emit Set
-    , "Empty" .|. "𝟘" :==>   Emit EmptyType
-    , "Unit" .|. "𝟙" :==>    Emit UnitType
-    , "elimEmpty" :==>       Emit ElimEmpty
-    , "“Id”" :==>            Emit QuoteId
-    , "Desc" :==>            Emit Desc
-    , "data" :==>            Emit Data
-    , "|" :==>               Emit Pipe
-    , "IDesc" :==>           Emit IDesc
-    , "“IId”" :==>           Emit Quote_IId
-    , "“Σ”" :==>             Emit Quote_Sg
-    , "“Π”" :==>             Emit Quote_Pi
-    , "elimID" :==>          Emit IDesc_Elim
-    , "µI" :==>              Emit MuI
-    , "inductionI" :==>      Emit InductionI
-    , "≡" :==>               Emit Eq
-    , "refl" :==>            Emit Refl
-    , "rewriteBy" :==>       Emit RewriteBy
-    , "elimEq" :==>          Emit ElimEq
-    , "where" :==>           Emit Where
-    , "_" :==>               Emit Underscore
-    , "then" :==>            Emit Then
-    , "absurdBy" :==>        Emit AbsurdBy
+emit = Emit . Token
+
+lexicalSpec :: LexicalSpecification (Action (NewlineOr Token))
+lexicalSpec =
+    [ "assume" :==>          emit Assume
+    , "normalise" :==>       emit Normalise
+    , ":" :==>               emit Colon
+    , ":=" :==>              emit ColonEquals
+    , ";" :==>               emit Semicolon
+    , "=" :==>               emit Equals
+    , "\\" .|. "\x03bb" :==> emit Lambda
+    , "->" .|. "→" :==>      emit Arrow
+    , "(" :==>               emit LParen
+    , ")" :==>               emit RParen
+    , "“→”" :==>             emit QuoteArrow
+    , "×" :==>               emit Times
+    , "“×”" :==>             emit QuoteTimes
+    , "+" :==>               emit Plus
+    , "“+”" :==>             emit QuotePlus
+    , "fst" :==>             emit Fst
+    , "snd" :==>             emit Snd
+    , "inl" :==>             emit Inl
+    , "inr" :==>             emit Inr
+    , "“K”" :==>             emit QuoteK
+    , "µ" :==>               emit Mu
+    , "construct" :==>       emit Construct
+    , "induction" :==>       emit Induction
+    , "elimD" :==>           emit ElimD
+    , "sem" :==>             emit Sem
+    , "()" .|. "⋄" :==>      emit UnitValue
+    , "«" :==>               emit LDoubleAngle
+    , "»" :==>               emit RDoubleAngle
+    , "," :==>               emit Comma
+    , "case" :==>            emit Case
+    , "for" :==>             emit For
+    , "." :==>               emit FullStop
+    , "with" :==>            emit With
+    , "{" :==>               emit LBrace
+    , "}" :==>               emit RBrace
+    , "Set" :==>             emit Set
+    , "Empty" .|. "𝟘" :==>   emit EmptyType
+    , "Unit" .|. "𝟙" :==>    emit UnitType
+    , "elimEmpty" :==>       emit ElimEmpty
+    , "“Id”" :==>            emit QuoteId
+    , "Desc" :==>            emit Desc
+    , "data" :==>            emit Data
+    , "|" :==>               emit Pipe
+    , "IDesc" :==>           emit IDesc
+    , "“IId”" :==>           emit Quote_IId
+    , "“Σ”" :==>             emit Quote_Sg
+    , "“Π”" :==>             emit Quote_Pi
+    , "elimID" :==>          emit IDesc_Elim
+    , "µI" :==>              emit MuI
+    , "inductionI" :==>      emit InductionI
+    , "≡" :==>               emit Eq
+    , "refl" :==>            emit Refl
+    , "rewriteBy" :==>       emit RewriteBy
+    , "elimEq" :==>          emit ElimEq
+    , "where" :==>           emit Where
+    , "_" :==>               emit Underscore
+    , "then" :==>            emit Then
+    , "absurdBy" :==>        emit AbsurdBy
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
-                           Emit Ident
+                             emit Ident
     , oneOrMore (tok digit) :==>
-                           Emit Number
-    , oneOrMore (tok space) :==>
-                              Ignore Whitespace
+                             emit Number
+    , "\n" :==>              Emit Newline
+    , oneOrMore (tok " \t") :==>
+                             Ignore Whitespace
     , ("--" .|. "–") .>>. star (tok (complement (singleton '\n'))) :==>
-                          Ignore Comment
+                             Ignore Comment
     , "{-"
        .>>.
        (star (tok anyChar) .&. complement (star (tok anyChar) .>>. "-}" .>>. star (tok anyChar)))
        .>>.
-       "-}" :==>          Ignore Comment
+       "-}" :==>             Ignore Comment
     ]

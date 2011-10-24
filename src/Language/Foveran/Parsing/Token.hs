@@ -5,6 +5,7 @@ module Language.Foveran.Parsing.Token
     )
     where
 
+import Language.Forvie.Layout
 import Language.Forvie.Lexing.Spec
 import Language.Haskell.TH.Lift
 
@@ -137,6 +138,13 @@ instance SyntaxHighlight Token where
     lexicalClass Underscore  = Punctuation
     lexicalClass Then        = Keyword
     lexicalClass AbsurdBy    = Keyword
+
+instance Layout Token where
+    lbrace = LBrace
+    rbrace = RBrace
+    semicolon = Semicolon
+    blockOpener Where = True
+    blockOpener _     = False
 
 instance Show Token where
   show Assume = "assume"

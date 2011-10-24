@@ -56,29 +56,32 @@ patternList =
     pure []
 
 file :: Parser Tok.Token [Declaration]
-file = declarations <* eos
+file = token Tok.LBrace *> declarations <* token Tok.RBrace <* eos
+
+declarations :: Parser Tok.Token [Declaration]
+declarations = many (token Tok.Semicolon)
+               *> many (declaration <* some (token Tok.Semicolon))
 
 declaration :: Parser Tok.Token Declaration
 declaration =
-    (\p nm t p' -> AssumptionDecl (Assume (makeSpan p p') nm t))
+    (\p nm t -> AssumptionDecl (Assume (makeSpan p t) nm t))
         <$> token Tok.Assume
         <*  commit
         <*> identifier
         <*  token Tok.Colon
         <*> term
-        <*> token Tok.Semicolon
     <|>
-    (\(nm1,p) t1 (nm2,p2) nms t2 p' ->
-         DefinitionDecl $ Definition (makeSpan p p') nm1 t1 nm2 (case nms of [] -> t2; nms -> Annot (makeSpan p2 t2) (Lam nms t2)))
-        <$> tokenWithText Tok.Ident <* commit <* token Tok.Colon  <*> term <*  token Tok.Semicolon
+    (\(nm1,p) t1 (nm2,p2) nms t2 ->
+         DefinitionDecl $ Definition (makeSpan p t2) nm1 t1 nm2 (case nms of [] -> t2; nms -> Annot (makeSpan p2 t2) (Lam nms t2)))
+        <$> tokenWithText Tok.Ident <* commit <* token Tok.Colon  <*> term <*  some (token Tok.Semicolon)
         <*> tokenWithText Tok.Ident                       
         <*> patternList
-        <*  token Tok.Equals <*> term <*> token Tok.Semicolon
+        <*  token Tok.Equals <*> term
     <|>
     IDataDecl <$> idata
     <|>
-    (\p nm params constructors p' ->
-         DatatypeDecl $ Datatype (makeSpan p p') nm params constructors)
+    (\p nm params constructors ->
+         DatatypeDecl $ Datatype (makeSpan p p) nm params constructors)
         <$> token Tok.Data
         <*> identifier
         <*> ((map (\p -> (paramIdent p,paramType p))) <$> dataParamList)
@@ -86,12 +89,10 @@ declaration =
         <*  token Tok.Set
         <*  token Tok.ColonEquals
         <*> constructorList
-        <*> token Tok.Semicolon
     <|>
-    (\p tm p' -> Normalise tm)
-    <$> token Tok.Normalise
-    <*> term
-    <*> token Tok.Semicolon
+    (\p tm -> Normalise tm)
+       <$> token Tok.Normalise
+       <*> term
 
 dataParamList :: Parser Tok.Token [DataParameter]
 dataParamList =
@@ -126,7 +127,6 @@ idata =
                    <*  token Tok.Colon <*> optional (term09 <* token Tok.Arrow) <* token Tok.Set
                    <*  token Tok.Where
                    <*  token Tok.LBrace <*> iconstructors <*> token Tok.RBrace
-                   <*  token Tok.Semicolon
 
 iconstructors :: Parser Tok.Token [IConstructor]
 iconstructors =
@@ -156,13 +156,6 @@ iconstructor =
           (\(nm,p) ts -> Annot (makeSpan p p) (ConsEnd nm ts)) <$> tokenWithText Tok.Ident <*> many term00
 
 --------------------------------------------------------------------------------
-
-declarations :: Parser Tok.Token [Declaration]
-declarations =
-    (:) <$> declaration <*> declarations
-    <|>
-    pure []
-
 term :: Parser Tok.Token TermPos
 term = term10
 

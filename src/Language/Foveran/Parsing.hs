@@ -23,6 +23,7 @@ import Control.StreamProcessor.IO
 import Text.ParserCombinators
 import Language.Forvie.Lexing.Spec
 import Language.Forvie.Lexing.Generator
+import Language.Forvie.Layout
 
 import Language.Foveran.Util.PrettyPrinting
 
@@ -37,6 +38,7 @@ data InputError
     = PE_UTF8DecodeError String
     | PE_LexingError     (Maybe (Char, Position))
     | PE_ParsingError    (Maybe (Lexeme Token)) [Maybe Token]
+    | PE_LayoutError     Span
 
 instance UTF8DecodeError InputError where
     utf8DecodeError = PE_UTF8DecodeError
@@ -47,6 +49,9 @@ instance LexingError InputError where
     
 instance ParsingError Token InputError where
     parseError = PE_ParsingError
+
+instance LayoutError InputError where
+    layoutError = PE_LayoutError
 
 --------------------------------------------------------------------------------
 ppToken Nothing  = "End of file"
@@ -71,10 +76,11 @@ ppInputError (PE_ParsingError Nothing expecting) =
 ppInputError (PE_ParsingError (Just (Lexeme _ p s)) expecting) =
     "Parse error" <+> ppSpan p <+> "on input" <+> text (T.unpack s)
     $$ ppExpecting expecting
+ppInputError (PE_LayoutError p) = "Layout error at" <+> ppSpan p
 
 --------------------------------------------------------------------------------
 
-lexer :: SP InputError ByteString (Lexeme (Action Token))
+lexer :: SP InputError ByteString (Lexeme (Action (NewlineOr Token)))
 lexer =
     toWord8 >>>
     decodeUTF8 >>>
@@ -83,7 +89,8 @@ lexer =
 parser :: SR InputError ByteString [Declaration]
 parser =
     lexer >>>
-    exceptIgnorable >>|
+    exceptIgnorable >>>
+    layout >>|
     parse file
 
 readFoveranFile :: FilePath -> IO (Either InputError [Declaration])
