@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.Foveran.Typing.Definition
     ( processDefinition )
     where
