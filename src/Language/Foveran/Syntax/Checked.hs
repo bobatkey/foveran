@@ -12,7 +12,6 @@ module Language.Foveran.Syntax.Checked
     , vbound
       
     , bindFree
-    , bindFree1
     , generalise
     , toDisplaySyntax
     )
@@ -150,15 +149,14 @@ generalise searchTerms originalTerm = go originalTerm 0
       go t@(In x) = In <$> generaliseAlg searchTerms t (go <$> x)
 
 --------------------------------------------------------------------------------
-bindAlg :: Ident -> TermCon (Int -> a) -> Int -> TermCon a
-bindAlg fnm (Free nm')       = \i -> if fnm == nm' then Bound i else Free nm'
-bindAlg fnm x                = traverseSyn x
+bindAlg :: [Ident] -> TermCon (Int -> a) -> Int -> TermCon a
+bindAlg nms (Free nm) = \i -> case elemIndex nm nms of
+                                Nothing -> Free nm
+                                Just k  -> Bound (i + k)
+bindAlg nms x         = traverseSyn x
 
-bindFree :: Ident -> Term -> Term
-bindFree nm x = translateRec (bindAlg nm) x 0
-
-bindFree1 :: Ident -> Term -> Term
-bindFree1 nm x = translateRec (bindAlg nm) x 1
+bindFree :: [Ident] -> Term -> Term
+bindFree nms x = translateRec (bindAlg nms) x 0
 
 --------------------------------------------------------------------------------
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term

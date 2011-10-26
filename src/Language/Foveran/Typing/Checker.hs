@@ -48,8 +48,8 @@ tyCheck :: AnnotRec p TermCon -> Context -> Value -> TypingMonad p CS.Term
 
 tyCheck (Annot p (Lam x t)) ctxt (VPi _ tA tB) =
   do let (x',ctxt') = ctxtExtendFreshen ctxt x tA Nothing
-     tm <- tyCheck (close x' t) ctxt' (tB $ reflect tA (CS.tmFree x'))
-     return (In $ CS.Lam x (CS.bindFree x' tm))
+     tm <- tyCheck (close [x'] t) ctxt' (tB $ reflect tA (CS.tmFree x'))
+     return (In $ CS.Lam x (CS.bindFree [x'] tm))
 
 tyCheck (Annot p (Lam x t)) ctxt v =
     Error p (ExpectingPiTypeForLambda ctxt v)
@@ -223,14 +223,14 @@ tySynth (Annot p (Pi x t1 t2)) ctxt =
     do (j,tm1) <- setCheck t1 ctxt
        let v          = tm1 `evalIn` ctxt
            (x',ctxt') = ctxtExtendFreshen ctxt (fromMaybe "x" x) v Nothing
-       (k,tm2) <- setCheck (close x' t2) ctxt'
-       return (VSet $ max j k, In $ CS.Pi x tm1 (CS.bindFree x' tm2))
+       (k,tm2) <- setCheck (close [x'] t2) ctxt'
+       return (VSet $ max j k, In $ CS.Pi x tm1 (CS.bindFree [x'] tm2))
 tySynth (Annot p (Sigma x t1 t2)) ctxt =
     do (j,tm1) <- setCheck t1 ctxt
        let v          = tm1 `evalIn` ctxt
            (x',ctxt') = ctxtExtendFreshen ctxt (fromMaybe "x" x) v Nothing
-       (k,tm2) <- setCheck (close x' t2) ctxt'
-       return (VSet $ max j k, In $ CS.Sigma x tm1 (CS.bindFree x' tm2))
+       (k,tm2) <- setCheck (close [x'] t2) ctxt'
+       return (VSet $ max j k, In $ CS.Sigma x tm1 (CS.bindFree [x'] tm2))
 tySynth (Annot p (Sum t1 t2)) ctxt =
     do (i,tm1) <- setCheck t1 ctxt
        (j,tm2) <- setCheck t2 ctxt
@@ -240,20 +240,20 @@ tySynth (Annot p (Case t x tP y tL z tR)) ctxt =
        case tS of
          VSum tA tB ->
              do let (x', ctxt1) = ctxtExtendFreshen ctxt x tS Nothing
-                (i,tmP0) <- setCheck (close x' tP) ctxt1
-                let tmP         = CS.bindFree x' tmP0
+                (i,tmP0) <- setCheck (close [x'] tP) ctxt1
+                let tmP         = CS.bindFree [x'] tmP0
                     (y', ctxt2) = ctxtExtendFreshen ctxt y tA Nothing
                     vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (CS.tmFree y')))
-                tmL <- tyCheck (close y' tL) ctxt2 vtP1
+                tmL <- tyCheck (close [y'] tL) ctxt2 vtP1
                 let (z', ctxt3) = ctxtExtendFreshen ctxt z tB Nothing
                     vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (CS.tmFree z')))
-                tmR <- tyCheck (close z' tR) ctxt3 vtP2
+                tmR <- tyCheck (close [z'] tR) ctxt3 vtP2
                 let tmA = reifyType0 tA
                     tmB = reifyType0 tB
                 return ( (tmP `evalInWithArg` ctxt) (tmS `evalIn` ctxt)
                        , In $ CS.Case tmS tmA tmB x tmP
-                                                  y (CS.bindFree y' tmL)
-                                                  z (CS.bindFree z' tmR))
+                                                  y (CS.bindFree [y'] tmL)
+                                                  z (CS.bindFree [z'] tmR))
          v ->
              Error p (CaseOnNonSum ctxt v)
 tySynth (Annot p Unit) ctxt =
@@ -283,9 +283,9 @@ tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
              unless (tA == tB) $ Error p (ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
              let (a',ctxt0) = ctxtExtendFreshen ctxt a vA Nothing
                  (e',ctxt1) = ctxtExtendFreshen ctxt0 e (VEq vA vA va (reflect vA (CS.tmFree a'))) Nothing
-                 tP'        = close e' $ close1 a' tP
+                 tP'        = close [e',a'] tP
              (_,tmP0) <- setCheck tP' ctxt1
-             let tmP        = CS.bindFree e' $ CS.bindFree1 a' $ tmP0
+             let tmP        = CS.bindFree [e',a'] tmP0
                  vtmP       = evaluate tmP [VRefl, va] (lookupDef ctxt)
                  vtmP'      = evaluate tmP [tm `evalIn` ctxt,vb] (lookupDef ctxt)
              tm_p <- tyCheck tp ctxt vtmP

@@ -6,7 +6,6 @@ module Language.Foveran.Syntax.LocallyNameless
     , toLocallyNamelessClosed
     , toLocallyNameless
     , close
-    , close1
     )
     where
 
@@ -169,9 +168,9 @@ toLocallyNameless t = translateStar toLN t
 binder :: (Int -> a) -> Int -> a
 binder f i = f (i+1)
 
-close' :: Ident -> TermCon (Int -> a) -> Int -> TermCon a
+close' :: [Ident] -> TermCon (Int -> a) -> Int -> TermCon a
 close' fnm (Free nm)        = pure $ Free nm
-close' fnm (Bound k)        = \i -> if i == k then Free fnm else Bound k
+close' fnm (Bound k)        = \i -> if k >= i then Free (fnm !! (k - i)) else Bound k
 close' fnm (Lam nm body)    = Lam nm <$> binder body
 close' fnm (App t ts)       = App <$> t <*> ts
 close' fnm (Set i)          = pure $ Set i
@@ -216,8 +215,5 @@ close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm InductionI       = pure InductionI
 
-close :: Ident -> AnnotRec a TermCon -> AnnotRec a TermCon
-close fnm x = translate (close' fnm) x 0
-
-close1 :: Ident -> AnnotRec a TermCon -> AnnotRec a TermCon
-close1 fnm x = translate (close' fnm) x 1
+close :: [Ident] -> AnnotRec a TermCon -> AnnotRec a TermCon
+close nms x = translate (close' nms) x 0
