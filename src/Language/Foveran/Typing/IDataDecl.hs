@@ -6,7 +6,7 @@ module Language.Foveran.Typing.IDataDecl
 
 import qualified Data.Set as S
 import           Control.Monad (unless, guard, when, forM_, forM)
-import           Control.Monad.State (StateT, evalStateT, get, put, lift)
+import           Control.Monad.State (StateT, evalStateT, gets, lift, modify)
 import           Data.Maybe (fromMaybe, isJust)
 import           Data.Rec (AnnotRec (Annot))
 import           Language.Foveran.Typing.DeclCheckMonad
@@ -49,10 +49,10 @@ processIDataDecl d = do
 checkParameterName :: DataParameter ->
                       StateT (S.Set Ident) DeclCheckM ()
 checkParameterName (DataParameter pos paramName _) = do
-  usedNames <- get
-  when (paramName `S.member` usedNames) $ do
+  nameUsed <- gets (S.member paramName)
+  when nameUsed $ do
     lift $ reportError pos (DuplicateParameterName paramName)
-  put (S.insert paramName usedNames)
+  modify (S.insert paramName)
 
 --------------------------------------------------------------------------------
 -- Intermediate representation of constructors, after the parameter
@@ -77,9 +77,10 @@ checkConstructor :: IDataDecl
                  -> IConstructor
                  -> StateT (S.Set Ident) DeclCheckM Constructor
 checkConstructor d (IConstructor pos nm bits) = do
-  usedNames <- get
-  when (nm `S.member` usedNames) $ do
+  nameUsed <- gets (S.member nm)
+  when nameUsed $ do
     lift $ reportError pos (DuplicateConstructorName nm)
+  modify (S.insert nm)
   (args, idxTm) <- lift $ checkConstructorBits d bits
   return (Constructor pos nm args idxTm)
 
@@ -138,8 +139,7 @@ extractRecursiveCall d t = loop t
 --------------------------------------------------------------------------------
 paramsType :: [DataParameter] ->
               ([Pattern] -> LN.TermPos) ->
-              [Pattern] ->
-              LN.TermPos
+              [Pattern] -> LN.TermPos
 paramsType []             tm bv = tm bv
 paramsType (param:params) tm bv = pos @| LN.Pi (Just nm) tyDom tyCod
     where DataParameter pos nm ty = param

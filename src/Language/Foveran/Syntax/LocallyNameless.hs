@@ -95,7 +95,7 @@ toLN (DS.Var nm)          bv = case lookupVar nm bv 0 of
                                  Just t  -> t
 toLN (DS.Lam nms body)    bv = doBinders nms bv
     where
-      doBinders []                 bv = return $ body bv
+      doBinders []      bv = return $ body bv
       doBinders (p:nms) bv = Layer $ Lam (identOfPattern p) (doBinders nms (p:bv))
 toLN (DS.App t ts)        bv = doApplications (return $ t bv) ts
     where doApplications tm []     = tm
