@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances, GeneralizedNewtypeDeriving #-}
 
 module Language.Foveran.Typing.DeclCheckMonad
     ( DeclCheckM ()
@@ -16,17 +16,21 @@ module Language.Foveran.Typing.DeclCheckMonad
 import           Control.Applicative
 import           Control.Monad (unless, ap)
 import           Control.Monad.IO.Class (MonadIO (..))
+import           Control.Monad.State (StateT, get, put, evalStateT)
+import qualified Control.Monad.Error as E
+import           Control.Monad.Error (ErrorT, runErrorT, throwError, MonadError)
 import           Data.Traversable (traverse)
 import           Text.Position (Span)
 
-import           Text.PrettyPrint
+import           Text.PrettyPrint (render, (<+>), ($$), nest, (<>))
 import           Text.PrettyPrint.IsString ()
-import           Language.Foveran.Util.PrettyPrinting
+import           Language.Foveran.Util.PrettyPrinting (ppSpan)
+import           Language.Foveran.Parsing.PrettyPrinter (ppIdent)
 
 import           Language.Foveran.Syntax.Identifier (Ident)
-import           Language.Foveran.Syntax.LocallyNameless (toLocallyNamelessClosed, TermPos)
+import           Language.Foveran.Syntax.LocallyNameless (TermPos)
 import qualified Language.Foveran.Syntax.Checked as CS
-import           Language.Foveran.Parsing.PrettyPrinter
+
 import           Language.Foveran.Typing.Conversion (Value)
 import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Checker
@@ -38,51 +42,41 @@ data Error
     | RepeatedIdent Ident
     | MalformedDefn Ident Ident
 
-newtype DeclCheckM a = DM (Context -> IO (Either (Span, Error) (a,Context)))
+newtype DeclCheckM a = DM { runDM :: StateT Context (ErrorT (Span, Error) IO) a }
+    deriving (Monad, Applicative, Functor, MonadIO, MonadError (Span,Error))
 
-instance Monad DeclCheckM where
-  return x   = DM $ \ctxt -> return $ Right (x, ctxt)
-  DM t >>= f = DM $ \ctxt -> do r <- t ctxt
-                                case r of
-                                  Left error      -> return $ Left error
-                                  Right (a,ctxt') -> let DM t' = f a
-                                                     in t' ctxt'
-
-instance Functor DeclCheckM where
-    fmap = liftA
-
-instance Applicative DeclCheckM where
-    pure  = return
-    (<*>) = ap
-
-instance MonadIO DeclCheckM where
-    liftIO c = DM $ \ctxt -> do r <- c
-                                return $ Right (r, ctxt)
+instance E.Error (Span, Error) where
+    noMsg = error "noMsg: not supported for Error"
+    strMsg = error "strMsg: not support for Error"
 
 getContext :: DeclCheckM Context
-getContext = DM $ \c -> return (Right (c,c))
+getContext = DM $ get
 
 -- FIXME: consider splitting out the IDataDecl errors from the type errors
 reportError :: Span -> TypeError -> DeclCheckM a
-reportError p err = DM $ \ctxt -> return (Left (p,TypeError err))
+reportError p err = throwError (p,TypeError err)
 
 liftTyCheck :: (Context -> TypingMonad Span a) -> DeclCheckM a
-liftTyCheck f = DM $ \ctxt -> case f ctxt of
-                                Error p err -> return $ Left  (p, TypeError err)
-                                Result a    -> return $ Right (a, ctxt)
+liftTyCheck f = do
+  ctxt <- DM get
+  case f ctxt of
+    Error p err -> throwError (p, TypeError err)
+    Result a    -> return a
 
 extend :: Span -> Ident -> Value -> Maybe Value -> DeclCheckM ()
-extend p nm ty def =
-    DM $ \ctxt ->
-        case ctxtExtend ctxt nm ty def of
-          Nothing    -> return $ Left (p, RepeatedIdent nm)
-          Just ctxt' -> return $ Right ((), ctxt')
+extend p nm ty def = do
+  do ctxt <- DM $ get
+     case ctxtExtend ctxt nm ty def of
+       Nothing    -> throwError (p, RepeatedIdent nm)
+       Just ctxt' -> DM $ put ctxt'
 
 evaluate :: CS.Term -> DeclCheckM Value
-evaluate t = DM $ \ctxt -> return $ Right (t `evalIn` ctxt, ctxt)
+evaluate t = do ctxt <- DM $ get
+                return (t `evalIn` ctxt)
 
 malformedDefinition :: Span -> Ident -> Ident -> DeclCheckM ()
-malformedDefinition p nm1 nm2 = DM $ \_ -> return $ Left (p, MalformedDefn nm1 nm2)
+malformedDefinition p nm1 nm2 =
+    throwError (p, MalformedDefn nm1 nm2)
 
 checkInternalDefinition :: Span -> Ident -> TermPos -> Maybe TermPos -> DeclCheckM ()
 checkInternalDefinition p nm ty tm = do
@@ -94,12 +88,12 @@ checkInternalDefinition p nm ty tm = do
   extend p nm vTy vTm
 
 runDeclCheck :: DeclCheckM () -> IO ()
-runDeclCheck (DM f) =
-    do r <- f emptyContext
+runDeclCheck e =
+    do r <- runErrorT $ evalStateT (runDM e) emptyContext
        case r of
-         Right ((), _)   -> return ()
+         Right () -> return ()
          Left (p, TypeError e) ->
-             putStrLn $ render $ text "Type error in term" <+> ppSpan p
+             putStrLn $ render $ "Type error in term" <+> ppSpan p
                                  $$ nest 2 (ppTypeError e)
          Left (p, RepeatedIdent nm) ->
              putStrLn $ render $ "Repeated binding" <+> "“" <> ppIdent nm <> "”" <+> "at" <+> ppSpan p
