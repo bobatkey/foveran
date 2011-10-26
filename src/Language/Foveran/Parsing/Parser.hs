@@ -262,10 +262,10 @@ term00 =
     -- FIXME: extend the left and right positions of the term to include the parens
     token Tok.LParen *> term10 <* token Tok.RParen
     <|>
-    foldr1 (\x y -> binary Pair x y)
-           <$  token Tok.LDoubleAngle
-           <*> ((:) <$> term10 <*> many (token Tok.Comma *> term10))
-           <* token Tok.RDoubleAngle
+    (\pl tms pr -> Annot (makeSpan pl pr) $ Tuple tms)
+      <$> token Tok.LDoubleAngle
+      <*> ((:) <$> term10 <*> many (token Tok.Comma *> term10))
+      <*> token Tok.RDoubleAngle
     <|>
     delimited <$> token Tok.Case
               <* commit

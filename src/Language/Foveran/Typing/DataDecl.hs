@@ -73,7 +73,7 @@ genDatatypeCarrier (Datatype p nm params constructors) =
 
       tm = paramsLam p params (Annot p $ Mu (Annot p $ App (Annot p $ Var nmDesc) (map (\(nm,_) -> Annot p $ Var nm) params)))
 
-makePair p x y = Annot p $ Pair x y
+makePair p x y = Annot p $ Tuple [x, y]
 
 genConstructors :: Datatype -> [Definition]
 genConstructors (Datatype p nm params constructors) = genConsLoop id constructors

@@ -46,7 +46,7 @@ pprint (Prod t1 t2)      = paren 08 (down t1 <+> "×" <+> t2)
 pprint (Sigma nms t1 t2) = paren 10 (hang ("(" <> ppPatterns nms <+> ":" <+> t1 <> ")" <+> "×") 0 t2)
 pprint (Proj1 t)         = paren 01 ("fst" <+> down t) -- These precs are a hack to make the output look less weird
 pprint (Proj2 t)         = paren 01 ("snd" <+> down t)
-pprint (Pair t1 t2)      = "«" <> (sep $ punctuate "," [resetPrec t1, resetPrec t2]) <> "»"
+pprint (Tuple tms)       = "«" <> (sep $ punctuate "," $ map resetPrec tms) <> "»"
 
 pprint (Sum t1 t2)             = paren 09 (down t1 <+> "+" <+> t2)
 pprint (Inl t)                 = paren 01 ("inl" <+> down t)

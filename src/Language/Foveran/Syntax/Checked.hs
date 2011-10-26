@@ -171,6 +171,10 @@ gatheringPi :: [DS.Pattern] -> DS.Term -> DS.Term -> DS.TermCon DS.Term
 gatheringPi nm t1 (In (DS.Pi bs t2)) = DS.Pi ((nm,t1):bs) t2
 gatheringPi nm t1 t2                 = DS.Pi [(nm,t1)] t2
 
+gatheringTuple :: DS.Term -> DS.Term -> DS.TermCon DS.Term
+gatheringTuple t1 (In (DS.Tuple tms)) = DS.Tuple (t1:tms)
+gatheringTuple t1 t2                  = DS.Tuple [t1,t2]
+
 toDisplay :: TermCon (NameSupply DS.Term) -> NameSupply (DS.TermCon DS.Term)
 toDisplay (Free nm)               = pure $ DS.Var nm
 toDisplay (Bound i)               = DS.Var <$> getBound i
@@ -181,7 +185,7 @@ toDisplay (Pi Nothing t1 t2)      = gatheringPi [] <$> t1 <*> bindDummy t2
 toDisplay (Pi (Just nm) t1 t2)    = bindK nm t2 $ \nm t2 -> gatheringPi [DS.PatVar nm] <$> t1 <*> pure t2
 toDisplay (Sigma Nothing t1 t2)   = DS.Prod <$> t1 <*> bindDummy t2
 toDisplay (Sigma (Just nm) t1 t2) = bindK nm t2 $ \nm t2 -> DS.Sigma [DS.PatVar nm] <$> t1 <*> pure t2
-toDisplay (Pair t1 t2)            = DS.Pair <$> t1 <*> t2
+toDisplay (Pair t1 t2)            = gatheringTuple <$> t1 <*> t2
 toDisplay (Proj1 t)               = DS.Proj1 <$> t
 toDisplay (Proj2 t)               = DS.Proj2 <$> t
 toDisplay (Sum t1 t2)             = DS.Sum <$> t1 <*> t2

@@ -105,7 +105,7 @@ data TermCon tm
     | Pi    [([Pattern], tm)] tm
     | Sigma [Pattern] tm tm
     | Prod  tm tm
-    | Pair  tm tm
+    | Tuple [tm]
     | Proj1 tm
     | Proj2 tm
     | Sum   tm tm
