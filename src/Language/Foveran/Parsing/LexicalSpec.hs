@@ -10,8 +10,8 @@ import Language.Foveran.Parsing.Token
 
 emit = Emit . Token
 
-lexicalSpec :: LexicalSpecification (Action (NewlineOr Token))
-lexicalSpec =
+lexicalSpec :: CompiledLexSpec (Action (NewlineOr Token))
+lexicalSpec = $([|compileLexicalSpecification
     [ "assume" :==>          emit Assume
     , "normalise" :==>       emit Normalise
     , ":" :==>               emit Colon
@@ -84,4 +84,4 @@ lexicalSpec =
        (star (tok anyChar) .&. complement (star (tok anyChar) .>>. "-}" .>>. star (tok anyChar)))
        .>>.
        "-}" :==>             Ignore Comment
-    ]
+    ] |])

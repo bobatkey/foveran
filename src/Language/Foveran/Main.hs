@@ -39,7 +39,7 @@ main = do
     GenerateEmacsMode ->
        E.genEmacsMode
     TypeCheck filename ->
-        do readResult <- P.readFoveranFile filename
+        do readResult <- P.parseFile filename
            case readResult of 
              Left err ->
                  do hPutStrLn stderr $ render (P.ppInputError err)

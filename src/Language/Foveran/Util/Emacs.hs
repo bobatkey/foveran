@@ -13,5 +13,5 @@ import Language.Foveran.Parsing.LexicalSpec (lexicalSpec)
 
 genEmacsMode :: IO a
 genEmacsMode = do
-  generateEmacsMode (compileLexicalSpecification lexicalSpec) "foveran" "\\\\.fv\\\\'"
+  generateEmacsMode lexicalSpec "foveran" "\\\\.fv\\\\'"
   exitSuccess

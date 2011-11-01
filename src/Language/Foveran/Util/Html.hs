@@ -6,6 +6,8 @@ module Language.Foveran.Util.Html
 import           System.Exit
 import           System.IO
 
+import           Data.MonadicStream ((|>|))
+
 import           Text.Blaze.Html5 ((!))
 import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
@@ -13,16 +15,15 @@ import qualified Text.Blaze.Html5.Attributes as A
 import qualified Data.ByteString.Lazy as BL
 import           Text.Blaze.Renderer.Utf8
 
-import           Control.StreamProcessor ((>>|))
-import           Control.StreamProcessor.IO (onFile)
 import           Language.Forvie.SyntaxHighlight.Html (generateHtml)
 
 import           Language.Foveran.Parsing.Token ()
-import           Language.Foveran.Parsing (lexer)
+import           Language.Foveran.Parsing (lexFile)
 
 writeHtmlDocument :: FilePath -> Maybe FilePath -> IO ()
 writeHtmlDocument fnm ofnm = do
-  result <- onFile fnm 16384 (lexer >>| generateHtml)
+  tokens <- lexFile fnm
+  result <- return (tokens |>| generateHtml)
   case result of
     Left err   ->
         do hPutStrLn stderr $ "An error occured"

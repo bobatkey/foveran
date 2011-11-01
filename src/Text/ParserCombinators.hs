@@ -2,15 +2,16 @@
 
 module Text.ParserCombinators where
 
+import           Prelude hiding (head)
 import           Control.Monad
 import           Control.Monad.Error
 import           Control.Applicative
 import qualified Data.DList as DL
-import           Data.DList
+import           Data.DList hiding (head)
 import           Text.Lexeme (Lexeme (..))
 import           Text.Position
 import qualified Data.Text as T
-import           Control.StreamProcessor hiding (EOS)
+import           Data.MonadicStream hiding (append, toList)
 
 {------------------------------------------------------------------------------}
 data Parser tok a
@@ -99,15 +100,14 @@ instance ParsingError tok String where
     parseError Nothing               _ = "Parse error on EOS"
     parseError (Just (Lexeme _ p s)) _ = "Parser error at " ++ show p ++ " on input '" ++ T.unpack s ++ "'"
 
-parse :: (Eq tok, ParsingError tok e) => Parser tok a -> SR e (Lexeme tok) a
+parse :: (Eq tok, MonadError e m, ParsingError tok e) => Parser tok a -> Reader (Lexeme tok) m a
 parse p = case parserToStateH p of
-            Left a  -> Yield a
+            Left a  -> return a
             Right s -> go (toList s)
     where
-      go state = Read $ processInput state
-
-      processInput state t
-          = case advance state t of
-              Left result  -> Yield result
-              Right []     -> ReadError (parseError t (expecting state))
-              Right state' -> go state'
+      go state = do
+        t <- head
+        case advance state t of
+          Left result  -> return result
+          Right []     -> lift $ throwError (parseError t (expecting state))
+          Right state' -> go state'
