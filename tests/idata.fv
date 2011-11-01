@@ -1,11 +1,12 @@
 semI : (I : Set) → IDesc I → (I → Set 2) → Set 2
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D
+semI I D X =
+  elimID I (λD. Set 2)
+    (λi. X i)
+    (λA. A)
+    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
+    (λA D semD. (a : A) × semD a)
+    (λA D semD. (a : A) → semD a)
+    D
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Nat : Set where
@@ -30,11 +31,14 @@ succ n = construct «inr (), n, refl» – :succ n
 – and we should add a check that we have got the right type. This will
 – be some kind of hint in the LocallyNameless syntax
 
-Nat:body : Unit + Unit -> IDesc Unit
-Nat:body d = case d for x. IDesc 𝟙 with
-               { inl _. “K” (() ≡ ())
-               ; inr _. “IId” () “×” “K” (() ≡ ())
-               }
+– constructor names are associated with 
+
+Nat:body : 𝟙 + 𝟙 -> IDesc Unit
+Nat:body d =
+  case d for x. IDesc 𝟙 with
+    { inl _. “K” (() ≡ ())
+    ; inr _. “IId” () “×” “K” (() ≡ ())
+    }
 
 elimtype :
   (I    : Set) →
@@ -66,6 +70,11 @@ Nat:elim P pzero psucc =
 
 add : Nat → Nat → Nat
 add n₁ n₂ =
+{-
+  recurseOn n₁ with
+    zero:    n₂
+    succ n₁: succ (recurse n₁)
+-}
   inductionI Unit Nat:code (λ_ _. Nat)
     (λ_ «c,d». case c for b. elimtype Unit (Unit + Unit) (λ_. Nat:body) (λ_ _. Nat) () b with
       { inl _. λz      _.     rewriteBy z then n₂
@@ -74,13 +83,103 @@ add n₁ n₂ =
     ()
     n₁
 
-add2 : Nat → Nat → Nat
-add2 n₁ n₂ = Nat:elim (λ_. Nat) n₂ (λn p. succ p) n₁
+{-
+possible new syntax:
+  inductionI x [for i x. P] with T
+
+i, x |- P : Set l
+|- T : (i : I) → (x : semI D (µ D) i) → liftI ... → P i (construct x)
+
+induction construct z for i x. P with T
+=
+T i x (all I (D i) (µI I D) P (λi x. induction x for i x. P with T))
+
+what is the level of 'all'?
+what is the level of 'lift'?
+what is the level of 'sem'?
+
+lift can only be defined as map from descriptions to descriptions for
+level-0 descriptions, because otherwise we need a higher level
+indexes.
+
+-}
+
+{-
+add : Nat → Nat → Nat
+add n₁ n₂ =
+  eliminate n₁ with
+    zero:    n₂
+    succ n₁: succ (recurse n₁)
+
+vecappend : (A : Set) → (n₁ n₂ : Nat) → Vector A n₁ → Vector A n₂ → Vector A (add n₁ n₂)
+vecappend A n₁ n₂ xs ys =
+  eliminate xs with
+    vnil:         ys
+    vcons n a xs: vcons (add n n₂) a (recurse xs)
+
+vechead : (A : Set) → (n : Nat) → Vector A (succ n) → A
+vechead A n xs = eliminate xs with
+  vnil: – empty case
+  vcons n a xs: a
+
+acceptsEmpty : (A : Set) → regexp A → Bool;
+acceptsEmpty A re =
+  eliminate re with
+    eps:         true
+    emp:         false
+    alt re₁ re₂: or (recurse re₁) (recurse re₂)
+    seq re₁ re₂: and (recurse re₁) (recurse re₂)
+    star re:     true
+    tok a:       false
+
+step : (A : Set) → regexp A → A → regexp A
+step A re a =
+  eliminate re with
+    eps:
+      emp
+    emp:
+      emp
+    alt re₁ re₂:
+      alt (recurse re₁) (recurse re₂)
+    seq re₁ re₂:
+      eliminate acceptsEmpty re₁ with
+        true:  alt (seq (recurse re₁) re₂) (recurse re₂)
+        false: seq (recurse re₁) re₂
+    star re:
+      seq (recurse re) (star re)
+    tok a':
+      eliminate symbol-eq a s' with
+        true:  eps
+        false: emp
+
+matches : (A : Set) → List A → regexp A → bool
+matches by
+  introduce A l.
+  eliminate l with
+    nil:      introduce r. acceptsEmpty A r
+    cons a l: introduce r. recurse l (step A r a)
+
+1. look at the type of the thing being looked at
+2. Check that it is of the form µI I (λi. “Σ“ (1 + ... + 1) (λb. body)) i
+3. Generate a case elimination with the appropriate cases, just ignoring the names for now
+4. The patterns get compiled into projections, with a rewrite. So we assume that all the 
+5. The "recurse x" things get rewritten somehow, in a later step...
+
+inductionI x for i x. P with blah
+
+-}
+
+data Bool : Set where
+  true  : Bool
+  false : Bool
+
+normalise Bool
 
 one : Nat
 one = succ zero
 
-normalise add one one
+normalise
+  add one one
 
 {-
 introduce P pzero psucc n.
@@ -247,4 +346,3 @@ normalise acc2;
 data Emp : Nat () → Set where
   { };
 -}
-
