@@ -6,10 +6,10 @@ module Language.Foveran.Typing
 
 import Language.Foveran.Typing.DeclCheckMonad
 import Language.Foveran.Syntax.Display (Declaration (..))
-import Language.Foveran.Typing.Assume ( processAssumeDecl )
-import Language.Foveran.Typing.Normalise ( doNormalise )
-import Language.Foveran.Typing.DataDecl ( checkDatatype )
-import Language.Foveran.Typing.IDataDecl ( processIDataDecl )
+import Language.Foveran.Typing.Assume (processAssumeDecl)
+import Language.Foveran.Typing.Normalise (processNormalise)
+import Language.Foveran.Typing.DataDecl (checkDatatype)
+import Language.Foveran.Typing.IDataDecl (processIDataDecl)
 import Language.Foveran.Typing.Definition (processDefinition)
 import Language.Foveran.Typing.Conversion.Value ( vliftTy, vlift
                                                 , vliftITy, vliftI
@@ -26,5 +26,5 @@ checkDecl :: Declaration -> DeclCheckM ()
 checkDecl (AssumptionDecl a) = processAssumeDecl a
 checkDecl (DefinitionDecl d) = processDefinition d
 checkDecl (DatatypeDecl d)   = checkDatatype d
-checkDecl (Normalise tm)     = doNormalise tm
+checkDecl (Normalise tm)     = processNormalise tm
 checkDecl (IDataDecl d)      = processIDataDecl d

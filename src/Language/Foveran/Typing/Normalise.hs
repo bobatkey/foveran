@@ -2,7 +2,7 @@
 -- | The interface to the normaliser
 
 module Language.Foveran.Typing.Normalise
-    ( doNormalise )
+    ( processNormalise )
     where
 
 import Control.Monad.IO.Class (liftIO)
@@ -17,8 +17,8 @@ import Language.Foveran.Typing.Checker (tySynth)
 import Language.Foveran.Typing.Errors
 import Language.Foveran.Typing.Context
 
-doNormalise :: DS.TermPos -> DeclCheckM ()
-doNormalise tmDS = do
+processNormalise :: DS.TermPos -> DeclCheckM ()
+processNormalise tmDS = do
   let tm = toLocallyNamelessClosed tmDS
   (ty,c) <- liftTyCheck $ tySynth tm
   v <- evaluate c
