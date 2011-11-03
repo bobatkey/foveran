@@ -59,9 +59,9 @@ reportError p err = throwError (p,TypeError err)
 liftTyCheck :: (Context -> TypingMonad Span a) -> DeclCheckM a
 liftTyCheck f = do
   ctxt <- DM get
-  case f ctxt of
-    Error p err -> throwError (p, TypeError err)
-    Result a    -> return a
+  case runTypingMonad $ f ctxt of
+    Left (p, err) -> throwError (p, TypeError err)
+    Right (a,_)   -> return a
 
 extend :: Span -> Ident -> Value -> Maybe Value -> DeclCheckM ()
 extend p nm ty def = do

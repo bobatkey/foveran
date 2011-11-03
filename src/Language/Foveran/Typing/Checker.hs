@@ -1,7 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
 
 module Language.Foveran.Typing.Checker
-    ( TypingMonad (..)
+    ( TypingMonad ()
+    , runTypingMonad
     , tyCheck
     , setCheck
     , tySynth
@@ -9,8 +10,13 @@ module Language.Foveran.Typing.Checker
     where
 
 import           Control.Monad (unless)
+import           Control.Monad.Identity (Identity, runIdentity)
+import           Control.Monad.State (StateT, runStateT)
+import           Control.Monad.Error (ErrorT, runErrorT, throwError, Error (..))
+import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In))
+import           Language.Foveran.Syntax.Identifier (Ident)
 import           Language.Foveran.Syntax.LocallyNameless
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.Conversion
@@ -18,22 +24,25 @@ import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Errors
 
 {------------------------------------------------------------------------------}
--- This is a bit small at the moment, but it might get bigger
-data TypingMonad p a
-    = Error  p TypeError
-    | Result a
+type MetaVariables p
+    = M.Map Ident (Context, Value, p)
 
-instance Monad (TypingMonad p) where
-    return x = Result x
-    Error p e >>= _ = Error p e
-    Result x  >>= f = f x
+type TypingMonad p a
+    = StateT (MetaVariables p) (ErrorT (p,TypeError) Identity) a
+
+instance Error (p,TypeError) where
+    noMsg = error "noMsg : not defined for type errors"
+
+runTypingMonad :: TypingMonad p a
+               -> Either (p,TypeError) (a,MetaVariables p)
+runTypingMonad c = runIdentity (runErrorT (runStateT c M.empty))
 
 {------------------------------------------------------------------------------}
 compareTypes :: p -> Context -> Value -> Value -> TypingMonad p ()
 compareTypes p ctxt (VSet i) (VSet j) =
-  unless (j <= i) $ Error p (LevelProblem j i)
+  unless (j <= i) $ throwError (p, LevelProblem j i)
 compareTypes p ctxt v1       v2 =
-  unless (tm1 == tm2) $ Error p (TypesNotEqual ctxt v1 v2)
+  unless (tm1 == tm2) $ throwError (p, TypesNotEqual ctxt v1 v2)
       where
         tm1 = reifyType0 v1
         tm2 = reifyType0 v2
@@ -52,7 +61,7 @@ tyCheck (Annot p (Lam x t)) ctxt (VPi _ tA tB) =
      return (In $ CS.Lam x (CS.bindFree [x'] tm))
 
 tyCheck (Annot p (Lam x t)) ctxt v =
-    Error p (ExpectingPiTypeForLambda ctxt v)
+    throwError (p, ExpectingPiTypeForLambda ctxt v)
 
 tyCheck (Annot p (Pair t1 t2)) ctxt (VSigma _ tA tB) =
     do tm1 <- tyCheck t1 ctxt tA
@@ -60,27 +69,27 @@ tyCheck (Annot p (Pair t1 t2)) ctxt (VSigma _ tA tB) =
        return (In $ CS.Pair tm1 tm2)
 
 tyCheck (Annot p (Pair _ _)) ctxt v =
-    Error p (ExpectingSigmaTypeForPair ctxt v)
+    throwError (p, ExpectingSigmaTypeForPair ctxt v)
 
 tyCheck (Annot p (Inl t)) ctxt (VSum tA _) =
     do tm <- tyCheck t ctxt tA
        return (In $ CS.Inl tm)
 
 tyCheck (Annot p (Inl t)) ctxt v =
-    Error p (ExpectingSumTypeForInl ctxt v)
+    throwError (p, ExpectingSumTypeForInl ctxt v)
 
 tyCheck (Annot p (Inr t)) ctxt (VSum _ tB) =
     do tm <- tyCheck t ctxt tB
        return (In $ CS.Inr tm)
 
 tyCheck (Annot p (Inr t)) ctxt v =
-    Error p (ExpectingSumTypeForInr ctxt v)
+    throwError (p, ExpectingSumTypeForInr ctxt v)
 
 tyCheck (Annot p UnitI) ctxt VUnit =
     do return (In $ CS.UnitI)
 
 tyCheck (Annot p UnitI) ctxt v =
-    Error p (ExpectingUnitTypeForUnit ctxt v)
+    throwError (p, ExpectingUnitTypeForUnit ctxt v)
 
 tyCheck (Annot p (Desc_K t)) ctxt VDesc =
     do tm <- tyCheck t ctxt (VSet 0)
@@ -91,13 +100,13 @@ tyCheck (Annot p (Desc_K t)) ctxt (VIDesc v) =
        return (In $ CS.IDesc_K tm)
 
 tyCheck (Annot p (Desc_K t)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p Desc_Id) ctxt VDesc =
     do return (In $ CS.Desc_Id)
 
 tyCheck (Annot p Desc_Id) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (Desc_Prod t1 t2)) ctxt VDesc =
     do tm1 <- tyCheck t1 ctxt VDesc
@@ -110,7 +119,7 @@ tyCheck (Annot p (Desc_Prod t1 t2)) ctxt (VIDesc v) =
        return (In $ CS.IDesc_Pair tm1 tm2)
 
 tyCheck (Annot p (Desc_Prod t1 t2)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (Desc_Sum t1 t2)) ctxt VDesc =
     do tm1 <- tyCheck t1 ctxt VDesc
@@ -118,7 +127,7 @@ tyCheck (Annot p (Desc_Sum t1 t2)) ctxt VDesc =
        return (In $ CS.Desc_Sum tm1 tm2)
 
 tyCheck (Annot p (Desc_Sum t1 t2)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (Construct t)) ctxt (VMu f) =
     do tm <- tyCheck t ctxt (vsem f $$ VMu f)
@@ -129,14 +138,14 @@ tyCheck (Annot p (Construct t)) ctxt (VMuI a d i) =
        return ( In $ CS.Construct tm )
 
 tyCheck (Annot p (Construct t)) ctxt v =
-    Error p (ExpectingMuTypeForConstruct ctxt v)
+    throwError (p, ExpectingMuTypeForConstruct ctxt v)
 
 tyCheck (Annot p (IDesc_Id t)) ctxt (VIDesc v) =
     do tm <- tyCheck t ctxt v
        return ( In $ CS.IDesc_Id tm )
 
 tyCheck (Annot p (IDesc_Id t)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt (VIDesc v) =
     do tm1 <- tyCheck t1 ctxt (VSet 0)
@@ -144,7 +153,7 @@ tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt (VIDesc v) =
        return (In $ CS.IDesc_Sg tm1 tm2)
 
 tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt (VIDesc v) =
     do tm1 <- tyCheck t1 ctxt (VSet 0)
@@ -152,27 +161,35 @@ tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt (VIDesc v) =
        return (In $ CS.IDesc_Pi tm1 tm2)
 
 tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt v =
-    Error p (ExpectingDescTypeForDesc ctxt v)
+    throwError (p, ExpectingDescTypeForDesc ctxt v)
 
 tyCheck (Annot p Refl) ctxt (VEq vA vB va vb) =
     do let tA = reifyType0 vA
            tB = reifyType0 vB
            ta = reify vA va 0
            tb = reify vB vb 0
-       unless (tA == tB) $ Error p (ReflCanOnlyProduceHomogenousEquality ctxt vA vB)
-       unless (ta == tb) $ Error p (ReflCanOnlyProduceEquality ctxt vA va vb)
+       unless (tA == tB) $ throwError (p, ReflCanOnlyProduceHomogenousEquality ctxt vA vB)
+       unless (ta == tb) $ throwError (p, ReflCanOnlyProduceEquality ctxt vA va vb)
        return (In $ CS.Refl)
 
 tyCheck (Annot p Refl) ctxt v =
-    Error p (ReflExpectingEqualityType ctxt v)
+    throwError (p, ReflExpectingEqualityType ctxt v)
 
+-- tyCheck (Annot p (Hole bv)) ctxt v =
+--     do nm <- newMetaVariable bv ctxt v p
+--        return (In $ CS.Hole nm)
+
+{------------------------------------------------------------------------------}
+{- The following are high-level features, and should be done using a general
+   meta-variable technique
+-}
 tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
     do (ty, tm) <- tySynth t ctxt
        case ty of
          VEq vA vB va vb ->
              do let tA = reifyType0 vA
                     tB = reifyType0 vB
-                unless (tA == tB) $ Error p (ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
+                unless (tA == tB) $ throwError (p, ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
                 let ta   = reify vA va 0
                     tb   = reify vB vb 0
                     eq   = reify ty (evaluate tm [] (lookupDef ctxt)) 0 -- normalise the equality proof
@@ -182,41 +199,43 @@ tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
                 tm_p <- tyCheck tp ctxt vP'
                 return (In $ CS.ElimEq tA ta tb tm "a" "eq" tmPg tm_p)
          ty ->
-             Error p (ExpectingEqualityType ctxt ty)
+             throwError (p, ExpectingEqualityType ctxt ty)
 
 tyCheck (Annot p (ElimEmpty t1 Nothing)) ctxt v =
     do tm1     <- tyCheck t1 ctxt VEmpty
        let tm2 = reifyType0 v
        return (In $ CS.ElimEmpty tm1 tm2)
 
+{------------------------------------------------------------------------------}
+{- Fall through case -}
 tyCheck (Annot p t) ctxt v =
     do (v',tm) <- tySynth (Annot p t) ctxt
        compareTypes p ctxt v v'
        return tm
 
-
+{------------------------------------------------------------------------------}
 setCheck :: AnnotRec p TermCon -> Context -> TypingMonad p (Int, CS.Term)
 setCheck t@(Annot p _) ctxt =
     do (tA,tm) <- tySynth t ctxt
        case tA of
          VSet j -> return (j, tm)
-         _      -> Error p ExpectingSet
+         _      -> throwError (p, ExpectingSet)
 
 
-
+{------------------------------------------------------------------------------}
 tySynth :: AnnotRec p TermCon -> Context -> TypingMonad p (Value, CS.Term)
 tySynth (Annot p (Bound _)) ctxt =
     error "internal: 'bound' variable discovered during type synthesis"
 tySynth (Annot p (Free nm)) ctxt =
     case lookupType nm ctxt of
-      Nothing -> Error p (UnknownIdentifier nm)
+      Nothing -> throwError (p, UnknownIdentifier nm)
       Just tA -> return (tA, In $ CS.Free nm)
 tySynth (Annot p (App t t')) ctxt =
     do (tF, tm) <- tySynth t ctxt
        case tF of
          VPi _ tA tB -> do tm' <- tyCheck t' ctxt tA
                            return (tB $ tm' `evalIn` ctxt, In $ CS.App tm tm')
-         ty          -> Error p (ApplicationOfNonFunction ctxt ty)
+         ty          -> throwError (p, ApplicationOfNonFunction ctxt ty)
 tySynth (Annot p (Set l)) ctxt =
     return (VSet (l + 1), In $ CS.Set l)
 tySynth (Annot p (Pi x t1 t2)) ctxt =
@@ -255,7 +274,7 @@ tySynth (Annot p (Case t x tP y tL z tR)) ctxt =
                                                   y (CS.bindFree [y'] tmL)
                                                   z (CS.bindFree [z'] tmR))
          v ->
-             Error p (CaseOnNonSum ctxt v)
+             throwError (p, CaseOnNonSum ctxt v)
 tySynth (Annot p Unit) ctxt =
     return (VSet 0, In $ CS.Unit)
 tySynth (Annot p UnitI) ctxt =
@@ -268,11 +287,6 @@ tySynth (Annot p (ElimEmpty t1 (Just t2))) ctxt =
        (_,tm2) <- setCheck t2 ctxt
        let vtm2 = evaluate tm2 [] (lookupDef ctxt)
        return (vtm2, In $ CS.ElimEmpty tm1 tm2)
-{-
-    -- FIXME: make this have a mandatory argument so we can use an arbitrary level
-    return ( forall "A" (VSet 10) $ \a -> VEmpty .->. a
-           , In $ CS.ElimEmpty)
--}
 
 tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
     do (ty, tm) <- tySynth t ctxt
@@ -280,7 +294,7 @@ tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
          VEq vA vB va vb -> do
              let tA = reifyType0 vA
                  tB = reifyType0 vB
-             unless (tA == tB) $ Error p (ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
+             unless (tA == tB) $ throwError (p, ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
              let (a',ctxt0) = ctxtExtendFreshen ctxt a vA Nothing
                  (e',ctxt1) = ctxtExtendFreshen ctxt0 e (VEq vA vA va (reflect vA (CS.tmFree a'))) Nothing
                  tP'        = close [e',a'] tP
@@ -295,7 +309,7 @@ tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
                     , In $ CS.ElimEq tA ta tb tm a e tmP tm_p
                     )
          ty ->
-             Error p (ExpectingEqualityType ctxt ty)
+             throwError (p, ExpectingEqualityType ctxt ty)
 
 
 tySynth (Annot p Desc) ctxt =
@@ -337,13 +351,13 @@ tySynth (Annot p (Proj1 t)) ctxt =
     do (tP, tmP) <- tySynth t ctxt
        case tP of
          VSigma _ tA _ -> return (tA, In $ CS.Proj1 tmP)
-         v             -> Error p (Proj1FromNonSigma ctxt v)
+         v             -> throwError (p, Proj1FromNonSigma ctxt v)
 
 tySynth (Annot p (Proj2 t)) ctxt =
     do (tP, tmP) <- tySynth t ctxt
        case tP of
          VSigma _ _ tB -> return (tB (vfst $ tmP `evalIn` ctxt), In $ CS.Proj2 tmP)
-         v             -> Error p (Proj2FromNonSigma ctxt v)
+         v             -> throwError (p, Proj2FromNonSigma ctxt v)
 
 tySynth (Annot p (Eq tA tB)) ctxt =
     do (tyA, tmA) <- tySynth tA ctxt
@@ -395,4 +409,4 @@ tySynth (Annot p InductionI) ctxt =
               )
 
 tySynth (Annot p t) ctxt =
-    Error p UnableToSynthesise
+    throwError (p, UnableToSynthesise)
