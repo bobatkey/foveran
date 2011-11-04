@@ -192,7 +192,7 @@ tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
                 unless (tA == tB) $ throwError (p, ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
                 let ta   = reify vA va 0
                     tb   = reify vB vb 0
-                    eq   = reify ty (evaluate tm [] (lookupDef ctxt)) 0 -- normalise the equality proof
+                    eq   = reify ty (tm `evalIn` ctxt) 0 -- normalise the equality proof
                     tmP  = reifyType0 tP
                     tmPg = CS.generalise [eq,tb] tmP
                 let vP' = evaluate tmPg [VRefl, va] (lookupDef ctxt)
@@ -285,7 +285,7 @@ tySynth (Annot p Empty) ctxt =
 tySynth (Annot p (ElimEmpty t1 (Just t2))) ctxt =
     do tm1     <- tyCheck t1 ctxt VEmpty
        (_,tm2) <- setCheck t2 ctxt
-       let vtm2 = evaluate tm2 [] (lookupDef ctxt)
+       let vtm2 = tm2 `evalIn` ctxt
        return (vtm2, In $ CS.ElimEmpty tm1 tm2)
 
 tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =

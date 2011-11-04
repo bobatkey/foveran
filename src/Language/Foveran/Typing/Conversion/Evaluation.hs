@@ -6,36 +6,40 @@ module Language.Foveran.Typing.Conversion.Evaluation
     where
 
 import Control.Applicative
-import Data.Rec
+import Data.Rec (foldRec)
 import Language.Foveran.Syntax.Checked
 import Language.Foveran.Typing.Conversion.Value
 
 {------------------------------------------------------------------------------}
-type Eval a = ([Value], Ident -> (Value, Maybe Value)) -> a
+type Environment = ([Value], Ident -> (Value, Maybe Value))
 
-getBound k (env, _) = env !! k
+type Eval a = Environment -> a
 
-getDef nm (_, context) =
-    case def of
-      Nothing -> reflect ty (tmFree nm)
-      Just d  -> d
-    where
-      (ty, def) = context nm
+lookupBound :: Int -> Eval Value
+lookupBound k (env, _) = env !! k
 
-withBound :: Eval a -> Eval (Value -> a)
-withBound p = \(env,defs) v -> p (v:env, defs)
+lookupFree :: Ident -> Eval Value
+lookupFree nm (_, context) =
+    case context nm of
+      (ty, Nothing)  -> reflect ty (tmFree nm)
+      (ty, Just def) -> def
+
+
+binder :: Eval a -> Eval (Value -> a)
+binder p = \(env,defs) v -> p (v:env, defs)
+
 
 eval :: TermCon (Eval Value) -> Eval Value
-eval (Bound k)     = getBound k
-eval (Free nm)     = getDef nm
+eval (Bound k)     = lookupBound k
+eval (Free nm)     = lookupFree nm
 
 eval (Set l)       = pure $ VSet l
 
-eval (Pi nm t1 t2) = VPi nm <$> t1 <*> withBound t2
-eval (Lam nm t)    = VLam nm <$> withBound t
+eval (Pi nm t1 t2) = VPi nm <$> t1 <*> binder t2
+eval (Lam nm t)    = VLam nm <$> binder t
 eval (App t1 t2)   = ($$) <$> t1 <*> t2
 
-eval (Sigma nm t1 t2) = VSigma nm <$> t1 <*> withBound t2
+eval (Sigma nm t1 t2) = VSigma nm <$> t1 <*> binder t2
 eval (Pair t1 t2)     = VPair <$> t1 <*> t2
 eval (Proj1 t)        = vfst <$> t
 eval (Proj2 t)        = vsnd <$> t
@@ -46,9 +50,9 @@ eval (Inr t)                 = VInr <$> t
 eval (Case t tA tB x tP y tL z tR) = vcase <$> t
                                      <*> tA
                                      <*> tB
-                                     <*> pure x <*> withBound tP
-                                     <*> pure y <*> withBound tL
-                                     <*> pure z <*> withBound tR
+                                     <*> pure x <*> binder tP
+                                     <*> pure y <*> binder tL
+                                     <*> pure z <*> binder tR
 
 eval Unit      = pure VUnit
 eval UnitI     = pure VUnitI
@@ -58,7 +62,7 @@ eval (ElimEmpty x a) = velimEmpty <$> x <*> a
 eval (Eq tA tB ta tb) = VEq <$> tA <*> tB <*> ta <*> tb
 eval Refl             = pure VRefl
 eval (ElimEq tA ta tb teq a e tP tp) =
-    velimeq <$> tA <*> ta <*> tb <*> teq <*> pure a <*> pure e <*> withBound (withBound tP) <*> tp
+    velimeq <$> tA <*> ta <*> tb <*> teq <*> pure a <*> pure e <*> binder (binder tP) <*> tp
                                    
 eval Desc               = pure VDesc
 eval (Desc_K t)         = VDesc_K <$> t
