@@ -13,12 +13,10 @@ module Language.Foveran.Typing.Context
     )
     where
 
-import           Data.Functor
-import           Data.Monoid
+import           Data.Functor ((<$>))
 import qualified Data.Text as T
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Rec (AnnotRec)
 import           Language.Foveran.Syntax.Checked (Term)
 import           Language.Foveran.Syntax.Identifier
 import           Language.Foveran.Typing.Conversion
