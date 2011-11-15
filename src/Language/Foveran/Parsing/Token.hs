@@ -74,6 +74,7 @@ data Token
     | Underscore
     | Then
     | AbsurdBy
+    | Hole
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -139,6 +140,7 @@ instance SyntaxHighlight Token where
     lexicalClass Underscore  = Punctuation
     lexicalClass Then        = Keyword
     lexicalClass AbsurdBy    = Keyword
+    lexicalClass Hole        = Keyword
 
 instance Layout Token where
     lbrace = LBrace
@@ -207,3 +209,4 @@ instance Show Token where
   show Underscore  = "_"
   show Then        = "then"
   show AbsurdBy    = "absurdBy"
+  show Hole        = "?"

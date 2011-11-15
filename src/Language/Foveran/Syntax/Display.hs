@@ -141,4 +141,7 @@ data TermCon tm
     | IDesc_Elim
     | MuI        tm tm
     | InductionI
+
+    | UserHole
+    | Hole       Ident
     deriving (Show, Functor)

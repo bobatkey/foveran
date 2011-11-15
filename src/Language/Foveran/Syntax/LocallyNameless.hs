@@ -63,6 +63,9 @@ data TermCon tm
   | IDesc_Elim
   | MuI        tm tm
   | InductionI
+
+  | UserHole
+  | Hole       Ident
   deriving (Show, Functor)
 
 instance Show (TermPos' p) where
@@ -161,6 +164,9 @@ toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
+toLN DS.UserHole          bv = Layer $ UserHole
+toLN (DS.Hole nm)         bv = Layer $ Hole nm
+
 toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
 toLocallyNamelessClosed t = translateStar toLN t []
 
@@ -173,7 +179,11 @@ binder f i = f (i+1)
 
 close' :: [Ident] -> TermCon (Int -> a) -> Int -> TermCon a
 close' fnm (Free nm)        = pure $ Free nm
-close' fnm (Bound k)        = \i -> if k >= i then Free (fnm !! (k - i)) else Bound k
+close' fnm (Bound k)        = \i -> if k < i then Bound k
+                                    else let j = k - i
+                                             l = length fnm
+                                         in if j < length fnm then Free (fnm !! j)
+                                            else Bound (k - l)
 close' fnm (Lam nm body)    = Lam nm <$> binder body
 close' fnm (App t ts)       = App <$> t <*> ts
 close' fnm (Set i)          = pure $ Set i
@@ -217,6 +227,8 @@ close' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm InductionI       = pure InductionI
+close' fnm UserHole         = pure UserHole
+close' fnm (Hole nm)        = pure (Hole nm)
 
-close :: [Ident] -> AnnotRec a TermCon -> AnnotRec a TermCon
-close nms x = translate (close' nms) x 0
+close :: [Ident] -> AnnotRec a TermCon -> Int -> AnnotRec a TermCon
+close nms x offset = translate (close' nms) x offset

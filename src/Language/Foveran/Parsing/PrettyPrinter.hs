@@ -91,6 +91,9 @@ pprint IDesc_Elim          = "elimID"
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
 pprint InductionI          = "inductionI"
 
+pprint UserHole            = "?"
+pprint (Hole nm)           = "?" <> ppIdent nm
+
 ppAnnotTerm :: TermPos -> PP.Doc
 ppAnnotTerm t = foldAnnot pprint t `atPrecedenceLevel` 10
 

@@ -70,6 +70,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "_" :==>               emit Underscore
     , "then" :==>            emit Then
     , "absurdBy" :==>        emit AbsurdBy
+    , "?" :==>               emit Hole
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                              emit Ident
     , oneOrMore (tok digit) :==>

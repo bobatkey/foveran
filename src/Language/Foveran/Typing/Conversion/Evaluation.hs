@@ -1,35 +1,57 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TypeOperators #-}
 
 module Language.Foveran.Typing.Conversion.Evaluation
-    ( evaluate
-    )
+    ( DefinitionContext (..)
+    , lookupType
+    , evalIn
+    , evalInWith )
     where
 
 import Control.Applicative
-import Data.Rec (foldRec)
+import Data.Rec (foldRec, Rec (In))
 import Language.Foveran.Syntax.Checked
 import Language.Foveran.Typing.Conversion.Value
 
 {------------------------------------------------------------------------------}
-type Environment = ([Value], Ident -> (Value, Maybe Value))
+class DefinitionContext ctxt where
+    lookupDefinition :: Ident -> ctxt -> Maybe (Value, Maybe Value)
 
-type Eval a = Environment -> a
+lookupType :: DefinitionContext ctxt => Ident -> ctxt -> Maybe Value
+lookupType identifier ctxt = fst <$> lookupDefinition identifier ctxt
 
-lookupBound :: Int -> Eval Value
-lookupBound k (env, _) = env !! k
+{------------------------------------------------------------------------------}
+type Environment ctxt holeContext = ([Value], ctxt, holeContext)
 
-lookupFree :: Ident -> Eval Value
-lookupFree nm (_, context) =
-    case context nm of
-      (ty, Nothing)  -> reflect ty (tmFree nm)
-      (ty, Just def) -> def
+type Eval ctxt holeContext a = Environment ctxt holeContext -> a
+
+lookupBound :: Int -> Eval ctxt holeContext Value
+lookupBound k (env, _, _) = env !! k
+
+lookupFree :: DefinitionContext ctxt =>
+              Ident
+           -> Eval ctxt holeContext Value
+lookupFree nm (_, context, _) =
+    case lookupDefinition nm context of
+      Nothing             -> error "Evaluation: unbound identifier"
+      Just (ty, Nothing)  -> reflect ty (tmFree nm)
+      Just (ty, Just def) -> def
+
+lookupHole :: DefinitionContext holeContext =>
+              Ident
+           -> Eval ctxt holeContext Value
+lookupHole identifier (_, _, holeContext) =
+    case lookupDefinition identifier holeContext of
+      Nothing             -> error "Evaluation: unbound hole"
+      Just (ty, Nothing)  -> reflect ty (\_ -> In $ Hole identifier)
+      Just (ty, Just def) -> def
+
+binder :: Eval ctxt holeContext a -> Eval ctxt holeContext (Value -> a)
+binder p = \(env,defs,holes) v -> p (v:env, defs, holes)
 
 
-binder :: Eval a -> Eval (Value -> a)
-binder p = \(env,defs) v -> p (v:env, defs)
-
-
-eval :: TermCon (Eval Value) -> Eval Value
+eval :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
+        TermCon (Eval ctxt holeContext Value)
+     -> Eval ctxt holeContext Value
 eval (Bound k)     = lookupBound k
 eval (Free nm)     = lookupFree nm
 
@@ -109,6 +131,21 @@ eval InductionI         = pure (VLam "I" $ \vI ->
                                 VLam "x" $ \vx ->
                                 vinductionI vI vD vP vk vi vx)
 
+eval (Hole nm)          = lookupHole nm
+
 {------------------------------------------------------------------------------}
-evaluate :: Term -> [Value] -> (Ident -> (Value, Maybe Value)) -> Value
-evaluate t env defs = foldRec eval t (env,defs)
+evalInWith :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
+              Term
+           -> ctxt
+           -> holeContext
+           -> [Value]
+           -> Value
+evalInWith term context holeContext environment =
+    foldRec eval term (environment, context, holeContext)
+
+evalIn :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
+          Term
+       -> ctxt
+       -> holeContext
+       -> Value
+evalIn term context holeContext = evalInWith term context holeContext []

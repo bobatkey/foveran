@@ -95,8 +95,8 @@ vecElim α Φ φnil φcons =
       case fst x for b. (z : semI Nat (body α n b) (λn. vec α n)) →
                         liftI Nat (body α n b) (λn. vec α n) Φ z →
                         Φ n (construct «b,z») with
-        { inl _. λz _. rewriteBy z then φnil
-        ; inr _. λz φ. rewriteBy snd (snd (snd z)) then
+        { inl _. λz _. rewriteBy z for n p. Φ n (construct «inl (), p») then φnil
+        ; inr _. λz φ. rewriteBy snd (snd (snd z)) for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p») then
                        φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ)
         } (snd x));
 
@@ -104,6 +104,7 @@ vecElim α Φ φnil φcons =
 add : Nat → Nat → Nat ;
 add n₁ n₂ = natInduction (λx. Nat) n₂ (λn. succ) n₁;
 
+{-
 vecappend :
   (α : Set) →
   (n₁ n₂ : Nat) →
@@ -116,10 +117,12 @@ vecappend α n₁ n₂ xs ys =
     (λn a xs xys. vcons α (add n n₂) a xys)
     n₁
     xs;
+-}
 
 singleton : (α : Set) → α → vec α (succ zero);
 singleton α a = vcons α zero a (vnil α);
 
+{-
 add_succ :
   (n : Nat) →
   add n (succ zero) ≡ succ n;
@@ -138,6 +141,7 @@ vecreverse α =
     (λn a xs rev_xs.
       rewriteBy add_succ n then
       vecappend α n (succ zero) rev_xs (singleton α a));
+-}
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 assume A : Set;
@@ -147,9 +151,11 @@ assume b : A;
 v : vec A two;
 v = vcons A one a (vcons A zero b (vnil A));
 
+{-
 normalise vecappend A two two v v;
 
 normalise vecreverse A two v;
+-}
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 not : Set → Set;

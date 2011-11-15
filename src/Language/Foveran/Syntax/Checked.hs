@@ -75,6 +75,8 @@ data TermCon tm
     | IDesc_Elim
     | MuI        tm tm
     | InductionI
+
+    | Hole       Ident  -- when evaluating, we look up the hole in the context and reflect it using the known type
     deriving (Show, Functor)
 
 --------------------------------------------------------------------------------
@@ -135,6 +137,8 @@ traverseSyn IDesc_Elim       = pure IDesc_Elim
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
+traverseSyn (Hole nm)        = pure (Hole nm)
+
 --------------------------------------------------------------------------------
 generaliseAlg :: [Term] -> Term -> TermCon (Int -> a) -> Int -> TermCon a
 generaliseAlg searchTerms currentTerm x =
@@ -150,13 +154,15 @@ generalise searchTerms originalTerm = go originalTerm 0
 
 --------------------------------------------------------------------------------
 bindAlg :: [Ident] -> TermCon (Int -> a) -> Int -> TermCon a
+bindAlg nms (Bound k) = \i -> if k >= i then Bound (i + length nms + k)
+                              else Bound k
 bindAlg nms (Free nm) = \i -> case elemIndex nm nms of
                                 Nothing -> Free nm
                                 Just k  -> Bound (i + k)
 bindAlg nms x         = traverseSyn x
 
-bindFree :: [Ident] -> Term -> Term
-bindFree nms x = translateRec (bindAlg nms) x 0
+bindFree :: [Ident] -> Term -> Int -> Term
+bindFree nms x offset = translateRec (bindAlg nms) x offset
 
 --------------------------------------------------------------------------------
 gatheringLam :: Ident -> DS.Term -> DS.TermCon DS.Term
@@ -175,7 +181,7 @@ gatheringTuple :: DS.Term -> DS.Term -> DS.TermCon DS.Term
 gatheringTuple t1 (In (DS.Tuple tms)) = DS.Tuple (t1:tms)
 gatheringTuple t1 t2                  = DS.Tuple [t1,t2]
 
-toDisplay :: TermCon (NameSupply DS.Term) -> NameSupply (DS.TermCon DS.Term)
+toDisplay :: TermCon (NameGeneration DS.Term) -> NameGeneration (DS.TermCon DS.Term)
 toDisplay (Free nm)               = pure $ DS.Var nm
 toDisplay (Bound i)               = DS.Var <$> getBound i
 toDisplay (Lam nm body)           = bindK nm body $ \nm body -> pure (gatheringLam nm body)
@@ -229,8 +235,9 @@ toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
+toDisplay (Hole nm)               = pure (DS.Hole nm)
 
-toDisplaySyntax :: Term -> NameSupply DS.Term
+toDisplaySyntax :: Term -> NameGeneration DS.Term
 toDisplaySyntax = translateRec toDisplay
 
 {------------------------------------------------------------------------------}
@@ -308,5 +315,6 @@ instance Eq Term where
   In IDesc_Elim == In IDesc_Elim     = True
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
   In InductionI  == In InductionI    = True
+  In (Hole nm)   == In (Hole nm')    = nm == nm'
   
   _             == _                 = False

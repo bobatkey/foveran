@@ -292,4 +292,6 @@ term00 =
     <|>
     keyword IDesc_Elim <$> token Tok.IDesc_Elim
     <|>
+    keyword UserHole <$> token Tok.Hole
+    <|>
     (\(nm,p) -> Annot p (Var nm)) <$> tokenWithText Tok.Ident

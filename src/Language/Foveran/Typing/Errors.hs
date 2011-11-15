@@ -5,42 +5,135 @@ module Language.Foveran.Typing.Errors
     , ppTypeError
     , ppTerm
     , ppType
+    , DataDeclError (..)
+    , ppDataDeclError
     )
     where
 
 import           Text.PrettyPrint
 import           Text.PrettyPrint.IsString
+import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers, runNameGeneration)
+import qualified Language.Foveran.Syntax.LocallyNameless as LN
+import           Language.Foveran.Syntax.Checked (toDisplaySyntax)
 import           Language.Foveran.Typing.Context
 import           Language.Foveran.Typing.Conversion (Value, reifyType0, reify)
-import           Language.Foveran.Syntax.Checked (Ident, toDisplaySyntax)
 import           Language.Foveran.Parsing.PrettyPrinter
-import qualified Data.Text as T
 
+{------------------------------------------------------------------------------}
 data TypeError
-    = ExpectingPiTypeForLambda    Context Value
-    | ExpectingSigmaTypeForPair   Context Value
-    | ExpectingSumTypeForInl      Context Value
-    | ExpectingSumTypeForInr      Context Value
-    | ExpectingUnitTypeForUnit    Context Value
-    | ExpectingDescTypeForDesc    Context Value
-    | ExpectingMuTypeForConstruct Context Value
+    = ExpectingPiTypeForLambda    Value
+    | ExpectingSigmaTypeForPair   Value
+    | ExpectingSumTypeForInl      Value
+    | ExpectingSumTypeForInr      Value
+    | ExpectingUnitTypeForUnit    Value
+    | ExpectingDescTypeForDesc    Value
+    | ExpectingMuTypeForConstruct Value
     | UnknownIdentifier           Ident
-    | ApplicationOfNonFunction    Context Value
-    | CaseOnNonSum                Context Value
+    | ApplicationOfNonFunction    Value
+    | CaseOnNonSum                Value
     | ExpectingSet
-    | UnableToSynthesise
-    | Proj1FromNonSigma           Context Value
-    | Proj2FromNonSigma           Context Value
+    | UnableToSynthesise          LN.TermPos
+    | Proj1FromNonSigma           Value
+    | Proj2FromNonSigma           Value
     | LevelProblem                Int Int
-    | TypesNotEqual               Context Value Value
-    | ReflCanOnlyProduceHomogenousEquality Context Value Value
-    | ReflCanOnlyProduceEquality  Context Value Value Value
-    | ReflExpectingEqualityType   Context Value
-    | ElimEqCanOnlyHandleHomogenousEq Context Value Value
-    | ExpectingEqualityType       Context Value
+    | TypesNotEqual               Value Value
+    | ReflCanOnlyProduceHomogenousEquality Value Value
+    | ReflCanOnlyProduceEquality  Value Value Value
+    | ReflExpectingEqualityType   Value
+    | ElimEqCanOnlyHandleHomogenousEq Value Value
+    | ExpectingEqualityType       Value
 
-      -- Data declaration errors
-    | DuplicateParameterName      Ident
+ppType :: UsesIdentifiers ctxt =>
+          ctxt
+       -> Value
+       -> Doc
+ppType ctxt v =
+    ppPlain $ runNameGeneration ctxt $ toDisplaySyntax $ reifyType0 v
+
+ppTerm :: UsesIdentifiers ctxt =>
+          ctxt
+       -> Value
+       -> Value
+       -> Doc
+ppTerm ctxt v vty =
+    ppPlain $ runNameGeneration ctxt $ toDisplaySyntax $ reify vty v 0
+
+
+ppTypeError :: UsesIdentifiers ctxt => ctxt -> TypeError -> Doc
+ppTypeError ctxt (ExpectingPiTypeForLambda ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term is a lambda-abstraction"
+ppTypeError ctxt (ExpectingSigmaTypeForPair ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term constructs a pair"
+ppTypeError ctxt (ExpectingSumTypeForInl ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term is a left injection"
+ppTypeError ctxt (ExpectingSumTypeForInr ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term is a right injection"
+ppTypeError ctxt (ExpectingUnitTypeForUnit ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term has type 𝟙"
+ppTypeError ctxt (ExpectingDescTypeForDesc ty)
+    = "Expecting Desc type for description"
+ppTypeError ctxt (ExpectingMuTypeForConstruct ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term is an inductive type constructor"
+ppTypeError ctxt (UnknownIdentifier nm)
+    = "Unknown identifier" <+> "“" <> ppIdent nm <> "”"
+ppTypeError ctxt (ApplicationOfNonFunction ty)
+    = "Application of non function"
+ppTypeError ctxt (CaseOnNonSum ty)
+    = "Case on value of non-sum type"
+ppTypeError ctxt (ExpectingSet)
+    = "Expecting a term of sort Set"
+ppTypeError ctxt (UnableToSynthesise t)
+    = "Unable to synthesise type for this term: " <> text (show t)
+ppTypeError ctxt (Proj1FromNonSigma ty)
+    = "First projection from non Sigma-type"
+ppTypeError ctxt (Proj2FromNonSigma ty)
+    = "Second projection from non Sigma-type"
+ppTypeError ctxt (LevelProblem i j)
+    = "Level problem:" <+> int i <+> "not <=" <+> int j
+ppTypeError ctxt (TypesNotEqual ty1 ty2)
+    = "Expecting term to have type "
+      $$ nest 4 (ppType ctxt ty1)
+      $$ "but term has type"
+      $$ nest 4 (ppType ctxt ty2)
+ppTypeError ctxt (ReflCanOnlyProduceHomogenousEquality tyA tyB)
+    = "'refl' can only produce homogenous equalities; types given:"
+      $$ nest 4 (ppType ctxt tyA)
+      $$ "and"
+      $$ nest 4 (ppType ctxt tyB)
+ppTypeError ctxt (ReflCanOnlyProduceEquality ty a b)
+    = "Type checking 'refl', but terms"
+      $$ nest 4 (ppTerm ctxt a ty)
+      $$ "and"
+      $$ nest 4 (ppTerm ctxt b ty)
+      $$ "are not equal."
+ppTypeError ctxt (ReflExpectingEqualityType ty)
+    = "Term produces a value of equality type, checker is expecting the type"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (ElimEqCanOnlyHandleHomogenousEq ty1 ty2)
+    = "Equality elimination can only handle elimination of homogenous equalities, types involved are:"
+      $$ nest 4 (ppType ctxt ty1)
+      $$ "and"
+      $$ nest 4 (ppType ctxt ty2)
+ppTypeError ctxt (ExpectingEqualityType ty)
+    = "Expecting term to have type"
+      $$ nest 4 (ppType ctxt ty)
+      $$ "but this term generates equalities"
+
+{------------------------------------------------------------------------------}
+data DataDeclError
+    = DuplicateParameterName      Ident
     | DuplicateConstructorName    Ident
     | ShadowingDatatypeName
     | ShadowingParameterName
@@ -50,103 +143,22 @@ data TypeError
     | TooManyArgumentsForDatatype
     | NotEnoughArgumentsForDatatype
 
-ppType :: Context -> Value -> Doc
-ppType ctxt v =
-  ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reifyType0 v
-
-ppTerm :: Context -> Value -> Value -> Doc
-ppTerm ctxt v vty =
-    ppPlain $ contextNameSupply ctxt $ toDisplaySyntax $ reify vty v 0
-
-
-ppTypeError :: TypeError -> Doc
-ppTypeError (ExpectingPiTypeForLambda ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a lambda-abstraction"
-ppTypeError (ExpectingSigmaTypeForPair ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term constructs a pair"
-ppTypeError (ExpectingSumTypeForInl ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a left injection"
-ppTypeError (ExpectingSumTypeForInr ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a right injection"
-ppTypeError (ExpectingUnitTypeForUnit ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term has type 𝟙"
-ppTypeError (ExpectingDescTypeForDesc ctxt ty)
-    = "Expecting Desc type for description"
-ppTypeError (ExpectingMuTypeForConstruct ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is an inductive type constructor"
-ppTypeError (UnknownIdentifier nm)
-    = "Unknown identifier" <+> "“" <> text (T.unpack nm) <> "”"
-ppTypeError (ApplicationOfNonFunction ctxt ty)
-    = "Application of non function"
-ppTypeError (CaseOnNonSum ctxt ty)
-    = "Case on value of non-sum type"
-ppTypeError (ExpectingSet)
-    = "Expecting a term of sort Set"
-ppTypeError (UnableToSynthesise)
-    = "Unable to synthesise type for this term"
-ppTypeError (Proj1FromNonSigma ctxt ty)
-    = "First projection from non Sigma-type"
-ppTypeError (Proj2FromNonSigma ctxt ty)
-    = "Second projection from non Sigma-type"
-ppTypeError (LevelProblem i j)
-    = "Level problem:" <+> int i <+> "not <=" <+> int j
-ppTypeError (TypesNotEqual ctxt ty1 ty2)
-    = "Expecting term to have type "
-      $$ nest 4 (ppType ctxt ty1)
-      $$ "but term has type"
-      $$ nest 4 (ppType ctxt ty2)
-ppTypeError (ReflCanOnlyProduceHomogenousEquality ctxt tyA tyB)
-    = "'refl' can only produce homogenous equalities; types given:"
-      $$ nest 4 (ppType ctxt tyA)
-      $$ "and"
-      $$ nest 4 (ppType ctxt tyB)
-ppTypeError (ReflCanOnlyProduceEquality ctxt ty a b)
-    = "Type checking 'refl', but terms"
-      $$ nest 4 (ppTerm ctxt a ty)
-      $$ "and"
-      $$ nest 4 (ppTerm ctxt b ty)
-      $$ "are not equal."
-ppTypeError (ReflExpectingEqualityType ctxt ty)
-    = "Term produces a value of equality type, checker is expecting the type"
-      $$ nest 4 (ppType ctxt ty)
-ppTypeError (ElimEqCanOnlyHandleHomogenousEq ctxt ty1 ty2)
-    = "Equality elimination can only handle elimination of homogenous equalities, types involved are:"
-      $$ nest 4 (ppType ctxt ty1)
-      $$ "and"
-      $$ nest 4 (ppType ctxt ty2)
-ppTypeError (ExpectingEqualityType ctxt ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term generates equalities"
-
--- IDataDecl errors
-ppTypeError (DuplicateConstructorName ident)
+ppDataDeclError :: DataDeclError -> Doc
+ppDataDeclError (DuplicateConstructorName ident)
     = "Duplicate constructor name: '" <> ppIdent ident <> "'"
-ppTypeError (DuplicateParameterName ident)
+ppDataDeclError (DuplicateParameterName ident)
     = "Duplicate parameter name: '" <> ppIdent ident <> "'"
-ppTypeError (ShadowingDatatypeName)
+ppDataDeclError (ShadowingDatatypeName)
     = "Shadowing of the data type's name in constructor definition"
-ppTypeError (ShadowingParameterName)
+ppDataDeclError (ShadowingParameterName)
     = "Shadowing of a parameter name in constructor definition"
-ppTypeError (ConstructorTypesMustEndWithNameOfDatatype givenNm expectedNm)
-    = "Constructor types must end with the name of the datatype being defined '" <> ppIdent expectedNm <> "', not '" <> ppIdent givenNm <> "'"
-ppTypeError (NonMatchingParameterArgument givenNm expectedNm)
+ppDataDeclError (ConstructorTypesMustEndWithNameOfDatatype givenNm expectedNm)
+    = "Constructor types must end with the name of the datatype being defined: '" <> ppIdent expectedNm <> "', not '" <> ppIdent givenNm <> "'"
+ppDataDeclError (NonMatchingParameterArgument givenNm expectedNm)
     = "Parameter argument has incorrect name: should be '" <> ppIdent expectedNm <> "', not '" <> ppIdent givenNm <> "'"
-ppTypeError (IllFormedArgument expectedNm)
+ppDataDeclError (IllFormedArgument expectedNm)
     = "Ill-formed parameter argument: should be '" <> ppIdent expectedNm <> "'"
-ppTypeError (TooManyArgumentsForDatatype)
+ppDataDeclError (TooManyArgumentsForDatatype)
     = "Too many arguments for data type in constructor declaration"
-ppTypeError (NotEnoughArgumentsForDatatype)
+ppDataDeclError (NotEnoughArgumentsForDatatype)
     = "Not enough arguments for data type in constructor declaration"

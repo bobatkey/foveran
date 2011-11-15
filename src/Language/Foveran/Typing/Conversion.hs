@@ -2,7 +2,10 @@
 
 module Language.Foveran.Typing.Conversion
        ( Value (..)
-       , evaluate
+       , DefinitionContext (..)
+       , lookupType
+       , evalInWith
+       , evalIn
        , reifyType0
        , reify
        , ($$)

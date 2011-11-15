@@ -10,7 +10,7 @@ import           Control.Monad.State (StateT, evalStateT, gets, lift, modify)
 import           Data.Maybe (fromMaybe, isJust)
 import           Data.Rec (AnnotRec (Annot))
 import           Language.Foveran.Typing.DeclCheckMonad
-import           Language.Foveran.Typing.Errors
+import           Language.Foveran.Typing.Errors (DataDeclError (..))
 import           Language.Foveran.Syntax.Display hiding (Constructor, consPos)
 import           Language.Foveran.Syntax.Identifier ((<+>))
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
@@ -26,7 +26,7 @@ evalStateTWith = flip evalStateT
 processIDataDecl :: IDataDecl -> DeclCheckM ()
 processIDataDecl d = do
   evalStateTWith S.empty $ do
-   forM_ (dataParameters d) checkParameterName
+    forM_ (dataParameters d) checkParameterName
 
   -- Check the constructors for duplicate names, shadowing and
   -- correctness of parameter names. Does not check for any type
@@ -38,12 +38,12 @@ processIDataDecl d = do
   let codeName = dataName d <+> ":code"
       codeTyp  = paramsType   (dataParameters d) (codeType d) []
       code     = paramsLambda (dataParameters d) (makeCode d constructors) []
-  checkInternalDefinition (dataPos d) codeName codeTyp (Just code)
+  checkDefinition (dataPos d) codeName codeTyp (Just code)
 
   -- Generate the type itself
   let typ = paramsType   (dataParameters d) (makeMuTy d) []
       trm = paramsLambda (dataParameters d) (makeMu d constructors) []
-  checkInternalDefinition (dataPos d) (dataName d) typ (Just trm)
+  checkDefinition (dataPos d) (dataName d) typ (Just trm)
 
 --------------------------------------------------------------------------------
 checkParameterName :: DataParameter ->
@@ -51,7 +51,7 @@ checkParameterName :: DataParameter ->
 checkParameterName (DataParameter pos paramName _) = do
   nameUsed <- gets (S.member paramName)
   when nameUsed $ do
-    lift $ reportError pos (DuplicateParameterName paramName)
+    lift $ reportDataDeclError pos (DuplicateParameterName paramName)
   modify (S.insert paramName)
 
 --------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ checkConstructor :: IDataDecl
 checkConstructor d (IConstructor pos nm bits) = do
   nameUsed <- gets (S.member nm)
   when nameUsed $ do
-    lift $ reportError pos (DuplicateConstructorName nm)
+    lift $ reportDataDeclError pos (DuplicateConstructorName nm)
   modify (S.insert nm)
   (args, idxTm) <- lift $ checkConstructorBits d bits
   return (Constructor pos nm args idxTm)
@@ -88,8 +88,8 @@ checkConstructorBits :: IDataDecl
                      -> IConstructorBitsPos
                      -> DeclCheckM ([ConstructorArg], TermPos)
 checkConstructorBits d (Annot p (ConsPi nm t bits)) = do
-  when (nm == dataName d) $ reportError p ShadowingDatatypeName
-  when (nm `elem` (map paramIdent $ dataParameters d)) $ reportError p ShadowingParameterName
+  when (nm == dataName d) $ reportDataDeclError p ShadowingDatatypeName
+  when (nm `elem` (map paramIdent $ dataParameters d)) $ reportDataDeclError p ShadowingParameterName
   (args, idxTm) <- checkConstructorBits d bits
   return (ConsArg p (Just nm) t : args, idxTm)
 checkConstructorBits d (Annot p (ConsArr t bits)) = do
@@ -101,22 +101,22 @@ checkConstructorBits d (Annot p (ConsArr t bits)) = do
         do callIdxTm <- checkParameters p (isJust (dataIndexType d)) callArgs (map paramIdent $ dataParameters d)
            return (ConsCall p Nothing bindings callIdxTm : args, idxTm)
 checkConstructorBits d (Annot p (ConsEnd nm tms)) = do
-  when (nm /= dataName d) $ reportError p (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
+  when (nm /= dataName d) $ reportDataDeclError p (ConstructorTypesMustEndWithNameOfDatatype nm (dataName d))
   idxTm <- checkParameters p (isJust (dataIndexType d)) tms (map paramIdent $ dataParameters d)
   return ([], idxTm)
 
 checkParameters :: Span -> Bool -> [TermPos] -> [Ident] -> DeclCheckM TermPos
 checkParameters pos False   []       []     = return (pos @| UnitI)
-checkParameters pos False   []       (p:ps) = reportError pos NotEnoughArgumentsForDatatype
+checkParameters pos False   []       (p:ps) = reportDataDeclError pos NotEnoughArgumentsForDatatype
 checkParameters pos True    [x]      []     = return x
-checkParameters pos True    [x]      (p:ps) = reportError pos NotEnoughArgumentsForDatatype
-checkParameters pos needIdx _        []     = reportError pos TooManyArgumentsForDatatype
-checkParameters pos needIdx []       _      = reportError pos NotEnoughArgumentsForDatatype
+checkParameters pos True    [x]      (p:ps) = reportDataDeclError pos NotEnoughArgumentsForDatatype
+checkParameters pos needIdx _        []     = reportDataDeclError pos TooManyArgumentsForDatatype
+checkParameters pos needIdx []       _      = reportDataDeclError pos NotEnoughArgumentsForDatatype
 checkParameters pos needIdx (a:args) (p:ps) =
     case a of
-      Annot pos' (Var arg) -> do when (arg /= p) $ reportError pos' (NonMatchingParameterArgument arg p)
+      Annot pos' (Var arg) -> do when (arg /= p) $ reportDataDeclError pos' (NonMatchingParameterArgument arg p)
                                  checkParameters pos needIdx args ps
-      Annot pos' _         -> do reportError pos' (IllFormedArgument p)
+      Annot pos' _         -> do reportDataDeclError pos' (IllFormedArgument p)
 
 extractRecursiveCall :: IDataDecl
                      -> TermPos

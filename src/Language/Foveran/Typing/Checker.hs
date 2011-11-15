@@ -1,412 +1,698 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, TypeOperators #-}
 
 module Language.Foveran.Typing.Checker
-    ( TypingMonad ()
+    ( (:>:) (..)
+    , TypingMonad ()
     , runTypingMonad
-    , tyCheck
-    , setCheck
-    , tySynth
-    )
+    , LocalContext ()
+    , emptyLocalContext
+    , HoleContext ()
+    , emptyHoleContext
+    , getHoles
+    , isType
+    , synthesiseTypeFor
+    , hasType )
     where
 
+import           Control.Applicative (pure, (<*>), (<|>))
 import           Control.Monad (unless)
+import           Control.Monad.Trans (lift)
 import           Control.Monad.Identity (Identity, runIdentity)
-import           Control.Monad.State (StateT, runStateT)
-import           Control.Monad.Error (ErrorT, runErrorT, throwError, Error (..))
-import qualified Data.Map as M
+import           Control.Monad.Reader (ReaderT, runReaderT, ask, local)
+import           Control.Monad.State (StateT, runStateT, get, modify)
+import           Data.Functor ((<$>))
+import qualified Data.Set as S
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In))
-import           Language.Foveran.Syntax.Identifier (Ident)
-import           Language.Foveran.Syntax.LocallyNameless
+import           Text.Position (Span)
+import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
+import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close)
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.Conversion
-import           Language.Foveran.Typing.Context
-import           Language.Foveran.Typing.Errors
+import           Language.Foveran.Typing.Errors (TypeError (..))
 
 {------------------------------------------------------------------------------}
-type MetaVariables p
-    = M.Map Ident (Context, Value, p)
+data a :>: b = a :>: b
 
-type TypingMonad p a
-    = StateT (MetaVariables p) (ErrorT (p,TypeError) Identity) a
+instance (DefinitionContext a, DefinitionContext b) => DefinitionContext (a :>: b) where
+    lookupDefinition identifier (ctxt1 :>: ctxt2) =
+        lookupDefinition identifier ctxt2 <|> lookupDefinition identifier ctxt1
 
-instance Error (p,TypeError) where
-    noMsg = error "noMsg : not defined for type errors"
-
-runTypingMonad :: TypingMonad p a
-               -> Either (p,TypeError) (a,MetaVariables p)
-runTypingMonad c = runIdentity (runErrorT (runStateT c M.empty))
+instance (UsesIdentifiers a, UsesIdentifiers b) => UsesIdentifiers (a :>: b) where
+    usedIdentifiers (a :>: b) = usedIdentifiers a `S.union` usedIdentifiers b
 
 {------------------------------------------------------------------------------}
-compareTypes :: p -> Context -> Value -> Value -> TypingMonad p ()
-compareTypes p ctxt (VSet i) (VSet j) =
-  unless (j <= i) $ throwError (p, LevelProblem j i)
-compareTypes p ctxt v1       v2 =
-  unless (tm1 == tm2) $ throwError (p, TypesNotEqual ctxt v1 v2)
-      where
-        tm1 = reifyType0 v1
-        tm2 = reifyType0 v2
+data LocalContext
+    = LocalContext { localContextMembers    :: [(Ident, Value)]
+                   , localContextUsedIdents :: S.Set Ident
+                   }
+
+instance DefinitionContext LocalContext where
+    lookupDefinition identifier localContext =
+        case lookup identifier (localContextMembers localContext) of
+          Nothing  -> Nothing
+          Just typ -> Just (typ, Nothing)
+
+instance UsesIdentifiers LocalContext where
+    usedIdentifiers = localContextUsedIdents
+
+emptyLocalContext :: LocalContext
+emptyLocalContext = LocalContext [] S.empty
+
+extendWith :: Ident -> Value -> LocalContext -> LocalContext
+extendWith identifier typ localContext
+    = LocalContext { localContextMembers    = (identifier, typ) : localContextMembers localContext
+                   , localContextUsedIdents = S.insert identifier (localContextUsedIdents localContext)
+                   }
+
+{------------------------------------------------------------------------------}
+{-
+data TypeOrSet
+    = Type      -- ^ We are looking to generate a type
+    | Set Value -- ^ We are looking to generate a term of some specific type
+-}
+
+data HoleData
+    = HoleData { holePosition     :: Span         -- ^ Where the hole was in the original input
+               , holeLocalContext :: LocalContext -- ^ The local context at the time the hole was created
+               , holeGoal         :: Value        -- ^ The type we are looking for. FIXME: want to also generate holes for proper types
+               , holeInfo         :: ()           -- ^ Information that might be useful in filling in this hole
+               }
+
+-- Store the holeLocalContext and holeGoal as terms?
+-- We can then look through them to see if they mention other holes
+
+makeTypeOfHole :: HoleData -> CS.Term
+makeTypeOfHole hole = parameters `makeType` endType
+    where
+      endType    = reifyType0 (holeGoal hole)
+      parameters = localContextMembers (holeLocalContext hole)
+
+      []                        `makeType` t = t
+      ((ident,ty):localContext) `makeType` t =
+          localContext `makeType` (In $ CS.Pi (Just ident) (reifyType0 ty) (CS.bindFree [ident] t 0))
+
+-- The generated term will still have free variables from prior
+-- definitions, and also other holes that were generated earlier. So
+-- to generate a value, we need to have all the types of the earlier
+-- definitions and holes.
+
+-- Holes are generated when coming across “UserHole” terms in the
+-- input. They are only allowed when a type is being pushed into a
+-- term. Already known holes can also be type checked; the types for
+-- these are synthesised.
+
+-- Term generated: CS.Hole nm `CS.App` argN `CS.App` arg(N-1) ... `CS.App` arg0
+-- When evaluating, just reflect the term at the generated type
+
+-- When substituting in, presumably we just have to generate the right
+-- amount of lambdas to make all the applications go away. Want to
+-- make sure that we don't end up completely normalising the result
+-- though.
+
+-- There is the problem of what to do with holes that stand for proper
+-- types. We cannot generate a normal type for this, though for the
+-- purposes of reflection, all Set levels are the same.
+
+-- Basically, we are pretending that each hole has a massive Pi type,
+-- even if that type cannot be expressed in the system.
+
+-- What I really want is not use the primitive application of the
+-- system, but to use explicit substitutions:
+
+--   CS.Hole nm [arg0,arg1,arg2,...,argN]
+
+-- evaluating: get the local context [ty0,...,tyN] and the goal
+-- - evaluate tyN --> vtyN
+-- - evaluate argN and reify against vtyN
+-- - evaluate ty(N-1) --> vty(N-1)
+-- - evaluate arg(N-1) in env with 
+
+-- test : (A : Set) -> A -> A
+-- test A a = id ? ?
+
+-- generates: ?hole0 : [A : Set, a : A] |- Set 0
+--            ?hole1 : [A : Set, a : A] |- ?hole0 A a
+
+{------------------------------------------------------------------------------}
+-- Contexts of holes
+data HoleContext = HoleContext { holes :: [(Ident, (HoleData, Value))] }
+
+getHoles :: HoleContext -> [(Ident, Value)]
+getHoles = map (\(nm, (_, v)) -> (nm, v)) . holes
+
+emptyHoleContext :: HoleContext
+emptyHoleContext = HoleContext []
+
+instance DefinitionContext HoleContext where
+    lookupDefinition identifier holeContext =
+        case lookup identifier (holes holeContext) of
+          Nothing       -> Nothing
+          Just (_, typ) -> Just (typ, Nothing)
+
+instance UsesIdentifiers HoleContext where
+    usedIdentifiers holeContext =
+        S.fromList (fst <$> holes holeContext)
+
+extendWithHole :: DefinitionContext context =>
+                  context
+               -> Ident
+               -> HoleData
+               -> HoleContext
+               -> HoleContext
+extendWithHole context identifier hole holeContext =
+    holeContext { holes = (identifier, (hole, holeType)) : holes holeContext }
+    where
+      holeType = evalIn (makeTypeOfHole hole) context holeContext
+
+{------------------------------------------------------------------------------}
+type TypingMonad ctxt a
+    = ReaderT ctxt (StateT HoleContext (ReaderT LocalContext (Either (Span, HoleContext, LocalContext, TypeError)))) a
+
+getLocalContext :: TypingMonad ctxt LocalContext
+getLocalContext = lift ask
+
+getHoleContext :: TypingMonad ctxt HoleContext
+getHoleContext = get
+
+getFullContext :: TypingMonad ctxt (ctxt :>: LocalContext)
+getFullContext = (:>:) <$> ask <*> getLocalContext
+
+-- | Binds a variable in the local context, and invokes another typing
+-- action in the extended context.
+bindVar' :: UsesIdentifiers ctxt =>
+            Int
+         -> Ident -- ^ Name hint
+         -> Value -- ^ The type of the newly bound identifier
+         -> TermPos -- ^ Term to pass through, should have at least one free local variable
+         -> (Value -> TermPos -> TypingMonad ctxt CS.Term)
+         -> TypingMonad ctxt CS.Term
+bindVar' offset nameHint typ tm k = do
+  freshIdentifier <- freshFor <$> getFullContext <*> pure nameHint
+  let tm' = close [freshIdentifier] tm offset
+      v   = reflect typ (CS.tmFree freshIdentifier)
+  context <- ask
+  a <- lift $ local (extendWith freshIdentifier typ) (runReaderT (k v tm') context)
+  return (CS.bindFree [freshIdentifier] a offset)
+
+bindVar :: UsesIdentifiers ctxt =>
+           Ident -- ^ Name hint
+        -> Value -- ^ The type of the newly bound identifier
+        -> TermPos -- ^ Term to pass through, should have at least one free local variable
+        -> (Value -> TermPos -> TypingMonad ctxt CS.Term)
+        -> TypingMonad ctxt CS.Term
+bindVar = bindVar' 0
+
+evalWith :: DefinitionContext ctxt =>
+            CS.Term
+         -> [Value]
+         -> TypingMonad ctxt Value
+evalWith term arguments =
+    evalInWith <$> pure term <*> getFullContext <*> getHoleContext <*> pure arguments
+
+eval :: DefinitionContext ctxt =>
+        CS.Term
+     -> TypingMonad ctxt Value
+eval term =
+    term `evalWith` []
+
+lookupIdent :: DefinitionContext ctxt =>
+               Ident
+            -> TypingMonad ctxt (Maybe Value)
+lookupIdent ident =
+    lookupType ident <$> getFullContext
+
+raiseError :: Span -> TypeError -> TypingMonad ctxt a
+raiseError p err = do
+  typingContext <- getLocalContext
+  holeContext   <- getHoleContext
+  lift $ lift $ lift $ Left (p, holeContext, typingContext, err)
+
+generateHole :: DefinitionContext context =>
+                Span -> Maybe Ident -> Value -> TypingMonad context CS.Term
+generateHole p nameHint holeType = do
+  holeIdentifier <- freshFor <$> getHoleContext <*> pure (fromMaybe "hole" nameHint)
+  context        <- ask
+  localContext   <- getLocalContext
+  let hole = HoleData p localContext holeType ()
+  modify $ extendWithHole context holeIdentifier hole
+  return $ (In $ CS.Hole holeIdentifier) `makeApp` (localContextMembers localContext)
+    where
+      makeApp t [] = t
+      makeApp t ((ident,_):localContext) =
+          In $ CS.App (t `makeApp` localContext) (In $ CS.Free ident)
+
+runTypingMonad :: TypingMonad ctxt a
+               -> ctxt
+               -> HoleContext
+               -> LocalContext
+               -> Either (Span, HoleContext, LocalContext, TypeError) (a,HoleContext)
+runTypingMonad c context holeContext localContext =
+    runReaderT (runStateT (runReaderT c context) holeContext) localContext
+
+{------------------------------------------------------------------------------}
+compareTypes :: Span -> Value -> Value -> TypingMonad ctxt ()
+compareTypes p (VSet i) (VSet j) =
+    do unless (j <= i) $ do
+         raiseError p (LevelProblem j i)
+compareTypes p v1       v2 =
+    do let tm1 = reifyType0 v1
+           tm2 = reifyType0 v2
+       unless (tm1 == tm2) $ do
+         raiseError p (TypesNotEqual v1 v2)
 
 -- should probably extend the cummulativity checking to include Pi and
 -- Sigma types (i.e. with cummulativity in the codomain of Pi). See
 -- e.g. “The View from the Left” or Norell's thesis.
 
 {------------------------------------------------------------------------------}
--- Type checking
-tyCheck :: AnnotRec p TermCon -> Context -> Value -> TypingMonad p CS.Term
+-- | Check that something is a type
+isType :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
+          TermPos
+       -> TypingMonad ctxt CS.Term
+isType (Annot p (Set l)) = do
+  return (In $ CS.Set l)
+isType (Annot p (Pi ident tA tB)) = do
+  tmA  <- isType tA
+  vtmA <- eval tmA
+  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
+  return (In $ CS.Pi ident tmA tmB)
+isType (Annot p (Sigma ident tA tB)) = do
+  tmA  <- isType tA
+  vtmA <- eval tmA
+  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
+  return (In $ CS.Sigma ident tmA tmB)
+isType (Annot p (Sum t1 t2)) = do
+  tm1 <- isType t1
+  tm2 <- isType t2
+  return (In $ CS.Sum tm1 tm2)
+isType (Annot p Unit) = do
+  return (In $ CS.Unit)
+isType (Annot p Empty) =do
+  return (In $ CS.Empty)
+isType (Annot p (Eq tA tB)) = do
+  (tyA, tmA) <- synthesiseTypeFor tA
+  (tyB, tmB) <- synthesiseTypeFor tB
+  let tyA' = reifyType0 tyA
+      tyB' = reifyType0 tyB
+  -- FIXME: need to be able to do equality types for terms that aren't
+  -- of synthesisable type.
+  return (In $ CS.Eq tyA' tyB' tmA tmB )
+isType term@(Annot p _) = do
+  (ty,tm) <- synthesiseTypeFor term
+  case ty of
+    VSet l -> return tm
+    _      -> raiseError p ExpectingSet
 
-tyCheck (Annot p (Lam x t)) ctxt (VPi _ tA tB) =
-  do let (x',ctxt') = ctxtExtendFreshen ctxt x tA Nothing
-     tm <- tyCheck (close [x'] t) ctxt' (tB $ reflect tA (CS.tmFree x'))
-     return (In $ CS.Lam x (CS.bindFree [x'] tm))
-
-tyCheck (Annot p (Lam x t)) ctxt v =
-    throwError (p, ExpectingPiTypeForLambda ctxt v)
-
-tyCheck (Annot p (Pair t1 t2)) ctxt (VSigma _ tA tB) =
-    do tm1 <- tyCheck t1 ctxt tA
-       tm2 <- tyCheck t2 ctxt (tB $ tm1 `evalIn` ctxt)
-       return (In $ CS.Pair tm1 tm2)
-
-tyCheck (Annot p (Pair _ _)) ctxt v =
-    throwError (p, ExpectingSigmaTypeForPair ctxt v)
-
-tyCheck (Annot p (Inl t)) ctxt (VSum tA _) =
-    do tm <- tyCheck t ctxt tA
-       return (In $ CS.Inl tm)
-
-tyCheck (Annot p (Inl t)) ctxt v =
-    throwError (p, ExpectingSumTypeForInl ctxt v)
-
-tyCheck (Annot p (Inr t)) ctxt (VSum _ tB) =
-    do tm <- tyCheck t ctxt tB
-       return (In $ CS.Inr tm)
-
-tyCheck (Annot p (Inr t)) ctxt v =
-    throwError (p, ExpectingSumTypeForInr ctxt v)
-
-tyCheck (Annot p UnitI) ctxt VUnit =
-    do return (In $ CS.UnitI)
-
-tyCheck (Annot p UnitI) ctxt v =
-    throwError (p, ExpectingUnitTypeForUnit ctxt v)
-
-tyCheck (Annot p (Desc_K t)) ctxt VDesc =
-    do tm <- tyCheck t ctxt (VSet 0)
-       return (In $ CS.Desc_K tm)
-
-tyCheck (Annot p (Desc_K t)) ctxt (VIDesc v) =
-    do tm <- tyCheck t ctxt (VSet 0)
-       return (In $ CS.IDesc_K tm)
-
-tyCheck (Annot p (Desc_K t)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p Desc_Id) ctxt VDesc =
-    do return (In $ CS.Desc_Id)
-
-tyCheck (Annot p Desc_Id) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (Desc_Prod t1 t2)) ctxt VDesc =
-    do tm1 <- tyCheck t1 ctxt VDesc
-       tm2 <- tyCheck t2 ctxt VDesc
-       return (In $ CS.Desc_Prod tm1 tm2)
-
-tyCheck (Annot p (Desc_Prod t1 t2)) ctxt (VIDesc v) =
-    do tm1 <- tyCheck t1 ctxt (VIDesc v)
-       tm2 <- tyCheck t2 ctxt (VIDesc v)
-       return (In $ CS.IDesc_Pair tm1 tm2)
-
-tyCheck (Annot p (Desc_Prod t1 t2)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (Desc_Sum t1 t2)) ctxt VDesc =
-    do tm1 <- tyCheck t1 ctxt VDesc
-       tm2 <- tyCheck t2 ctxt VDesc
-       return (In $ CS.Desc_Sum tm1 tm2)
-
-tyCheck (Annot p (Desc_Sum t1 t2)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (Construct t)) ctxt (VMu f) =
-    do tm <- tyCheck t ctxt (vsem f $$ VMu f)
-       return ( In $ CS.Construct tm )
-
-tyCheck (Annot p (Construct t)) ctxt (VMuI a d i) =
-    do tm <- tyCheck t ctxt (vsemI $$ a $$ (d $$ i) $$ vmuI a d)
-       return ( In $ CS.Construct tm )
-
-tyCheck (Annot p (Construct t)) ctxt v =
-    throwError (p, ExpectingMuTypeForConstruct ctxt v)
-
-tyCheck (Annot p (IDesc_Id t)) ctxt (VIDesc v) =
-    do tm <- tyCheck t ctxt v
-       return ( In $ CS.IDesc_Id tm )
-
-tyCheck (Annot p (IDesc_Id t)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt (VIDesc v) =
-    do tm1 <- tyCheck t1 ctxt (VSet 0)
-       tm2 <- tyCheck t2 ctxt (tm1 `evalIn` ctxt .->. VIDesc v)
-       return (In $ CS.IDesc_Sg tm1 tm2)
-
-tyCheck (Annot p (IDesc_Sg t1 t2)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt (VIDesc v) =
-    do tm1 <- tyCheck t1 ctxt (VSet 0)
-       tm2 <- tyCheck t2 ctxt (tm1 `evalIn` ctxt .->. VIDesc v)
-       return (In $ CS.IDesc_Pi tm1 tm2)
-
-tyCheck (Annot p (IDesc_Pi t1 t2)) ctxt v =
-    throwError (p, ExpectingDescTypeForDesc ctxt v)
-
-tyCheck (Annot p Refl) ctxt (VEq vA vB va vb) =
-    do let tA = reifyType0 vA
-           tB = reifyType0 vB
-           ta = reify vA va 0
-           tb = reify vB vb 0
-       unless (tA == tB) $ throwError (p, ReflCanOnlyProduceHomogenousEquality ctxt vA vB)
-       unless (ta == tb) $ throwError (p, ReflCanOnlyProduceEquality ctxt vA va vb)
-       return (In $ CS.Refl)
-
-tyCheck (Annot p Refl) ctxt v =
-    throwError (p, ReflExpectingEqualityType ctxt v)
-
--- tyCheck (Annot p (Hole bv)) ctxt v =
---     do nm <- newMetaVariable bv ctxt v p
---        return (In $ CS.Hole nm)
+-- FIXME: add type-holes to this list
 
 {------------------------------------------------------------------------------}
-{- The following are high-level features, and should be done using a general
-   meta-variable technique
--}
-tyCheck (Annot p (ElimEq t Nothing tp)) ctxt tP =
-    do (ty, tm) <- tySynth t ctxt
+-- Type checking
+hasType :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
+           TermPos
+        -> Value
+        -> TypingMonad ctxt CS.Term
+
+hasType (Annot p (Set l1)) (VSet l2) = do
+  unless (l1 < l2) $ raiseError p ExpectingSet -- FIXME: expecting a set of a certain level
+  return (In $ CS.Set l1)
+
+hasType (Annot p (Pi ident tA tB)) (VSet l) = do
+  tmA  <- tA `hasType` VSet l
+  vtmA <- eval tmA
+  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
+  return (In $ CS.Pi ident tmA tmB)
+
+hasType (Annot p (Sigma ident tA tB)) (VSet l) = do
+  tmA  <- tA `hasType` VSet l
+  vtmA <- eval tmA
+  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
+  return (In $ CS.Sigma ident tmA tmB)
+
+hasType (Annot p (Sum t1 t2)) (VSet l) = do
+  tm1 <- t1 `hasType` VSet l
+  tm2 <- t2 `hasType` VSet l
+  return (In $ CS.Sum tm1 tm2)
+
+hasType (Annot p Unit) (VSet l) = do
+  return (In $ CS.Unit)
+
+hasType (Annot p Empty) (VSet l) = do
+  return (In $ CS.Empty)
+
+hasType (Annot p (Eq tA tB)) (VSet l) = do
+  (tyA, tmA) <- synthesiseTypeFor tA
+  (tyB, tmB) <- synthesiseTypeFor tB
+  let tyA' = reifyType0 tyA
+      tyB' = reifyType0 tyB
+  -- FIXME: to do the in-universe version of this, we need to
+  -- determine the level of tyA and tyB somehow, by checking tyA and
+  -- tyB, which means converting from Checked syntax to
+  -- LocallyNameless syntax. Also, we need to be able to do equality
+  -- types for terms that aren't of synthesisable type.
+  return (In $ CS.Eq tyA' tyB' tmA tmB)
+
+-- FIXME: all the error cases too.
+{------------------------------}
+hasType (Annot p (Lam x tm)) (VPi _ tA tB) = do
+  tm' <- bindVar x tA tm $ \x tm -> tm `hasType` (tB x)
+  return (In $ CS.Lam x tm')
+
+hasType (Annot p (Lam x t)) v = do
+  raiseError p (ExpectingPiTypeForLambda v)
+
+
+hasType (Annot p (Pair t1 t2)) (VSigma _ tA tB) = do
+  tm1  <- t1 `hasType` tA
+  vtm1 <- eval tm1
+  tm2  <- t2 `hasType` (tB vtm1)
+  return (In $ CS.Pair tm1 tm2)
+
+hasType (Annot p (Pair _ _)) v = do
+  raiseError p (ExpectingSigmaTypeForPair v)
+
+
+hasType (Annot p (Inl t)) (VSum tA _) = do
+  tm <- t `hasType` tA
+  return (In $ CS.Inl tm)
+
+hasType (Annot p (Inl t)) v = do
+  raiseError p (ExpectingSumTypeForInl v)
+
+hasType (Annot p (Inr t)) (VSum _ tB) = do
+  tm <- t `hasType` tB
+  return (In $ CS.Inr tm)
+
+hasType (Annot p (Inr t)) v = do
+  raiseError p (ExpectingSumTypeForInr v)
+
+hasType (Annot p UnitI) VUnit = do
+  return (In $ CS.UnitI)
+
+hasType (Annot p UnitI) v = do
+  raiseError p (ExpectingUnitTypeForUnit v)
+
+
+hasType (Annot p (Desc_K t)) VDesc = do
+  tm <- t `hasType` (VSet 0)
+  return (In $ CS.Desc_K tm)
+
+hasType (Annot p (Desc_K t)) (VIDesc v) = do
+  tm <- t `hasType` (VSet 0)
+  return (In $ CS.IDesc_K tm)
+
+hasType (Annot p (Desc_K t)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
+hasType (Annot p Desc_Id) VDesc = do
+  return (In $ CS.Desc_Id)
+
+hasType (Annot p Desc_Id) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
+hasType (Annot p (Desc_Prod t1 t2)) VDesc = do
+  tm1 <- t1 `hasType` VDesc
+  tm2 <- t2 `hasType` VDesc
+  return (In $ CS.Desc_Prod tm1 tm2)
+
+hasType (Annot p (Desc_Prod t1 t2)) (VIDesc v) = do
+  tm1 <- t1 `hasType` (VIDesc v)
+  tm2 <- t2 `hasType` (VIDesc v)
+  return (In $ CS.IDesc_Pair tm1 tm2)
+
+hasType (Annot p (Desc_Prod t1 t2)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
+hasType (Annot p (Desc_Sum t1 t2)) VDesc = do
+  tm1 <- t1 `hasType` VDesc
+  tm2 <- t2 `hasType` VDesc
+  return (In $ CS.Desc_Sum tm1 tm2)
+
+hasType (Annot p (Desc_Sum t1 t2)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
+hasType (Annot p (Construct t)) (VMu f) = do
+  tm <- t `hasType` (vsem f $$ VMu f)
+  return (In $ CS.Construct tm)
+
+hasType (Annot p (Construct t)) (VMuI a d i) = do
+  tm <- t `hasType` (vsemI $$ a $$ (d $$ i) $$ vmuI a d)
+  return (In $ CS.Construct tm)
+
+hasType (Annot p (Construct t)) v = do
+  raiseError p (ExpectingMuTypeForConstruct v)
+
+
+hasType (Annot p (IDesc_Id t)) (VIDesc v) = do
+  tm <- t `hasType` v
+  return (In $ CS.IDesc_Id tm)
+
+hasType (Annot p (IDesc_Id t)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
+hasType (Annot p (IDesc_Sg t1 t2)) (VIDesc v) = do
+  tm1  <- t1 `hasType` (VSet 0)
+  vtm1 <- eval tm1
+  tm2  <- t2 `hasType` (vtm1 .->. VIDesc v)
+  return (In $ CS.IDesc_Sg tm1 tm2)
+
+hasType (Annot p (IDesc_Sg t1 t2)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+hasType (Annot p (IDesc_Pi t1 t2)) (VIDesc v) = do
+  tm1  <- t1 `hasType` (VSet 0)
+  vtm1 <- eval tm1
+  tm2  <- t2 `hasType` (vtm1 .->. VIDesc v)
+  return (In $ CS.IDesc_Pi tm1 tm2)
+
+hasType (Annot p (IDesc_Pi t1 t2)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+hasType (Annot p Refl) (VEq vA vB va vb) = do
+  let tA = reifyType0 vA
+      tB = reifyType0 vB
+      ta = reify vA va 0
+      tb = reify vB vb 0
+  unless (tA == tB) $ do
+    raiseError p (ReflCanOnlyProduceHomogenousEquality vA vB)
+  unless (ta == tb) $ do
+    raiseError p (ReflCanOnlyProduceEquality vA va vb)
+  return (In $ CS.Refl)
+
+hasType (Annot p Refl) v = do
+  raiseError p (ReflExpectingEqualityType v)
+
+hasType (Annot p UserHole) v = do
+  generateHole p Nothing v
+
+{------------------------------------------------------------------------------}
+-- The following are “high-level” features, and should be done using a general
+-- elaborator
+hasType (Annot p (ElimEq t Nothing tp)) tP =
+    do (ty, tm) <- synthesiseTypeFor t
        case ty of
          VEq vA vB va vb ->
              do let tA = reifyType0 vA
                     tB = reifyType0 vB
-                unless (tA == tB) $ throwError (p, ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
+                unless (tA == tB) $ do
+                  raiseError p (ElimEqCanOnlyHandleHomogenousEq vA vB)
                 let ta   = reify vA va 0
                     tb   = reify vB vb 0
-                    eq   = reify ty (tm `evalIn` ctxt) 0 -- normalise the equality proof
-                    tmP  = reifyType0 tP
+                eq <- reify ty <$> eval tm <*> pure 0 -- normalise the equality proof
+                let tmP  = reifyType0 tP
                     tmPg = CS.generalise [eq,tb] tmP
-                let vP' = evaluate tmPg [VRefl, va] (lookupDef ctxt)
-                tm_p <- tyCheck tp ctxt vP'
+                vP'  <- tmPg `evalWith` [VRefl, va]
+                tm_p <- hasType tp vP'
                 return (In $ CS.ElimEq tA ta tb tm "a" "eq" tmPg tm_p)
          ty ->
-             throwError (p, ExpectingEqualityType ctxt ty)
+             raiseError p (ExpectingEqualityType ty)
 
-tyCheck (Annot p (ElimEmpty t1 Nothing)) ctxt v =
-    do tm1     <- tyCheck t1 ctxt VEmpty
+
+hasType (Annot p (ElimEmpty t1 Nothing)) v =
+    do tm1     <- hasType t1 VEmpty
        let tm2 = reifyType0 v
        return (In $ CS.ElimEmpty tm1 tm2)
 
-{------------------------------------------------------------------------------}
+{------------------------------}
 {- Fall through case -}
-tyCheck (Annot p t) ctxt v =
-    do (v',tm) <- tySynth (Annot p t) ctxt
-       compareTypes p ctxt v v'
-       return tm
+hasType (Annot p t) v = do
+  (v',tm) <- synthesiseTypeFor (Annot p t)
+  compareTypes p v v'
+  return tm
 
 {------------------------------------------------------------------------------}
-setCheck :: AnnotRec p TermCon -> Context -> TypingMonad p (Int, CS.Term)
-setCheck t@(Annot p _) ctxt =
-    do (tA,tm) <- tySynth t ctxt
-       case tA of
-         VSet j -> return (j, tm)
-         _      -> throwError (p, ExpectingSet)
+-- Attempt to synthesise a type for a given term. It is guaranteed
+-- that the returned type and term will be well-typed in the supplied
+-- context.
+synthesiseTypeFor :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
+                     TermPos
+                  -> TypingMonad ctxt (Value, CS.Term)
 
-
-{------------------------------------------------------------------------------}
-tySynth :: AnnotRec p TermCon -> Context -> TypingMonad p (Value, CS.Term)
-tySynth (Annot p (Bound _)) ctxt =
+synthesiseTypeFor (Annot p (Bound _)) =
     error "internal: 'bound' variable discovered during type synthesis"
-tySynth (Annot p (Free nm)) ctxt =
-    case lookupType nm ctxt of
-      Nothing -> throwError (p, UnknownIdentifier nm)
-      Just tA -> return (tA, In $ CS.Free nm)
-tySynth (Annot p (App t t')) ctxt =
-    do (tF, tm) <- tySynth t ctxt
-       case tF of
-         VPi _ tA tB -> do tm' <- tyCheck t' ctxt tA
-                           return (tB $ tm' `evalIn` ctxt, In $ CS.App tm tm')
-         ty          -> throwError (p, ApplicationOfNonFunction ctxt ty)
-tySynth (Annot p (Set l)) ctxt =
-    return (VSet (l + 1), In $ CS.Set l)
-tySynth (Annot p (Pi x t1 t2)) ctxt =
-    do (j,tm1) <- setCheck t1 ctxt
-       let v          = tm1 `evalIn` ctxt
-           (x',ctxt') = ctxtExtendFreshen ctxt (fromMaybe "x" x) v Nothing
-       (k,tm2) <- setCheck (close [x'] t2) ctxt'
-       return (VSet $ max j k, In $ CS.Pi x tm1 (CS.bindFree [x'] tm2))
-tySynth (Annot p (Sigma x t1 t2)) ctxt =
-    do (j,tm1) <- setCheck t1 ctxt
-       let v          = tm1 `evalIn` ctxt
-           (x',ctxt') = ctxtExtendFreshen ctxt (fromMaybe "x" x) v Nothing
-       (k,tm2) <- setCheck (close [x'] t2) ctxt'
-       return (VSet $ max j k, In $ CS.Sigma x tm1 (CS.bindFree [x'] tm2))
-tySynth (Annot p (Sum t1 t2)) ctxt =
-    do (i,tm1) <- setCheck t1 ctxt
-       (j,tm2) <- setCheck t2 ctxt
-       return (VSet (max i j), In $ CS.Sum tm1 tm2)
-tySynth (Annot p (Case t x tP y tL z tR)) ctxt =
-    do (tS,tmS) <- tySynth t ctxt
-       case tS of
-         VSum tA tB ->
-             do let (x', ctxt1) = ctxtExtendFreshen ctxt x tS Nothing
-                (i,tmP0) <- setCheck (close [x'] tP) ctxt1
-                let tmP         = CS.bindFree [x'] tmP0
-                    (y', ctxt2) = ctxtExtendFreshen ctxt y tA Nothing
-                    vtP1        = (tmP `evalInWithArg` ctxt2) (VInl (reflect tA (CS.tmFree y')))
-                tmL <- tyCheck (close [y'] tL) ctxt2 vtP1
-                let (z', ctxt3) = ctxtExtendFreshen ctxt z tB Nothing
-                    vtP2        = (tmP `evalInWithArg` ctxt3) (VInr (reflect tB (CS.tmFree z')))
-                tmR <- tyCheck (close [z'] tR) ctxt3 vtP2
-                let tmA = reifyType0 tA
-                    tmB = reifyType0 tB
-                return ( (tmP `evalInWithArg` ctxt) (tmS `evalIn` ctxt)
-                       , In $ CS.Case tmS tmA tmB x tmP
-                                                  y (CS.bindFree [y'] tmL)
-                                                  z (CS.bindFree [z'] tmR))
-         v ->
-             throwError (p, CaseOnNonSum ctxt v)
-tySynth (Annot p Unit) ctxt =
-    return (VSet 0, In $ CS.Unit)
-tySynth (Annot p UnitI) ctxt =
-    return (VUnit, In $ CS.UnitI)
 
-tySynth (Annot p Empty) ctxt =
-    return (VSet 0, In $ CS.Empty)
-tySynth (Annot p (ElimEmpty t1 (Just t2))) ctxt =
-    do tm1     <- tyCheck t1 ctxt VEmpty
-       (_,tm2) <- setCheck t2 ctxt
-       let vtm2 = tm2 `evalIn` ctxt
-       return (vtm2, In $ CS.ElimEmpty tm1 tm2)
+synthesiseTypeFor (Annot p (Free nm)) = do
+  result <- lookupIdent nm
+  case result of
+    Nothing -> raiseError p (UnknownIdentifier nm)
+    Just tA -> return (tA, In $ CS.Free nm)
 
-tySynth (Annot p (ElimEq t (Just (a, e, tP)) tp)) ctxt =
-    do (ty, tm) <- tySynth t ctxt
-       case ty of
-         VEq vA vB va vb -> do
-             let tA = reifyType0 vA
-                 tB = reifyType0 vB
-             unless (tA == tB) $ throwError (p, ElimEqCanOnlyHandleHomogenousEq ctxt vA vB)
-             let (a',ctxt0) = ctxtExtendFreshen ctxt a vA Nothing
-                 (e',ctxt1) = ctxtExtendFreshen ctxt0 e (VEq vA vA va (reflect vA (CS.tmFree a'))) Nothing
-                 tP'        = close [e',a'] tP
-             (_,tmP0) <- setCheck tP' ctxt1
-             let tmP        = CS.bindFree [e',a'] tmP0
-                 vtmP       = evaluate tmP [VRefl, va] (lookupDef ctxt)
-                 vtmP'      = evaluate tmP [tm `evalIn` ctxt,vb] (lookupDef ctxt)
-             tm_p <- tyCheck tp ctxt vtmP
-             let ta = reify vA va 0
-                 tb = reify vA vb 0
-             return ( vtmP'
-                    , In $ CS.ElimEq tA ta tb tm a e tmP tm_p
-                    )
-         ty ->
-             throwError (p, ExpectingEqualityType ctxt ty)
+synthesiseTypeFor (Annot p (App t t')) = do
+  (tF, tm) <- synthesiseTypeFor t
+  case tF of
+    VPi _ tA tB -> do tm'  <- t' `hasType` tA
+                      vtm' <- eval tm'
+                      return (tB vtm', In $ CS.App tm tm')
+    ty          -> do raiseError p (ApplicationOfNonFunction ty)
 
+synthesiseTypeFor (Annot p (Case t x tP y tL z tR)) = do
+  (tS,tmS) <- synthesiseTypeFor t
+  case tS of
+    VSum tA tB ->
+        do tmP <- bindVar x tS tP $ \_ tP -> isType tP
+           tmL <- bindVar y tA tL $ \y tL -> do
+                    vP <- tmP `evalWith` [VInl y]
+                    tL `hasType` vP
+           tmR <- bindVar z tB tR $ \z tR -> do
+                    vP <- tmP `evalWith` [VInr z]
+                    tR `hasType` vP
+           vS  <- eval tmS
+           v   <- tmP `evalWith` [vS]
+           let tmA = reifyType0 tA
+               tmB = reifyType0 tB
+           return (v, In $ CS.Case tmS tmA tmB x tmP y tmL z tmR)
+    v ->
+        do raiseError p (CaseOnNonSum v)
 
-tySynth (Annot p Desc) ctxt =
-    return (VSet 1, In $ CS.Desc)
-tySynth (Annot p Desc_Elim) ctxt =
-    return ( forall "P" (VDesc .->. VSet 10) $ \vP ->
-             (forall "A" (VSet 0) $ \x -> vP $$ VDesc_K x) .->.
-             (vP $$ VDesc_Id) .->.
-             (forall "d1" VDesc $ \d1 ->
-              forall "d2" VDesc $ \d2 ->
-              (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Prod d1 d2))) .->.
-             (forall "d1" VDesc $ \d1 ->
-              forall "d2" VDesc $ \d2 ->
-              (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Sum d1 d2))) .->.
-             (forall "x" VDesc $ \x -> vP $$ x)
-           , In $ CS.Desc_Elim)
-tySynth (Annot p Sem) ctxt =
-    return ( VDesc .->. VSet 0 .->. VSet 0, In $ CS.Sem )
-tySynth (Annot p (Mu t)) ctxt =
-    do tm <- tyCheck t ctxt VDesc
-       return (VSet 0, In $ CS.Mu tm)
+synthesiseTypeFor (Annot p (ElimEmpty t1 (Just t2))) = do
+  tm1  <- t1 `hasType` VEmpty
+  tm2  <- isType t2
+  vtm2 <- eval tm2
+  return (vtm2, In $ CS.ElimEmpty tm1 tm2)
 
-tySynth (Annot p (MuI t1 t2)) ctxt =
-    do tm1 <- tyCheck t1 ctxt (VSet 0)
-       let v = tm1 `evalIn` ctxt
-       tm2 <- tyCheck t2 ctxt (v .->. VIDesc v)
-       return (v .->. VSet 0, In $ CS.MuI tm1 tm2)
+synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
+  (ty, tm) <- synthesiseTypeFor t
+  case ty of
+    VEq vA vB va vb ->
+        do let tA = reifyType0 vA
+               tB = reifyType0 vB
+           unless (tA == tB) $ do
+             raiseError p (ElimEqCanOnlyHandleHomogenousEq vA vB)
+           -- check the elimination set
+           tmP <- bindVar' 1 a vA tP $ \x tP -> do
+                    bindVar e (VEq vA vA va x) tP $ \e tP -> do
+                      isType tP
+           -- Check 'tp'
+           vtmP  <- tmP `evalWith` [VRefl, va]
+           tm_p  <- tp `hasType` vtmP
+           -- create the result type
+           vtm   <- eval tm
+           vtmP' <- tmP `evalWith` [vtm, vb]
+           -- create the term
+           let ta = reify vA va 0
+               tb = reify vB vb 0
+           return (vtmP', In $ CS.ElimEq tA ta tb tm a e tmP tm_p)
+    ty ->
+        do raiseError p (ExpectingEqualityType ty)
 
-tySynth (Annot p Induction) ctxt =
-    return ( forall "F" VDesc               $ \f ->
-             forall "P" (VMu f .->. VSet 2) $ \p ->
-             (forall "x" (vsem f $$ VMu f) $ \x ->
-              (vlift $$ f $$ VMu f $$ p $$ x) .->.
-              p $$ (VConstruct x)) .->.
-             (forall "x" (VMu f) $ \x -> p $$ x)
-           , In CS.Induction)
+synthesiseTypeFor (Annot p Desc) = do
+  return (VSet 1, In $ CS.Desc)
 
-tySynth (Annot p (Proj1 t)) ctxt =
-    do (tP, tmP) <- tySynth t ctxt
-       case tP of
-         VSigma _ tA _ -> return (tA, In $ CS.Proj1 tmP)
-         v             -> throwError (p, Proj1FromNonSigma ctxt v)
+synthesiseTypeFor (Annot p Desc_Elim) = do
+  return ( forall "P" (VDesc .->. VSet 10) $ \vP ->
+           (forall "A" (VSet 0) $ \x -> vP $$ VDesc_K x) .->.
+           (vP $$ VDesc_Id) .->.
+           (forall "d1" VDesc $ \d1 ->
+            forall "d2" VDesc $ \d2 ->
+            (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Prod d1 d2))) .->.
+           (forall "d1" VDesc $ \d1 ->
+            forall "d2" VDesc $ \d2 ->
+            (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Sum d1 d2))) .->.
+           (forall "x" VDesc $ \x -> vP $$ x)
+         , In $ CS.Desc_Elim)
 
-tySynth (Annot p (Proj2 t)) ctxt =
-    do (tP, tmP) <- tySynth t ctxt
-       case tP of
-         VSigma _ _ tB -> return (tB (vfst $ tmP `evalIn` ctxt), In $ CS.Proj2 tmP)
-         v             -> throwError (p, Proj2FromNonSigma ctxt v)
+synthesiseTypeFor (Annot p Sem) = do
+  return ( VDesc .->. VSet 0 .->. VSet 0, In $ CS.Sem )
 
-tySynth (Annot p (Eq tA tB)) ctxt =
-    do (tyA, tmA) <- tySynth tA ctxt
-       (tyB, tmB) <- tySynth tB ctxt
-       let tyA' = reifyType0 tyA
-           tyB' = reifyType0 tyB
-       -- FIXME: determine the level of tyA and tyB somehow
-       return ( VSet 0, In $ CS.Eq tyA' tyB' tmA tmB )
+synthesiseTypeFor (Annot p (Mu t)) = do
+  tm <- t `hasType` VDesc
+  return (VSet 0, In $ CS.Mu tm)
+
+synthesiseTypeFor (Annot p (MuI t1 t2)) = do
+  tm1 <- t1 `hasType` (VSet 0)
+  v   <- eval tm1
+  tm2 <- t2 `hasType` (v .->. VIDesc v)
+  return (v .->. VSet 0, In $ CS.MuI tm1 tm2)
+
+synthesiseTypeFor (Annot p Induction) = do
+  return ( forall "F" VDesc               $ \f ->
+           forall "P" (VMu f .->. VSet 2) $ \p ->
+           (forall "x" (vsem f $$ VMu f) $ \x ->
+            (vlift $$ f $$ VMu f $$ p $$ x) .->.
+            p $$ (VConstruct x)) .->.
+           (forall "x" (VMu f) $ \x -> p $$ x)
+         , In CS.Induction)
+
+synthesiseTypeFor (Annot p (Proj1 t)) = do
+  (tP, tmP) <- synthesiseTypeFor t
+  case tP of
+    VSigma _ tA _ -> do return (tA, In $ CS.Proj1 tmP)
+    v             -> do raiseError p (Proj1FromNonSigma v)
+
+synthesiseTypeFor (Annot p (Proj2 t)) = do
+  (tP, tmP) <- synthesiseTypeFor t
+  case tP of
+    VSigma _ _ tB -> do v <- vfst <$> eval tmP
+                        return (tB v, In $ CS.Proj2 tmP)
+    v             -> do raiseError p (Proj2FromNonSigma v)
+
+-- FIXME: hack, to get the datatype descriptions going
+synthesiseTypeFor (Annot p UnitI) = do
+  return (VUnit, In $ CS.UnitI)
 
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
-tySynth (Annot p IDesc) ctxt =
-    do return (VSet 0 .->. VSet 1, In $ CS.IDesc)
-       
-tySynth (Annot p IDesc_Elim) ctxt =
-    do return ( forall "I" (VSet 0) $ \i ->
-                forall "P" (VIDesc i .->. VSet 10) $ \p ->
-                (forall "x" i $ \x -> p $$ VIDesc_Id x) .->.
-                (forall "A" (VSet 0) $ \a -> p $$ VIDesc_K a) .->.
-                (forall "D1" (VIDesc i) $ \d1 ->
-                 forall "D2" (VIDesc i) $ \d2 ->
-                 (p $$ d1) .->.
-                 (p $$ d2) .->.
-                 (p $$ (VIDesc_Pair d1 d2))) .->.
-                (forall "A" (VSet 0) $ \a ->
-                 forall "D" (a .->. VIDesc i) $ \d ->
-                 (forall "x" a $ \x -> p $$ (d $$ x)) .->.
-                 (p $$ (VIDesc_Sg a d))) .->.
-                (forall "A" (VSet 0) $ \a ->
-                 forall "D" (a .->. VIDesc i) $ \d ->
-                 (forall "x" a $ \x -> p $$ (d $$ x)) .->.
-                 (p $$ (VIDesc_Pi a d))) .->.
-                (forall "D" (VIDesc i) $ \d -> p $$ d)
-              , In $ CS.IDesc_Elim
-              )
+synthesiseTypeFor (Annot p IDesc) = do
+  return (VSet 0 .->. VSet 1, In $ CS.IDesc)
 
-tySynth (Annot p InductionI) ctxt =
-    do return ( forall "I" (VSet 0) $ \vI ->
-                forall "D" (vI .->. VIDesc vI) $ \vD ->
-                forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
-                forall "k" (forall "i" vI $ \i ->
-                            forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
-                            (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
-                            (vP $$ i $$ VConstruct x)) $ \k ->
-                forall "i" vI $ \i ->
-                forall "x" (vmuI vI vD $$ i) $ \x ->
-                vP $$ i $$ x
-              , In $ CS.InductionI
-              )
+synthesiseTypeFor (Annot p IDesc_Elim) = do
+  return ( forall "I" (VSet 0) $ \i ->
+           forall "P" (VIDesc i .->. VSet 10) $ \p ->
+           (forall "x" i $ \x -> p $$ VIDesc_Id x) .->.
+           (forall "A" (VSet 0) $ \a -> p $$ VIDesc_K a) .->.
+           (forall "D1" (VIDesc i) $ \d1 ->
+            forall "D2" (VIDesc i) $ \d2 ->
+            (p $$ d1) .->.
+            (p $$ d2) .->.
+            (p $$ (VIDesc_Pair d1 d2))) .->.
+           (forall "A" (VSet 0) $ \a ->
+            forall "D" (a .->. VIDesc i) $ \d ->
+            (forall "x" a $ \x -> p $$ (d $$ x)) .->.
+            (p $$ (VIDesc_Sg a d))) .->.
+           (forall "A" (VSet 0) $ \a ->
+            forall "D" (a .->. VIDesc i) $ \d ->
+            (forall "x" a $ \x -> p $$ (d $$ x)) .->.
+            (p $$ (VIDesc_Pi a d))) .->.
+           (forall "D" (VIDesc i) $ \d -> p $$ d)
+         , In $ CS.IDesc_Elim)
 
-tySynth (Annot p t) ctxt =
-    throwError (p, UnableToSynthesise)
+synthesiseTypeFor (Annot p InductionI) = do
+  return ( forall "I" (VSet 0) $ \vI ->
+           forall "D" (vI .->. VIDesc vI) $ \vD ->
+           forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
+           forall "k" (forall "i" vI $ \i ->
+                       forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
+                       (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
+                       (vP $$ i $$ VConstruct x)) $ \k ->
+           forall "i" vI $ \i ->
+           forall "x" (vmuI vI vD $$ i) $ \x ->
+           vP $$ i $$ x
+         , In $ CS.InductionI)
+
+synthesiseTypeFor (Annot p t) = do
+  raiseError p (UnableToSynthesise (Annot p t))
