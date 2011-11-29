@@ -13,6 +13,7 @@ module Language.Foveran.Syntax.Identifier
     , bindDummy
     , bindK
     , runNameGeneration
+    , runNameGenerationWith
     )
     where
 
@@ -40,7 +41,7 @@ freshen used nm = loop variants
           variants = nm:[ nm `mappend` (T.pack $ show i) | i <- [0..]]
 
 getBound :: Int -> NameGeneration Ident
-getBound i = NG $ \(used, bound) -> bound !! i
+getBound i = NG $ \(used, bound) -> if i > length bound then error ("index too large: " ++ show i) else bound !! i
 
 bind :: Ident -> NameGeneration a -> NameGeneration (Ident, a)
 bind nm (NG f)   = NG $ \(used, bound) -> let (used',nm') = freshen used nm in (nm', f (used', nm':bound))
@@ -63,6 +64,9 @@ bind2 nm1 nm2 x k = do (nm1',x') <- bind nm1 x
 
 runNameGeneration :: UsesIdentifiers s => s -> NameGeneration a -> a
 runNameGeneration s (NG f) = f (usedIdentifiers s, [])
+
+runNameGenerationWith :: UsesIdentifiers s => s -> [Ident] -> NameGeneration a -> a
+runNameGenerationWith s idents (NG f) = f (usedIdentifiers s, idents)
 
 (<+>) :: Ident -> T.Text -> Ident
 nm <+> t = T.append nm t

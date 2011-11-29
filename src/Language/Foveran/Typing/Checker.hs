@@ -1,179 +1,39 @@
 {-# LANGUAGE OverloadedStrings, TypeOperators #-}
 
 module Language.Foveran.Typing.Checker
-    ( (:>:) (..)
-    , TypingMonad ()
+    ( TypingMonad ()
     , runTypingMonad
-    , LocalContext ()
-    , emptyLocalContext
-    , HoleContext ()
-    , emptyHoleContext
-    , getHoles
     , isType
     , synthesiseTypeFor
     , hasType )
     where
 
-import           Control.Applicative (pure, (<*>), (<|>))
+import           Control.Applicative (pure, (<*>), (<$>))
 import           Control.Monad (unless)
 import           Control.Monad.Trans (lift)
-import           Control.Monad.Identity (Identity, runIdentity)
 import           Control.Monad.Reader (ReaderT, runReaderT, ask, local)
 import           Control.Monad.State (StateT, runStateT, get, modify)
-import           Data.Functor ((<$>))
-import qualified Data.Set as S
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In))
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
 import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close)
 import qualified Language.Foveran.Syntax.Checked as CS
+import           Language.Foveran.Typing.LocalContext
+import           Language.Foveran.Typing.DefinitionContext
+import           Language.Foveran.Typing.Hole
 import           Language.Foveran.Typing.Conversion
 import           Language.Foveran.Typing.Errors (TypeError (..))
 
 {------------------------------------------------------------------------------}
-data a :>: b = a :>: b
-
-instance (DefinitionContext a, DefinitionContext b) => DefinitionContext (a :>: b) where
-    lookupDefinition identifier (ctxt1 :>: ctxt2) =
-        lookupDefinition identifier ctxt2 <|> lookupDefinition identifier ctxt1
-
-instance (UsesIdentifiers a, UsesIdentifiers b) => UsesIdentifiers (a :>: b) where
-    usedIdentifiers (a :>: b) = usedIdentifiers a `S.union` usedIdentifiers b
-
-{------------------------------------------------------------------------------}
-data LocalContext
-    = LocalContext { localContextMembers    :: [(Ident, Value)]
-                   , localContextUsedIdents :: S.Set Ident
-                   }
-
-instance DefinitionContext LocalContext where
-    lookupDefinition identifier localContext =
-        case lookup identifier (localContextMembers localContext) of
-          Nothing  -> Nothing
-          Just typ -> Just (typ, Nothing)
-
-instance UsesIdentifiers LocalContext where
-    usedIdentifiers = localContextUsedIdents
-
-emptyLocalContext :: LocalContext
-emptyLocalContext = LocalContext [] S.empty
-
-extendWith :: Ident -> Value -> LocalContext -> LocalContext
-extendWith identifier typ localContext
-    = LocalContext { localContextMembers    = (identifier, typ) : localContextMembers localContext
-                   , localContextUsedIdents = S.insert identifier (localContextUsedIdents localContext)
-                   }
-
-{------------------------------------------------------------------------------}
-{-
-data TypeOrSet
-    = Type      -- ^ We are looking to generate a type
-    | Set Value -- ^ We are looking to generate a term of some specific type
--}
-
-data HoleData
-    = HoleData { holePosition     :: Span         -- ^ Where the hole was in the original input
-               , holeLocalContext :: LocalContext -- ^ The local context at the time the hole was created
-               , holeGoal         :: Value        -- ^ The type we are looking for. FIXME: want to also generate holes for proper types
-               , holeInfo         :: ()           -- ^ Information that might be useful in filling in this hole
-               }
-
--- Store the holeLocalContext and holeGoal as terms?
--- We can then look through them to see if they mention other holes
-
-makeTypeOfHole :: HoleData -> CS.Term
-makeTypeOfHole hole = parameters `makeType` endType
-    where
-      endType    = reifyType0 (holeGoal hole)
-      parameters = localContextMembers (holeLocalContext hole)
-
-      []                        `makeType` t = t
-      ((ident,ty):localContext) `makeType` t =
-          localContext `makeType` (In $ CS.Pi (Just ident) (reifyType0 ty) (CS.bindFree [ident] t 0))
-
--- The generated term will still have free variables from prior
--- definitions, and also other holes that were generated earlier. So
--- to generate a value, we need to have all the types of the earlier
--- definitions and holes.
-
--- Holes are generated when coming across “UserHole” terms in the
--- input. They are only allowed when a type is being pushed into a
--- term. Already known holes can also be type checked; the types for
--- these are synthesised.
-
--- Term generated: CS.Hole nm `CS.App` argN `CS.App` arg(N-1) ... `CS.App` arg0
--- When evaluating, just reflect the term at the generated type
-
--- When substituting in, presumably we just have to generate the right
--- amount of lambdas to make all the applications go away. Want to
--- make sure that we don't end up completely normalising the result
--- though.
-
--- There is the problem of what to do with holes that stand for proper
--- types. We cannot generate a normal type for this, though for the
--- purposes of reflection, all Set levels are the same.
-
--- Basically, we are pretending that each hole has a massive Pi type,
--- even if that type cannot be expressed in the system.
-
--- What I really want is not use the primitive application of the
--- system, but to use explicit substitutions:
-
---   CS.Hole nm [arg0,arg1,arg2,...,argN]
-
--- evaluating: get the local context [ty0,...,tyN] and the goal
--- - evaluate tyN --> vtyN
--- - evaluate argN and reify against vtyN
--- - evaluate ty(N-1) --> vty(N-1)
--- - evaluate arg(N-1) in env with 
-
--- test : (A : Set) -> A -> A
--- test A a = id ? ?
-
--- generates: ?hole0 : [A : Set, a : A] |- Set 0
---            ?hole1 : [A : Set, a : A] |- ?hole0 A a
-
-{------------------------------------------------------------------------------}
--- Contexts of holes
-data HoleContext = HoleContext { holes :: [(Ident, (HoleData, Value))] }
-
-getHoles :: HoleContext -> [(Ident, Value)]
-getHoles = map (\(nm, (_, v)) -> (nm, v)) . holes
-
-emptyHoleContext :: HoleContext
-emptyHoleContext = HoleContext []
-
-instance DefinitionContext HoleContext where
-    lookupDefinition identifier holeContext =
-        case lookup identifier (holes holeContext) of
-          Nothing       -> Nothing
-          Just (_, typ) -> Just (typ, Nothing)
-
-instance UsesIdentifiers HoleContext where
-    usedIdentifiers holeContext =
-        S.fromList (fst <$> holes holeContext)
-
-extendWithHole :: DefinitionContext context =>
-                  context
-               -> Ident
-               -> HoleData
-               -> HoleContext
-               -> HoleContext
-extendWithHole context identifier hole holeContext =
-    holeContext { holes = (identifier, (hole, holeType)) : holes holeContext }
-    where
-      holeType = evalIn (makeTypeOfHole hole) context holeContext
-
-{------------------------------------------------------------------------------}
 type TypingMonad ctxt a
-    = ReaderT ctxt (StateT HoleContext (ReaderT LocalContext (Either (Span, HoleContext, LocalContext, TypeError)))) a
+    = ReaderT ctxt (StateT Holes (ReaderT LocalContext (Either (Span, Holes, LocalContext, TypeError)))) a
 
 getLocalContext :: TypingMonad ctxt LocalContext
 getLocalContext = lift ask
 
-getHoleContext :: TypingMonad ctxt HoleContext
-getHoleContext = get
+getCurrentHoles :: TypingMonad ctxt Holes
+getCurrentHoles = get
 
 getFullContext :: TypingMonad ctxt (ctxt :>: LocalContext)
 getFullContext = (:>:) <$> ask <*> getLocalContext
@@ -208,7 +68,7 @@ evalWith :: DefinitionContext ctxt =>
          -> [Value]
          -> TypingMonad ctxt Value
 evalWith term arguments =
-    evalInWith <$> pure term <*> getFullContext <*> getHoleContext <*> pure arguments
+    evalInWith <$> pure term <*> getFullContext <*> getCurrentHoles <*> pure arguments
 
 eval :: DefinitionContext ctxt =>
         CS.Term
@@ -225,28 +85,24 @@ lookupIdent ident =
 raiseError :: Span -> TypeError -> TypingMonad ctxt a
 raiseError p err = do
   typingContext <- getLocalContext
-  holeContext   <- getHoleContext
+  holeContext   <- getCurrentHoles
   lift $ lift $ lift $ Left (p, holeContext, typingContext, err)
 
 generateHole :: DefinitionContext context =>
-                Span -> Maybe Ident -> Value -> TypingMonad context CS.Term
+                Span -> Maybe Ident -> Maybe Value -> TypingMonad context CS.Term
 generateHole p nameHint holeType = do
-  holeIdentifier <- freshFor <$> getHoleContext <*> pure (fromMaybe "hole" nameHint)
-  context        <- ask
+  holeIdentifier <- freshFor <$> getCurrentHoles <*> pure (fromMaybe "hole" nameHint)
   localContext   <- getLocalContext
-  let hole = HoleData p localContext holeType ()
-  modify $ extendWithHole context holeIdentifier hole
-  return $ (In $ CS.Hole holeIdentifier) `makeApp` (localContextMembers localContext)
-    where
-      makeApp t [] = t
-      makeApp t ((ident,_):localContext) =
-          In $ CS.App (t `makeApp` localContext) (In $ CS.Free ident)
+  let hole      = makeHole localContext holeType
+      arguments = map (\(ident,_) -> In $ CS.Free ident) (localContextMembers localContext)
+  modify $ extendWithHole holeIdentifier hole
+  return $ (In $ CS.Hole holeIdentifier arguments)
 
 runTypingMonad :: TypingMonad ctxt a
                -> ctxt
-               -> HoleContext
+               -> Holes
                -> LocalContext
-               -> Either (Span, HoleContext, LocalContext, TypeError) (a,HoleContext)
+               -> Either (Span, Holes, LocalContext, TypeError) (a,Holes)
 runTypingMonad c context holeContext localContext =
     runReaderT (runStateT (runReaderT c context) holeContext) localContext
 
@@ -297,14 +153,14 @@ isType (Annot p (Eq tA tB)) = do
       tyB' = reifyType0 tyB
   -- FIXME: need to be able to do equality types for terms that aren't
   -- of synthesisable type.
-  return (In $ CS.Eq tyA' tyB' tmA tmB )
+  return (In $ CS.Eq tyA' tyB' tmA tmB)
+isType (Annot p UserHole) = do
+  generateHole p Nothing Nothing
 isType term@(Annot p _) = do
   (ty,tm) <- synthesiseTypeFor term
   case ty of
     VSet l -> return tm
     _      -> raiseError p ExpectingSet
-
--- FIXME: add type-holes to this list
 
 {------------------------------------------------------------------------------}
 -- Type checking
@@ -488,7 +344,7 @@ hasType (Annot p Refl) v = do
   raiseError p (ReflExpectingEqualityType v)
 
 hasType (Annot p UserHole) v = do
-  generateHole p Nothing v
+  generateHole p Nothing (Just v)
 
 {------------------------------------------------------------------------------}
 -- The following are “high-level” features, and should be done using a general

@@ -143,5 +143,5 @@ data TermCon tm
     | InductionI
 
     | UserHole
-    | Hole       Ident
+    | Hole       Ident [tm]
     deriving (Show, Functor)

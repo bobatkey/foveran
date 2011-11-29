@@ -2,8 +2,6 @@
 
 module Language.Foveran.Typing.Conversion
        ( Value (..)
-       , DefinitionContext (..)
-       , lookupType
        , evalInWith
        , evalIn
        , reifyType0

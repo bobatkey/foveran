@@ -65,7 +65,7 @@ data TermCon tm
   | InductionI
 
   | UserHole
-  | Hole       Ident
+  | Hole       Ident [tm]
   deriving (Show, Functor)
 
 instance Show (TermPos' p) where
@@ -165,7 +165,7 @@ toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
 toLN DS.UserHole          bv = Layer $ UserHole
-toLN (DS.Hole nm)         bv = Layer $ Hole nm
+toLN (DS.Hole nm tms)     bv = Layer $ Hole nm (map (\t -> return (t bv)) tms)
 
 toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
 toLocallyNamelessClosed t = translateStar toLN t []
@@ -228,7 +228,7 @@ close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm InductionI       = pure InductionI
 close' fnm UserHole         = pure UserHole
-close' fnm (Hole nm)        = pure (Hole nm)
+close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms
 
 close :: [Ident] -> AnnotRec a TermCon -> Int -> AnnotRec a TermCon
 close nms x offset = translate (close' nms) x offset

@@ -8,7 +8,8 @@ module Language.Foveran.Typing.Context
 
 import qualified Data.Map as M
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
-import           Language.Foveran.Typing.Conversion (Value, DefinitionContext (..))
+import           Language.Foveran.Typing.Conversion (Value)
+import           Language.Foveran.Typing.DefinitionContext (DefinitionContext (..))
 
 newtype Context
     = Context { getMapping :: M.Map Ident (Value, Maybe Value) }

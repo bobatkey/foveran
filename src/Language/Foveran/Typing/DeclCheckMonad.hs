@@ -23,7 +23,7 @@ import           Data.Rec (AnnotRec (Annot))
 import           Data.Traversable (traverse)
 import           Text.Position (Span)
 
-import           Text.PrettyPrint (render, (<+>), ($$), nest, (<>), vcat)
+import           Text.PrettyPrint (render, (<+>), ($$), nest, (<>), vcat, text)
 import           Text.PrettyPrint.IsString ()
 import           Language.Foveran.Util.PrettyPrinting (ppSpan)
 import           Language.Foveran.Parsing.PrettyPrinter (ppIdent, ppPlain)
@@ -33,7 +33,10 @@ import           Language.Foveran.Syntax.LocallyNameless (TermPos)
 import qualified Language.Foveran.Syntax.Checked as CS
 
 import           Language.Foveran.Typing.Conversion (Value, evalIn)
+import           Language.Foveran.Typing.DefinitionContext
 import           Language.Foveran.Typing.Context
+import           Language.Foveran.Typing.LocalContext
+import           Language.Foveran.Typing.Hole
 import           Language.Foveran.Typing.Checker
 import           Language.Foveran.Typing.Errors
 
@@ -62,21 +65,21 @@ reportMalformedDefinition :: Span -> Ident -> Ident -> DeclCheckM ()
 reportMalformedDefinition p nm1 nm2 =
     throwError (p, MalformedDefn nm1 nm2)
 
-runTyping :: TypingMonad Context a -> DeclCheckM (a,HoleContext)
+runTyping :: TypingMonad Context a -> DeclCheckM (a,Holes)
 runTyping f = do
   ctxt <- DM get
-  case runTypingMonad f ctxt emptyHoleContext emptyLocalContext of
-    Left (p, holeContext, lctxt, err) ->
+  case runTypingMonad f ctxt noHoles emptyLocalContext of
+    Left (p, holes, lctxt, err) ->
         do throwError (p, TypeError (ctxt :>: lctxt) err)
-    Right (a, holeContext)  ->
-        do return (a, holeContext)
+    Right (a, holes)  ->
+        do return (a, holes)
 
 runTypingNoHoles :: Span
                  -> TypingMonad Context a
                  -> DeclCheckM a
 runTypingNoHoles p t = do
-  (a, holeContext) <- runTyping t
-  case getHoles holeContext of
+  (a, holes) <- runTyping t
+  case getHoles holes of
     [] -> return a
     _  -> throwError (p, IncompleteTyping)
 
@@ -90,7 +93,7 @@ extend p nm ty def = do
 evaluate :: CS.Term -> DeclCheckM Value
 evaluate t = do
   ctxt <- DM $ get
-  return (evalIn t ctxt emptyHoleContext)
+  return (evalIn t ctxt noHoles)
 
 positionOf :: TermPos -> Span
 positionOf (Annot p _) = p
@@ -103,15 +106,15 @@ checkDefinition p nm ty Nothing = do
 checkDefinition p nm ty (Just tm) = do
   cTy <- runTypingNoHoles (positionOf ty) $ isType ty
   vTy <- evaluate cTy
-  (cTm, holeContext) <- runTyping $ tm `hasType` vTy
+  (cTm, holes) <- runTyping $ tm `hasType` vTy
   ctxt <- DM $ get
-  case getHoles holeContext of
+  case getHoles holes of
     [] -> do vTm <- evaluate cTm
              extend p nm vTy (Just vTm)
-    h  -> do liftIO $ putStrLn $ render $    "Generated holes:"
-                                          $$ nest 2 (vcat (map (\(holeNm,ty) -> ppIdent holeNm <+> ":" <+> ppType ctxt ty) (reverse h)))
-                                          $$ "Term:"
-                                          $$ nest 2 (ppPlain $ runNameGeneration ctxt $ CS.toDisplaySyntax $ cTm)
+    h  -> do liftIO $ putStrLn $ render $    "Generated holes:" <+> text (show (length h))
+                                          $$ nest 2 (vcat (map (uncurry (ppHole ctxt)) $ reverse h))
+                                          -- $$ "Term:"
+                                          -- $$ nest 2 (ppPlain $ runNameGeneration ctxt $ CS.toDisplaySyntax $ cTm)
              extend p nm vTy Nothing
 
 runDeclCheck :: DeclCheckM () -> IO ()

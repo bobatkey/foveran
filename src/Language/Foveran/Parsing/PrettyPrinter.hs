@@ -92,7 +92,7 @@ pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
 pprint InductionI          = "inductionI"
 
 pprint UserHole            = "?"
-pprint (Hole nm)           = "?" <> ppIdent nm
+pprint (Hole nm tms)       = "?" <> ppIdent nm <> "[" <> hcat (punctuate "," (map resetPrec (reverse tms))) <> "]"
 
 ppAnnotTerm :: TermPos -> PP.Doc
 ppAnnotTerm t = foldAnnot pprint t `atPrecedenceLevel` 10

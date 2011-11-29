@@ -1,57 +1,59 @@
 {-# LANGUAGE OverloadedStrings, TypeOperators #-}
 
 module Language.Foveran.Typing.Conversion.Evaluation
-    ( DefinitionContext (..)
-    , lookupType
-    , evalIn
+    ( evalIn
     , evalInWith )
     where
 
 import Control.Applicative
 import Data.Rec (foldRec, Rec (In))
+import Data.Traversable (sequenceA)
 import Language.Foveran.Syntax.Checked
+import Language.Foveran.Typing.Hole
+import Language.Foveran.Typing.DefinitionContext
 import Language.Foveran.Typing.Conversion.Value
 
 {------------------------------------------------------------------------------}
-class DefinitionContext ctxt where
-    lookupDefinition :: Ident -> ctxt -> Maybe (Value, Maybe Value)
+type Environment ctxt = ([Value], ctxt, Holes)
 
-lookupType :: DefinitionContext ctxt => Ident -> ctxt -> Maybe Value
-lookupType identifier ctxt = fst <$> lookupDefinition identifier ctxt
+type Eval ctxt a = Environment ctxt -> a
 
-{------------------------------------------------------------------------------}
-type Environment ctxt holeContext = ([Value], ctxt, holeContext)
-
-type Eval ctxt holeContext a = Environment ctxt holeContext -> a
-
-lookupBound :: Int -> Eval ctxt holeContext Value
+lookupBound :: Int -> Eval ctxt Value
 lookupBound k (env, _, _) = env !! k
 
 lookupFree :: DefinitionContext ctxt =>
               Ident
-           -> Eval ctxt holeContext Value
+           -> Eval ctxt Value
 lookupFree nm (_, context, _) =
     case lookupDefinition nm context of
       Nothing             -> error "Evaluation: unbound identifier"
       Just (ty, Nothing)  -> reflect ty (tmFree nm)
       Just (ty, Just def) -> def
 
-lookupHole :: DefinitionContext holeContext =>
-              Ident
-           -> Eval ctxt holeContext Value
-lookupHole identifier (_, _, holeContext) =
-    case lookupDefinition identifier holeContext of
-      Nothing             -> error "Evaluation: unbound hole"
-      Just (ty, Nothing)  -> reflect ty (\_ -> In $ Hole identifier)
-      Just (ty, Just def) -> def
+doHole :: DefinitionContext ctxt =>
+          Ident
+       -> Eval ctxt ([Value] -> Value)
+doHole identifier (_, context, holes) arguments =
+    case holeGoal of
+      GoalType   -> VNeutral term
+      GoalSet ty -> reflect (evalInWith ty context holes arguments) term
+    where
+      HoleData holeContext holeGoal = lookupHole identifier holes
 
-binder :: Eval ctxt holeContext a -> Eval ctxt holeContext (Value -> a)
+      term = In <$> (Hole identifier <$> reifyArguments arguments holeContext)
+
+      reifyArguments []       []               i = []
+      reifyArguments (v:args) ((ident,ty):tys) i = reify vty v i:reifyArguments args tys i
+          where vty = evalInWith ty context holes args
+      reifyArguments _        _                i = error "Incorrect number of arguments to hole"
+
+binder :: Eval ctxt a -> Eval ctxt (Value -> a)
 binder p = \(env,defs,holes) v -> p (v:env, defs, holes)
 
 
-eval :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
-        TermCon (Eval ctxt holeContext Value)
-     -> Eval ctxt holeContext Value
+eval :: DefinitionContext ctxt =>
+        TermCon (Eval ctxt Value)
+     -> Eval ctxt Value
 eval (Bound k)     = lookupBound k
 eval (Free nm)     = lookupFree nm
 
@@ -131,21 +133,21 @@ eval InductionI         = pure (VLam "I" $ \vI ->
                                 VLam "x" $ \vx ->
                                 vinductionI vI vD vP vk vi vx)
 
-eval (Hole nm)          = lookupHole nm
+eval (Hole nm tms)      = doHole nm <*> sequenceA tms
 
 {------------------------------------------------------------------------------}
-evalInWith :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
+evalInWith :: DefinitionContext ctxt =>
               Term
            -> ctxt
-           -> holeContext
+           -> Holes
            -> [Value]
            -> Value
 evalInWith term context holeContext environment =
     foldRec eval term (environment, context, holeContext)
 
-evalIn :: (DefinitionContext ctxt, DefinitionContext holeContext) =>
+evalIn :: DefinitionContext ctxt =>
           Term
        -> ctxt
-       -> holeContext
+       -> Holes
        -> Value
 evalIn term context holeContext = evalInWith term context holeContext []

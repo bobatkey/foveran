@@ -20,6 +20,7 @@ module Language.Foveran.Syntax.Checked
 import           Control.Applicative
 import           Data.Rec
 import           Data.List (elemIndex)
+import           Data.Traversable
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
 
@@ -76,7 +77,7 @@ data TermCon tm
     | MuI        tm tm
     | InductionI
 
-    | Hole       Ident  -- when evaluating, we look up the hole in the context and reflect it using the known type
+    | Hole       Ident [tm]
     deriving (Show, Functor)
 
 --------------------------------------------------------------------------------
@@ -137,7 +138,7 @@ traverseSyn IDesc_Elim       = pure IDesc_Elim
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
-traverseSyn (Hole nm)        = pure (Hole nm)
+traverseSyn (Hole nm tms)    = Hole nm <$> sequenceA tms
 
 --------------------------------------------------------------------------------
 generaliseAlg :: [Term] -> Term -> TermCon (Int -> a) -> Int -> TermCon a
@@ -235,7 +236,7 @@ toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
-toDisplay (Hole nm)               = pure (DS.Hole nm)
+toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
 
 toDisplaySyntax :: Term -> NameGeneration DS.Term
 toDisplaySyntax = translateRec toDisplay
@@ -315,6 +316,6 @@ instance Eq Term where
   In IDesc_Elim == In IDesc_Elim     = True
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
   In InductionI  == In InductionI    = True
-  In (Hole nm)   == In (Hole nm')    = nm == nm'
+  In (Hole nm tms)   == In (Hole nm' tms')    = nm == nm' && tms == tms'
   
   _             == _                 = False
