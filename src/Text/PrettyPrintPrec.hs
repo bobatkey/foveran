@@ -4,7 +4,7 @@ module Text.PrettyPrintPrec
      atPrecedenceLevel,
      resetPrec,
      text,
-     (<>), (<+>), ($$), hang, nest, hsep, punctuate, sep, paren, cat, down, vcat,
+     (<>), (<+>), ($$), hang, nest, hsep, hcat, punctuate, sep, paren, cat, down, vcat,
      int,
      render)
     where
@@ -47,6 +47,9 @@ nest n p = PrecDoc $ \lev -> PP.nest n (p `atPrecedenceLevel` lev)
 
 hsep :: [PrecDoc] -> PrecDoc
 hsep l = PrecDoc $ \lev -> PP.hsep $ map (`atPrecedenceLevel` lev) l
+
+hcat :: [PrecDoc] -> PrecDoc
+hcat l = PrecDoc $ \lev -> PP.hcat $ map (`atPrecedenceLevel` lev) l
 
 sep :: [PrecDoc] -> PrecDoc
 sep l = PrecDoc $ \lev -> PP.sep $ map (`atPrecedenceLevel` lev) l
