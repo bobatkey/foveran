@@ -35,10 +35,13 @@ doHole :: DefinitionContext ctxt =>
        -> Eval ctxt ([Value] -> Value)
 doHole identifier (_, context, holes) arguments =
     case holeGoal of
-      GoalType   -> VNeutral term
-      GoalSet ty -> reflect (evalInWith ty context holes arguments) term
+      GoalIsType  -> VNeutral term
+      GoalType ty -> reflect (evalInWith ty context holes arguments) term
     where
-      HoleData holeContext holeGoal = lookupHole identifier holes
+      hole = lookupHole identifier holes
+
+      holeContext = getHoleContext hole
+      holeGoal    = getHoleGoal hole
 
       term = In <$> (Hole identifier <$> reifyArguments arguments holeContext)
 

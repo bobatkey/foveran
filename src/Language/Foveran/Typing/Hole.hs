@@ -3,7 +3,9 @@
 module Language.Foveran.Typing.Hole
     ( HoleContext
     , HoleGoal (..)
-    , HoleData (..) -- FIXME: make this abstract
+    , HoleData
+    , getHoleContext
+    , getHoleGoal
     , makeHole
     , ppHole
     , Holes (getHoles)
@@ -25,13 +27,19 @@ import qualified Data.Set as S
 
 --------------------------------------------------------------------------------
 type HoleContext = [(Ident, Term)]
-data HoleGoal    = GoalType
-                 | GoalSet  Term
+data HoleGoal    = GoalIsType
+                 | GoalType   Term
 
 data HoleData
     = HoleData { holeContext :: HoleContext
                , holeGoal    :: HoleGoal
                }
+
+getHoleContext :: HoleData -> HoleContext
+getHoleContext = holeContext
+
+getHoleGoal :: HoleData -> HoleGoal
+getHoleGoal = holeGoal
 
 makeHole :: LocalContext -> Maybe Value -> HoleData
 makeHole localContext goal =
@@ -40,8 +48,8 @@ makeHole localContext goal =
       members = localContextMembers localContext
 
       holeGoal = case goal of
-                   Nothing -> GoalType
-                   Just t  -> GoalSet $ bindFree (map fst members) (reifyType0 t) 0
+                   Nothing -> GoalIsType
+                   Just t  -> GoalType (bindFree (map fst members) (reifyType0 t) 0)
 
       go []                       = []
       go ((ident,v):localContext) =
@@ -62,8 +70,8 @@ ppHole names holeIdentifier hole =
       ppHoleContextMembers ((ident, ty):xs) =
           (ppIdent ident <+> ":" <+> ppTerm (map fst xs) ty):ppHoleContextMembers xs
 
-      ppHoleGoal GoalType     = "Type"
-      ppHoleGoal (GoalSet ty) = ppTerm (map fst $ holeContext hole) ty
+      ppHoleGoal GoalIsType    = "Type"
+      ppHoleGoal (GoalType ty) = ppTerm (map fst $ holeContext hole) ty
 
       ppTerm localNames = ppPlain . runNameGenerationWith names localNames . toDisplaySyntax
 
