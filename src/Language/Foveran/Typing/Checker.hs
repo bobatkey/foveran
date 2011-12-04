@@ -41,7 +41,7 @@ getFullContext = (:>:) <$> ask <*> getLocalContext
 -- | Binds a variable in the local context, and invokes another typing
 -- action in the extended context.
 bindVar' :: UsesIdentifiers ctxt =>
-            Int
+            Int -- ^ Offset
          -> Ident -- ^ Name hint
          -> Value -- ^ The type of the newly bound identifier
          -> TermPos -- ^ Term to pass through, should have at least one free local variable
