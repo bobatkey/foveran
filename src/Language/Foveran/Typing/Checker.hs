@@ -154,6 +154,15 @@ isType (Annot p (Eq tA tB)) = do
   -- FIXME: need to be able to do equality types for terms that aren't
   -- of synthesisable type.
   return (In $ CS.Eq tyA' tyB' tmA tmB)
+isType (Annot p (SemI tD x tA)) = do
+  (tyD, tmD) <- synthesiseTypeFor tD
+  case tyD of
+    VIDesc tyI -> do
+      tmA <- bindVar x tyI tA $ \x tA -> isType tA
+      let tmI = reifyType0 tyI
+      return (In $ CS.SemI tmI tmD x tmA)
+    v ->
+      raiseError p (ExpectingIDescForSemI v)
 isType (Annot p UserHole) = do
   generateHole p Nothing Nothing
 isType term@(Annot p _) = do
@@ -207,6 +216,16 @@ hasType (Annot p (Eq tA tB)) (VSet l) = do
   -- LocallyNameless syntax. Also, we need to be able to do equality
   -- types for terms that aren't of synthesisable type.
   return (In $ CS.Eq tyA' tyB' tmA tmB)
+
+hasType (Annot p (SemI tD x tA)) (VSet l) = do
+  (tyD, tmD) <- synthesiseTypeFor tD
+  case tyD of
+    VIDesc tyI -> do
+      tmA <- bindVar x tyI tA $ \x tA -> tA `hasType` (VSet l)
+      let tmI = reifyType0 tyI
+      return (In $ CS.SemI tmI tmD x tmA)
+    v ->
+      raiseError p (ExpectingIDescForSemI v)
 
 -- FIXME: all the error cases too.
 {------------------------------}
@@ -296,7 +315,7 @@ hasType (Annot p (Construct t)) (VMu f) = do
   return (In $ CS.Construct tm)
 
 hasType (Annot p (Construct t)) (VMuI a d i) = do
-  tm <- t `hasType` (vsemI $$ a $$ (d $$ i) $$ vmuI a d)
+  tm <- t `hasType` (vsemI a (d $$ i) "i" (vmuI a d $$))
   return (In $ CS.Construct tm)
 
 hasType (Annot p (Construct t)) v = do
@@ -400,6 +419,8 @@ hasType (Annot p t) v = do
   compareTypes p v v'
   return tm
 
+{------------------------------------------------------------------------------}
+{------------------------------------------------------------------------------}
 {------------------------------------------------------------------------------}
 -- Attempt to synthesise a type for a given term. It is guaranteed
 -- that the returned type and term will be well-typed in the supplied
@@ -561,7 +582,7 @@ synthesiseTypeFor (Annot p InductionI) = do
            forall "D" (vI .->. VIDesc vI) $ \vD ->
            forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
            forall "k" (forall "i" vI $ \i ->
-                       forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
+                       forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
                        (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
                        (vP $$ i $$ VConstruct x)) $ \k ->
            forall "i" vI $ \i ->

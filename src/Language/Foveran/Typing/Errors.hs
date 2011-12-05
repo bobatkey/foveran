@@ -42,6 +42,7 @@ data TypeError
     | ReflExpectingEqualityType   Value
     | ElimEqCanOnlyHandleHomogenousEq Value Value
     | ExpectingEqualityType       Value
+    | ExpectingIDescForSemI       Value
 
 ppType :: UsesIdentifiers ctxt =>
           ctxt
@@ -130,6 +131,9 @@ ppTypeError ctxt (ExpectingEqualityType ty)
     = "Expecting term to have type"
       $$ nest 4 (ppType ctxt ty)
       $$ "but this term generates equalities"
+ppTypeError ctxt (ExpectingIDescForSemI ty)
+    = "Expecting term to have indexed description type, but type is"
+      $$ nest 4 (ppType ctxt ty)
 
 {------------------------------------------------------------------------------}
 data DataDeclError

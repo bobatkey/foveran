@@ -1,13 +1,3 @@
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Nat : Set :=
   | zero :
   | succ : Nat
@@ -71,7 +61,7 @@ leqInduction :
 leqInduction P φzero φsucc n₁ n₂ =
   inductionI (Nat × Nat) LeqDesc
     (λp x. P (fst p) (snd p) x)
-    (λp x. case fst x for b. (z : semI (Nat × Nat) (body p b) (λp. Leq (fst p) (snd p))) →
+    (λp x. case fst x for b. (z : semI[body p b, p. Leq (fst p) (snd p)]) →
                              liftI (Nat × Nat) (body p b) (λp. Leq (fst p) (snd p)) (λp x. P (fst p) (snd p) x) z →
                              P (fst p) (snd p) (construct «b, z») with
              { inl u. λz u.
@@ -114,12 +104,12 @@ elim-leqSucc :
 elim-leqSucc Φ φsucc n₁ n₂ le =
   leqInduction (λn₁ n₂ le. (n'₁ : Nat) → (le' : Leq (succ n'₁) n₂) → n₁ ≡ succ n'₁ → le ≡ le' → Φ n'₁ n₂ le')
     (λn₂ n'₁ le' zero≡succ eq₂.
-      elimEmpty (Φ n'₁ n₂ le') (succ≢zero n'₁ (symm Nat zero (succ n'₁) zero≡succ)))
+      elimEmpty (succ≢zero n'₁ (symm Nat zero (succ n'₁) zero≡succ)))
     (λn₁ n₂ le₀ φ₀ n'₁ le' eq₁.
-      elimEq succ-inj n₁ n'₁ eq₁
-         for n'₁ p. (le' : Leq (succ n'₁) (succ n₂)) → leqSucc n₁ n₂ le₀ ≡ le' → Φ n'₁ (succ n₂) le'
-        with (λle' eq₂. elimEq eq₂ for le' p. Φ n₁ (succ n₂) le'
-                          with (φsucc n₁ n₂ le₀))
+      (elimEq succ-inj n₁ n'₁ eq₁
+          for n'₁ p. (le' : Leq (succ n'₁) (succ n₂)) → leqSucc n₁ n₂ le₀ ≡ le' → Φ n'₁ (succ n₂) le'
+         with λle' eq₂. elimEq eq₂ for le' p. Φ n₁ (succ n₂) le'
+                         with φsucc n₁ n₂ le₀)
       le')
     (succ n₁) n₂ le n₁ le refl refl;
 

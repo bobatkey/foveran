@@ -3,15 +3,6 @@
 
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
 lift2 : (D : Desc) →
         (A : Set) →
         sem D A →
@@ -20,53 +11,41 @@ lift2 D A = elimD (λD. sem D A → IDesc A)
                   (λA' x. “K” Unit)
                   (λx. “IId” x)
                   (λD₁ D₂ f g x. f (fst x) “×” g (snd x))
- 		  (λD₁ D₂ f g x. case x for d. IDesc A with
-		                    { inl y. f y
-		 		    ; inr z. g z
-				    })
+ 		  (λD₁ D₂ f g x. case x with { inl y. f y; inr z. g z })
                   D;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Need to actually implement these...
+{-
 liftI : (I : Set) →
         (D : IDesc I) →
         (A : I → Set 2) →
         (Φ : (i : I) → A i → Set 2) →
-        semI I D A →
+        semI[D, i. A i] →
         Set 2;
 liftI I D A Φ =
-  elimID I (λD. semI I D A → Set 2)
+  elimID I (λD. semI[D, i. A i] → Set 2)
          (λi a. Φ i a)
          (λA' a. Unit)
          (λD₁ D₂ lift₁ lift₂ p. lift₁ (fst p) × lift₂ (snd p))
          (λB D liftD p. liftD (fst p) (snd p))
          (λB D liftD f. (b : B) → liftD b (f b))
          D;
+-}
 
 unitI : (I : Set) →
         (D : IDesc I) →
         (A : I → Set) →
-        (x : semI I D (λi. A i)) →
+        (x : semI[D, i. A i]) →
         liftI I D (λi. A i) (λi a. Unit) x;
 unitI I D A =
-  elimID I (λD. (x : semI I D (λi. A i)) → liftI I D (λi. A i) (λi a. Unit) x)
+  elimID I (λD. (x : semI[D, i. A i]) → liftI I D (λi. A i) (λi a. Unit) x)
     (λi a. ⋄)
     (λA' a'. ⋄)
     (λD₁ D₂ unit₁ unit₂ x. « unit₁ (fst x), unit₂ (snd x) »)
     (λB D unit x. unit (fst x) (snd x))
     (λB D unit x. λb. unit b (x b))
     D;
-
-assume inductionI : (I : Set) →
-                    (D : I → IDesc I) →
-                    (Φ : (i : I) → µI I D i → Set 2) →
-                    (k : (i : I) →
-                         (x : semI I (D i) (λi. µI I D i)) →
-                         liftI I (D i) (λi. µI I D i) Φ x →
-                         Φ i (construct x)) →
-                    (i : I) →
-                    (x : µI I D i) →
-                    Φ i x;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – The following two declarations define catamorphisms for indexed data.
@@ -75,14 +54,14 @@ drop : (I : Set) →
        (D : I → IDesc I) →
        (A : I → Set) →
        (i : I) →
-       (x : semI I (D i) (λi. µI I D i)) →
+       (x : semI[D i, i. µI I D i]) →
        liftI I (D i) (λi. µI I D i) (λi x. A i) x →
-       semI I (D i) (λi. A i);
+       semI[D i, i. A i];
 drop I D A i =
   elimID I
-    (λD'. (x : semI I D' (λi. µI I D i)) →
+    (λD'. (x : semI[D', i. µI I D i]) →
           liftI I D' (λi. µI I D i) (λi x. A i) x →
-          semI I D' (λi. A i))
+          semI[D', i. A i])
     (λi x a. a)
     (λX x u. x)
     (λD₁ D₂ drop₁ drop₂ x a.
@@ -94,7 +73,7 @@ drop I D A i =
 icata : (I : Set) →
         (D : I → IDesc I) →
         (A : I → Set) →
-        ((i : I) → semI I (D i) (λi. A i) → A i) →
+        ((i : I) → semI[D i, i. A i] → A i) →
         (i : I) → µI I D i → A i;
 icata I D A k =
   inductionI I D
@@ -141,14 +120,14 @@ refinement-to-refinement2 D A r = λa. «fst (r a), λx. inl (snd (r a) x)»;
 – refinements.
 recons : (A : Set) →
          (D : Desc) →
-         (Ψ : A → Set 2) →
+         (Ψ : A → Set) →
          (x : sem D A) →
-         (y : semI A (lift2 D A x) Ψ) →
+         (y : semI[lift2 D A x, a. Ψ a]) →
          liftI A (lift2 D A x) Ψ (λi x. µ D) y →
          sem D (µ D);
 recons A D Ψ =
   elimD (λD'. (x : sem D' A) →
-               (y : semI A (lift2 D' A x) Ψ) →
+               (y : semI[lift2 D' A x, a. Ψ a]) →
                liftI A (lift2 D' A x) Ψ (λi x. µ D) y →
                sem D' (µ D))
         (λA x u u'. x)
@@ -158,9 +137,7 @@ recons A D Ψ =
           , r₂ (snd x) (snd y) (snd p)
           »)
         (λD₁ D₂ r₁ r₂ x.
-           case x for x. (y : semI A (lift2 (D₁ “+” D₂) A x) Ψ) →
-                         liftI A (lift2 (D₁ “+” D₂) A x) Ψ (λi x. µ D) y →
-                         sem (D₁ “+” D₂) (µ D) with
+           case x with
              { inl x₁. λy₁ p₁. inl (r₁ x₁ y₁ p₁)
 	     ; inr x₂. λy₂ p₂. inr (r₂ x₂ y₂ p₂)
              })
@@ -185,11 +162,11 @@ zip :
   (A B : Set) →
   (D : Desc) →
   (x : sem D A) →
-  semI A (lift2 D A x) (λi. B) →
+  semI[lift2 D A x, i. B] →
   sem D B;
 zip A B =
   elimD (λD'. (x : sem D' A) →
-              semI A (lift2 D' A x) (λi. B) →
+              semI[lift2 D' A x, i. B] →
               sem D' B)
     (λA' x u. x)
     (λx b. b)
@@ -198,7 +175,7 @@ zip A B =
       , zip₂ (snd x) (snd y)
       »)
     (λD₁ D₂ zip₁ zip₂ x.
-      case x for x. semI A (lift2 (D₁ “+” D₂) A x) (λi. B) → sem (D₁ “+” D₂) B with
+      case x with
         { inl x. λy. inl (zip₁ x y)
         ; inr x. λy. inr (zip₂ x y)
         });
@@ -223,7 +200,7 @@ data Nat : Set :=
 caseNat : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
 caseNat A a f =
   induction NatDesc A
-    (λx p. case x for x. A (construct x) with
+    (λx p. case x with
              { inl u. a
              ; inr n. f n
              });
@@ -238,11 +215,8 @@ data List (A : Set) : Set :=
 fin-refinement : refinement NatDesc Nat;
 fin-refinement =
   caseNat (λn. (X : Set) × (X → sem NatDesc Nat))
-    (    « Empty,       λe. elimEmpty (sem NatDesc Nat) e »)
-    (λn. « Unit + Unit, λs. case s for s. sem NatDesc Nat with
-                              { inl u. inl ⋄
-                              ; inr u. inr n
-                              } »);
+    (    « Empty,       λe. elimEmpty e »)
+    (λn. « Unit + Unit, λs. case s with { inl u. inl ⋄; inr u. inr n } »);
 
 finDesc : Nat → IDesc Nat;
 finDesc = apply-refinement NatDesc Nat fin-refinement;
@@ -265,9 +239,9 @@ finElim : (Φ : (n : Nat) → fin n → Set 2) →
           (n : Nat) → (x : fin n) → Φ n x;
 finElim Φ φz φs =
   inductionI Nat finDesc Φ
-    (caseNat (λn. (x : semI Nat (finDesc n) (λn. fin n)) → liftI Nat (finDesc n) (λn. fin n) Φ x → Φ n (construct x))
-       (λx φ. elimEmpty (Φ zero (construct x)) (fst x))
-       (λn x. case fst x for y. (z : semI Nat (lift2 NatDesc Nat (snd (fin-refinement (succ n)) y)) (λn. fin n)) →
+    (caseNat (λn. (x : semI[finDesc n, n. fin n]) → liftI Nat (finDesc n) (λn. fin n) Φ x → Φ n (construct x))
+       (λ«x,_» φ. absurdBy x)
+       (λn x. case fst x for y. (z : semI[lift2 NatDesc Nat (snd (fin-refinement (succ n)) y), n. fin n]) →
                                 liftI Nat (finDesc (succ n)) (λn. fin n) Φ «y,z» →
                                 Φ (succ n) (construct «y,z») with
                 { inl u. λu' u''. φz n
@@ -303,7 +277,7 @@ vec-elim : (A : Set) →
            (n : Nat) → (v : Vec A n) → Φ n v;
 vec-elim A Φ φnil φcons =
   inductionI Nat (VecDesc A) Φ
-    (caseNat (λn. (v : semI Nat (VecDesc A n) (λn. Vec A n)) →
+    (caseNat (λn. (v : semI[VecDesc A n, n. Vec A n]) ->
                   liftI Nat (VecDesc A n) (λn. Vec A n) Φ v →
                   Φ n (construct v))
        (λv φ. φnil)
@@ -320,7 +294,7 @@ vec-to-list A =
 list-refinement : (A : Set) → refinement NatDesc Unit;
 list-refinement A =
   λu. « Unit + A
-      , λx. case x for d. sem NatDesc Unit with
+      , λx. case x with
               { inl u. inl ⋄
               ; inr a. inr ⋄
               }
@@ -351,7 +325,7 @@ list-elim A Φ φnil φcons =
     (λi. Φ)
     (λi x.
       case fst x
-        for y. (z : semI Unit (lift2 NatDesc Unit (snd (list-refinement A ⋄) y)) (λu. List2 A)) →
+        for y. (z : semI[lift2 NatDesc Unit (snd (list-refinement A ⋄) y), u. List2 A]) ->
                liftI Unit (List2Desc A i) (λu. List2 A) (λi. Φ) «y, z» →
                Φ (construct «y, z») with
         { inl u. λz u. φnil

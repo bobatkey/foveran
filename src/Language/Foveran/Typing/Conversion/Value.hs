@@ -167,28 +167,18 @@ vsem vD = loop vD
           reflect (VSet 0 .->. VSet 0)
                   (pure (In Sem) `tmApp` tm)
 
-{------------------------------------------------------------------------------}
-vsemI :: Value
-vsemI = VLam "I" $ \i ->
-        VLam "D" $ \d ->
-        VLam "X" $ \x ->
-        videsc_elim i (VLam "D2" $ \d -> VSet 2)
-          (VLam "i" $ \i -> x $$ i)
-          (VLam "A" $ \a -> a)
-          (VLam "D₁" $ \d1 ->
-           VLam "D₂" $ \d2 ->
-           VLam "semD₁" $ \semd1 ->
-           VLam "semD₂" $ \semd2 ->
-           semd1 .*. semd2)
-          (VLam "A" $ \a ->
-           VLam "D" $ \d ->
-           VLam "semD" $ \semD ->
-           VSigma (Just "a") a (\a -> semD $$ a))
-          (VLam "A" $ \a ->
-           VLam "D" $ \d ->
-           VLam "semD" $ \semD ->
-           VPi (Just "a") a (\a -> semD $$ a))
-          d
+vsemI :: Value -> Value -> Ident -> (Value -> Value) -> Value
+vsemI vI vD x vA = loop vD
+    where
+      loop (VIDesc_Id i)       = vA i
+      loop (VIDesc_K a)        = a
+      loop (VIDesc_Pair d1 d2) = loop d1 .*. loop d2
+      loop (VIDesc_Sg a d)     = VSigma (Just "a") a (\a -> loop (d $$ a))
+      loop (VIDesc_Pi a d)     = VPi (Just "a") a (\a -> loop (d $$ a))
+      loop (VNeutral tm)       = VNeutral (In <$> (SemI <$> reifyType vI
+                                                        <*> tm
+                                                        <*> pure x
+                                                        <*> tmBound (\tmx -> let v = reflect vI tmx in reifyType (vA v))))
 
 {------------------------------------------------------------------------------}
 vdesc_elim vP vK vI vPr vSu = loop
@@ -346,7 +336,7 @@ vliftITy = forall "I" (VSet 0) $ \vI ->
            forall "D" (VIDesc vI) $ \vD ->
            forall "A" (vI .->. VSet 0) $ \vA ->
            forall "P" (forall "i" vI $ \vi -> vA $$ vi .->. VSet 2) $ \_ ->
-           vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi) .->.
+           vsemI vI vD "i" (vA $$) .->.
            VSet 2
 
 vliftI :: Value
@@ -356,7 +346,7 @@ vliftI = VLam "I" $ \vI ->
          VLam "P" $ \vP ->
          VLam "x" $ \vx ->
          videsc_elim vI (VLam "D" $ \vD ->
-                         vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi) .->.
+                         vsemI vI vD "i" (vA $$) .->.
                          VSet 2)
            (VLam "i" $ \vi ->
             VLam "a" $ \va ->
@@ -390,7 +380,7 @@ vallI = VLam "I" $ \vI ->
         VLam "p" $ \vp ->
         VLam "xs" $ \xs ->
         videsc_elim vI (VLam "D" $ \vD ->
-                        forall "xs" (vsemI $$ vI $$ vD $$ (VLam "i" $ \vi -> vA $$ vi)) $ \xs ->
+                        forall "xs" (vsemI vI vD "i" (vA $$)) $ \xs ->
                         vliftI $$ vI $$ vD $$ vA $$ vP $$ xs)
           (VLam "x" $ \x ->
            VLam "xs" $ \xs ->
@@ -427,7 +417,7 @@ vinductionI vI vD vP vk = loop
                    `tmApp` reify (vI .->. VIDesc vI) vD
                    `tmApp` reify (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) vP
                    `tmApp` reify (forall "i" vI $ \i ->
-                                  forall "x" (vsemI $$ vI $$ (vD $$ i) $$ vmuI vI vD) $ \x ->
+                                  forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
                                   (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
                                   vP $$ i $$ VConstruct x) vk
                    `tmApp` reify vI vi
@@ -486,7 +476,7 @@ reify VDesc            VDesc_Id            = \i -> In $ Desc_Id
 reify VDesc            (VDesc_Prod v1 v2)  = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
 reify VDesc            (VDesc_Sum v1 v2)   = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
 reify (VMu tA)         (VConstruct v)      = \i -> In $ Construct (reify (vsem tA $$ (VMu tA)) v i)
-reify (VMuI tI tD ti)  (VConstruct v)      = \i -> In $ Construct (reify (vsemI $$ tI $$ (tD $$ ti) $$ (vmuI tI tD)) v i)
+reify (VMuI tI tD ti)  (VConstruct v)      = \i -> In $ Construct (reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v i)
 reify (VIDesc tI)      (VIDesc_Id x)       = \i -> In $ IDesc_Id (reify tI x i)
 reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)

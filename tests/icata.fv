@@ -1,55 +1,16 @@
 – catamorphisms for indexed data
-
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
-liftI : (I : Set) →
-        (D : IDesc I) →
-        (A : I → Set 2) →
-        (Φ : (i : I) → A i → Set 2) →
-        semI I D A →
-        Set 2;
-liftI I D A Φ =
-  elimID I (λD. semI I D A → Set 2)
-         (λi a. Φ i a)
-         (λA' a. Unit)
-         (λD₁ D₂ lift₁ lift₂ p. lift₁ (fst p) × lift₂ (snd p))
-         (λB D liftD p. liftD (fst p) (snd p))
-         (λB D liftD f. (b : B) → liftD b (f b))
-         D;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– Need to actually implement these...
-assume inductionI : (I : Set) →
-                    (D : I → IDesc I) →
-                    (Φ : (i : I) → µI I D i → Set 2) →
-                    (k : (i : I) →
-                         (x : semI I (D i) (λi. µI I D i)) →
-                         liftI I (D i) (λi. µI I D i) Φ x →
-                         Φ i (construct x)) →
-                    (i : I) →
-                    (x : µI I D i) →
-                    Φ i x;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-drop : (I : Set) →
-       (D : I → IDesc I) →
-       (A : I → Set) →
-       (i : I) →
-       (x : semI I (D i) (λi. µI I D i)) →
-       liftI I (D i) (λi. µI I D i) (λi x. A i) x →
-       semI I (D i) (λi. A i);
+drop : (I : Set) ->
+       (D : I -> IDesc I) ->
+       (A : I -> Set) ->
+       (i : I) ->
+       (x : semI[D i, i. µI I D i]) ->
+       liftI I (D i) (λi. µI I D i) (λi x. A i) x ->
+       semI[D i, i. A i]
 drop I D A i =
   elimID I
-    (λD'. (x : semI I D' (λi. µI I D i)) →
-          liftI I D' (λi. µI I D i) (λi x. A i) x →
-          semI I D' (λi. A i))
+    (λD'. (x : semI[D', i. µI I D i]) ->
+          liftI I D' (λi. µI I D i) (λi x. A i) x ->
+          semI[D', i. A i])
     (λi x a. a)
     (λX x u. x)
     (λD₁ D₂ drop₁ drop₂ x a.
@@ -58,11 +19,11 @@ drop I D A i =
     (λX D drop f a. λx. drop x (f x) (a x))
     (D i);
 
-icata : (I : Set) →
-        (D : I → IDesc I) →
-        (A : I → Set) →
-        ((i : I) → semI I (D i) (λi. A i) → A i) →
-        (i : I) → µI I D i → A i;
+icata : (I : Set) ->
+        (D : I -> IDesc I) ->
+        (A : I -> Set) ->
+        ((i : I) -> semI[D i, i. A i] -> A i) ->
+        (i : I) -> µI I D i -> A i;
 icata I D A k =
   inductionI I D
     (λi x. A i)

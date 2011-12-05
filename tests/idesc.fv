@@ -1,4 +1,4 @@
-toI : Desc → IDesc Unit;
+toI : Desc -> IDesc Unit;
 toI = elimD (λx. IDesc Unit)
             (λA. “K” A)
             (“IId” ⋄)
@@ -8,20 +8,11 @@ toI = elimD (λx. IDesc Unit)
 				  	              ; inr u. ID₂
 					              }));
 
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
-lift2 : (D : Desc) →
-        (A : Set) →
-        sem D A →
+lift2 : (D : Desc) ->
+        (A : Set) ->
+        sem D A ->
         IDesc A;
-lift2 D A = elimD (λD. sem D A → IDesc A)
+lift2 D A = elimD (λD. sem D A -> IDesc A)
                   (λA' x. “K” Unit)
                   (λx. “IId” x)
                   (λD₁ D₂ f g x. f (fst x) “×” g (snd x))
@@ -31,12 +22,12 @@ lift2 D A = elimD (λD. sem D A → IDesc A)
 				    })
                   D;
 
-lift3 : (I : Set) →
-        (D : IDesc I) →
-        (A : I → Set) →
-        semI I D (λi. A i) →
+lift3 : (I : Set) ->
+        (D : IDesc I) ->
+        (A : I -> Set) ->
+        semI[D, i. A i] ->
         IDesc ((i : I) × A i);
-lift3 I D A = elimID I (λD. semI I D (λi. A i) → IDesc ((i : I) × A i))
+lift3 I D A = elimID I (λD. semI[D, i. A i] -> IDesc ((i : I) × A i))
                      (λi a. “IId” «i,a»)
                      (λA' a. “K” Unit)
                      (λD₁ D₂ lift₁ lift₂ p. lift₁ (fst p) “×” lift₂ (snd p))
@@ -44,40 +35,29 @@ lift3 I D A = elimID I (λD. semI I D (λi. A i) → IDesc ((i : I) × A i))
                      (λB D liftD f. “Π” B (λb. liftD b (f b)))
                      D;
 
-lift4 : (I : Set) →
-        (D : IDesc I) →
-        (A : I → Set) →
-        (P : (i : I) → A i → Set 2) →
-        semI I D (λi. A i) →
+lift4 : (I : Set) ->
+        (D : IDesc I) ->
+        (A : I -> Set) ->
+        (P : (i : I) -> A i -> Set 2) ->
+        semI[D, i. A i] ->
         Set 2;
-lift4 I D A P x = semI ((i : I) × A i) (lift3 I D A x) (λp. P (fst p) (snd p));
+lift4 I D A P x = semI[lift3 I D A x, p. P (fst p) (snd p)]
 
 
-allI : (I  : Set) →
-       (D  : IDesc I) →
-       (A  : I → Set) →
-       (P  : (i : I) → A i → Set 2) →
-       (p  : (i : I) → (x : A i) → P i x) →
-       (xs : semI I D (λi. A i)) →
+allI : (I  : Set) ->
+       (D  : IDesc I) ->
+       (A  : I -> Set) ->
+       (P  : (i : I) -> A i -> Set 2) ->
+       (p  : (i : I) -> (x : A i) -> P i x) ->
+       (xs : semI[D, i. A i]) ->
        lift4 I D A P xs;
-allI I D A P p = elimID I (λD. (xs : semI I D (λi. A i)) → lift4 I D A P xs)
+allI I D A P p = elimID I (λD. (xs : semI[D, i. A i]) -> lift4 I D A P xs)
                         (λx xs. p x xs)
                         (λA xs. ⋄)
                         (λD₁ D₂ all₁ all₂ x. «all₁ (fst x), all₂ (snd x)»)
                         (λB D all x. all (fst x) (snd x))
                         (λB D all x. λb. all b (x b))
                         D;
-
-assume inductionI : (I : Set) →
-                    (D : I → IDesc I) →
-                    (P : (i : I) → µI I D i → Set 2) →
-                    (k : (i : I) →
-                         (x : semI I (D i) (λi. µI I D i)) →
-                         lift4 I (D i) (µI I D) P x →
-                         P i (construct x)) →
-                    (i : I) →
-                    (x : µI I D i) →
-                    P i x;
 
 – this is all the bits I need to do induction on indexed data types!
 – what about higher-Set universes? Do I need to beef up semI?
@@ -88,10 +68,10 @@ data Nat : Set :=
   ;
 
 caseNat :
-  (Φ : Nat → Set 2) →
-  (Φ zero) →
-  ((n : Nat) → Φ (succ n)) →
-  (n : Nat) → Φ n;
+  (Φ : Nat -> Set 2) ->
+  (Φ zero) ->
+  ((n : Nat) -> Φ (succ n)) ->
+  (n : Nat) -> Φ n;
 caseNat Φ φzero φsucc =
   induction NatDesc Φ
     (λx p. case x for x. Φ (construct x) with
@@ -99,27 +79,29 @@ caseNat Φ φzero φsucc =
              ; inr n. φsucc n
              });
 
-vectorDesc : Nat → IDesc Nat;
+vectorDesc : Nat -> IDesc Nat;
 vectorDesc = caseNat (λn. IDesc Nat)
                      (    “K” Unit)
                      (λn. “K” Nat “×” “IId” n);
 
-vector : Nat → Set;
+vector : Nat -> Set;
 vector n = µI Nat vectorDesc n;
 
 vnil : vector zero;
 vnil = construct ⋄;
 
-vcons : (n : Nat) → Nat → vector n → vector (succ n);
+vcons : (n : Nat) -> Nat -> vector n -> vector (succ n);
 vcons n a t = construct « a, t »;
 
+{-
 velim :
-  (Φ : (n : Nat) → vector n → Set 2) →
-  (Φ zero vnil) →
-  ((n : Nat) → (a : Nat) → (t : vector n) → Φ n t → Φ (succ n) (vcons n a t)) →
-  (n : Nat) → (v : vector n) → Φ n v;
+  (Φ : (n : Nat) -> vector n -> Set 2) ->
+  (Φ zero vnil) ->
+  ((n : Nat) -> (a : Nat) -> (t : vector n) -> Φ n t -> Φ (succ n) (vcons n a t)) ->
+  (n : Nat) -> (v : vector n) -> Φ n v;
 velim Φ φnil φcons =
   inductionI Nat vectorDesc Φ
-    (caseNat (λn. (x : semI Nat (vectorDesc n) (λn. vector n)) → lift4 Nat (vectorDesc n) vector Φ x → Φ n (construct x))
+    (caseNat (λn. (x : semI[vectorDesc n, n. vector n]) -> lift4 Nat (vectorDesc n) vector Φ x -> Φ n (construct x))
              (λx u. φnil)
              (λn x p. φcons n (fst x) (snd x) (snd p)));
+-}

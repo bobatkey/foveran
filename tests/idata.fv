@@ -1,14 +1,3 @@
-semI : (I : Set) -> IDesc I -> (I -> Set 2) -> Set 2
-semI I D X =
-  elimID I (λD. Set 2)
-    (λi. X i)
-    (λA. A)
-    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-    (λA D semD. (a : A) × semD a)
-    (λA D semD. (a : A) -> semD a)
-    D
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Nat : Set where
   zero : Nat
   succ : Nat -> Nat
@@ -35,7 +24,7 @@ succ n = construct «inr (), n, refl» – :succ n
 
 Nat:body : Unit + Unit -> IDesc Unit
 Nat:body d =
-  case d for x. IDesc 𝟙 with
+  case d with
     { inl _. “K” (() ≡ ())
     ; inr _. “IId” () “×” “K” (() ≡ ())
     }
@@ -50,7 +39,7 @@ elimtype :
   Set 2
 elimtype I C body P =
   λi c.
-    (z : semI I (body i c) (λi. µI I (λi. “Σ” C (body i)) i)) ->
+    (z : semI[body i c, i. µI I (λi. “Σ” C (body i)) i]) ->
     liftI I (body i c) (λi. µI I (λi. “Σ” C (body i)) i) P z ->
     P i (construct «c,z»)
 
@@ -78,27 +67,6 @@ add n₁ n₂ =
       } d)
     ()
     n₁
-
-{-
-possible new syntax:
-  inductionI x [for i x. P] with T
-
-i, x |- P : Set l
-|- T : (i : I) -> (x : semI D (µ D) i) -> liftI ... -> P i (construct x)
-
-induction construct z for i x. P with T
-=
-T i x (all I (D i) (µI I D) P (λi x. induction x for i x. P with T))
-
-what is the level of 'all'?
-what is the level of 'lift'?
-what is the level of 'sem'?
-
-lift can only be defined as map from descriptions to descriptions for
-level-0 descriptions, because otherwise we need a higher level
-indexes.
-
--}
 
 {-
 vecappend : (A : Set) -> (n₁ n₂ : Nat) -> Vector A n₁ -> Vector A n₂ -> Vector A (add n₁ n₂)
@@ -176,18 +144,6 @@ normalise
 {-
 introduce P pzero psucc n.
 eliminate n with
-  introduce _ «constructor, arguments».
-  case constructor for c. (z : semI Unit (Nat:body c) (λ_. Nat ())) ->
-                          liftI Unit (Nat:body c) (λ_. Nat ()) (λ_. P) z ->
-                          P (construct «c, arguments») with
-    { inl _. introduce eq _.
-      rewriteBy eq then pzero
-    ; inr _. introduce «n, eq» «p, _».
-      rewriteBy eq then psucc n p
-    } arguments
-
-introduce P pzero psucc n.
-eliminate n with
   zero.   pzero
   succ n. psucc n (recurse n)
 
@@ -253,7 +209,7 @@ local
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 Vector:body : Set -> Nat -> Unit + Unit -> IDesc Nat;
 Vector:body A n b =
-  case b for b. IDesc Nat with
+  case b with
     { inl _. “K” (zero ≡ n)
     ; inr _. “Σ” Nat (λn'. “Σ” A (λa. “IId” n' “×” “K”(succ n' ≡ n)))
     }
@@ -292,12 +248,10 @@ data regexp (A : Set) : Set where
   tok  : A -> regexp A
 ;
 
-{-
 data Fin : Nat -> Set where
-  { fz : (n : Nat) -> Fin (succ n)
-  ; fs : (n : Nat) -> Fin n -> Fin (succ n)
-  };
--}
+  fz : (n : Nat) -> Fin (succ n)
+  fs : (n : Nat) -> Fin n -> Fin (succ n)
+
 {-
 {-
 
@@ -342,3 +296,16 @@ normalise acc2;
 data Emp : Nat () -> Set where
   { };
 -}
+
+data Eq (A : Set) (a : A) : A -> Set where
+  reflexivity : Eq A a a
+
+normalise Eq;
+ 
+assume A : Set
+assume a : A
+
+normalise inductionI A (Eq:code A a);
+
+
+;

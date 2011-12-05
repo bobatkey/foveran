@@ -39,11 +39,11 @@ assume p : a ≡ a;
 
 normalise elimEq p for a' p'. p' ≡ r A a with refl;
 
-k : (α : Set) →
-    (a : α) →
-    (p : a ≡ a) →
-    p ≡ r α a;
-k α a p =
+uip : (α : Set) ->
+      (a : α) ->
+      (p : a ≡ a) ->
+      p ≡ r α a;
+uip α a p =
   elimEq p for b q. q ≡ r α a with refl;
 
 

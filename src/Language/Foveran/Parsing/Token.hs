@@ -68,10 +68,13 @@ data Token
     | Quote_Sg
     | Quote_Pi
     | IDesc_Elim
+    | SemI
     | MuI
     | InductionI
 
     | Underscore
+    | LSqBracket
+    | RSqBracket
     | Then
     | AbsurdBy
     | Hole
@@ -90,6 +93,8 @@ instance SyntaxHighlight Token where
     lexicalClass Arrow       = Operator
     lexicalClass LParen      = Punctuation
     lexicalClass RParen      = Punctuation
+    lexicalClass LSqBracket  = Punctuation
+    lexicalClass RSqBracket  = Punctuation
     lexicalClass QuoteArrow  = Constructor
     lexicalClass Times       = Operator
     lexicalClass QuoteTimes  = Constructor
@@ -130,6 +135,7 @@ instance SyntaxHighlight Token where
     lexicalClass Quote_Sg    = Constructor
     lexicalClass Quote_Pi    = Constructor
     lexicalClass IDesc_Elim  = Keyword
+    lexicalClass SemI        = Keyword
     lexicalClass MuI         = Type
     lexicalClass InductionI  = Keyword
     lexicalClass Eq          = Operator
@@ -159,6 +165,8 @@ instance Show Token where
   show Arrow       = "→"
   show LParen      = "("
   show RParen      = ")"
+  show LSqBracket  = "["
+  show RSqBracket  = "]"
   show QuoteArrow  = "“→”"
   show Times       = "×"
   show QuoteTimes  = "“×”"
@@ -198,6 +206,7 @@ instance Show Token where
   show Quote_Pi    = "“Π”"
   show IDesc_Elim  = "elimID"
   show Sem         = "sem"
+  show SemI        = "semI"
   show MuI         = "µI"
   show InductionI  = "inductionI"
   show Eq          = "≡"

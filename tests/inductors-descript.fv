@@ -107,7 +107,7 @@ lift' D α Φ = elimD (λD. sem D α → Set 2)
                     (λA x. Unit)
                     (λx. Φ x)
                     (λF G f g x. f (fst x) × g (snd x))
-                    (λF G f g x. case x for d. Set 2 with
+                    (λF G f g x. case x with
                                    { inl y. f y
                                    ; inr z. g z
                                    })
@@ -155,17 +155,8 @@ caseD D Φ k =
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – Some things for indexed descriptions.
-semI : (I : Set) → IDesc I → (I → Set 1) → Set 1;
-semI I D X = elimID I (λD. Set 1)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
 semI' : (I J : Set) → (I → IDesc J) → (J → Set 1) → (I → Set 1);
-semI' I J D X i = semI J (D i) X;
+semI' I J D X i = semI[D i, j. X j];
 
 – Composition of descriptions of indexed functors. The type of this 
 – function is deliberately phrased to look like a monadic bind operator.
@@ -187,10 +178,10 @@ commute : (I J : Set) →
           (D₁ : IDesc I) →
           (D₂ : I → IDesc J) →
           (Φ  : J → Set 1) →
-          semI I D₁ (λa. semI J (D₂ a) Φ) →
-          semI J (compose I J D₁ D₂) Φ;
+          semI[D₁, a. semI[D₂ a, j. Φ j]] →
+          semI[compose I J D₁ D₂, j. Φ j];
 commute I J D₁ D₂ Φ =
-  elimID I (λD₁. semI I D₁ (λa. semI J (D₂ a) Φ) → semI J (compose I J D₁ D₂) Φ)
+  elimID I (λD₁. semI[D₁, a. semI[D₂ a, j. Φ j]] → semI[compose I J D₁ D₂, j. Φ j])
          (λi x. x)
          (λA a. a)
          (λD₁ D₂ c₁ c₂ p. «c₁ (fst p), c₂ (snd p)»)
@@ -202,10 +193,10 @@ commute2 : (I J : Set) →
            (D₁ : IDesc I) →
            (D₂ : I → IDesc J) →
            (Φ  : J → Set 1) →
-           semI J (compose I J D₁ D₂) Φ →
-           semI I D₁ (λa. semI J (D₂ a) Φ);
+           semI[compose I J D₁ D₂, j. Φ j] →
+           semI[D₁, a. semI[D₂ a, j. Φ j]];
 commute2 I J D₁ D₂ Φ =
-  elimID I (λD₁. semI J (compose I J D₁ D₂) Φ → semI I D₁ (λa. semI J (D₂ a) Φ))
+  elimID I (λD₁. semI[compose I J D₁ D₂, j. Φ j] → semI[D₁, a. semI[D₂ a, j. Φ j]])
          (λi x. x)
          (λA a. a)
          (λD₁ D₂ c₁ c₂ p. «c₁ (fst p), c₂ (snd p)»)
@@ -220,10 +211,10 @@ map : (A : Set) →
       (D : IDesc A) →
       (Φ Ψ : A → Set 1) →
       (f : (a : A) → Φ a → Ψ a) →
-      semI A D Φ →
-      semI A D Ψ;
+      semI[D, a. Φ a] →
+      semI[D, a. Ψ a]
 map A D Φ Ψ f =
- elimID A (λD'. semI A D' Φ → semI A D' Ψ)
+ elimID A (λD'. semI[D', a. Φ a] → semI[D', a. Ψ a])
         f
         (λA a. a)
         (λD₁ D₂ map₁ map₂ p. «map₁ (fst p), map₂ (snd p)»)
@@ -272,7 +263,7 @@ lift-to-lift2 D A Φ =
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
         (λD₁ D₂ f₁ f₂ x.
-            case x for x. lift' (D₁ “+” D₂) A Φ x → semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x with
+            case x with
               { inl y. λa. f₁ y a
               ; inr z. λb. f₂ z b
               })
@@ -290,7 +281,7 @@ lift2-to-lift D A Φ =
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
         (λD₁ D₂ f₁ f₂ x.
-            case x for x. semI' (sem (D₁ “+” D₂) A) A (lift2 (D₁ “+” D₂) A) Φ x → lift' (D₁ “+” D₂) A Φ x with
+            case x with
               { inl y. λa. f₁ y a
               ; inr z. λb. f₂ z b
               })
@@ -434,11 +425,11 @@ maybe A = Unit + A;
 – exploration proceeds according to the original inductor.
 with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
-  « λx. case x for x. IDesc (maybe A) with
+  « λx. case x with
           { inl u. “Π” A (λa. “IId” (inr a))
           ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a))
           }
-  , λΦ k x. case x for x. Φ x with
+  , λΦ k x. case x with
               { inl u.
                   k (inl u)
                     (snd AI (λa. Φ (inr a))
@@ -458,11 +449,11 @@ with-bottom A AI =
 – directly to the top element.
 with-top : (A : Set) → inductor A → inductor (maybe A);
 with-top A AI =
-  « λx. case x for x. IDesc (maybe A) with
+  « λx. case x with
           { inl u. “K” Unit
           ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a)) “×” “IId” (inl ⋄)
           }
-  , λΦ k x. case x for x. Φ x with
+  , λΦ k x. case x with
               { inl u. k (inl u) ⋄
               ; inr a. snd AI (λa. Φ (inr a))
                         (λa φ. k (inr a)
@@ -597,10 +588,10 @@ primitive-inductor A AI Ψ k =
 – its structure. I'm fairly sure this is the right thing to do.
 collapse : (A : Set) →
            (H : IDesc A) →
-           (φ : semI A H (λa. IDesc A)) →
+           (φ : semI[H, a. IDesc A]) →
            IDesc A;
 collapse A =
-  elimID A (λD. semI A D (λa. IDesc A) → IDesc A)
+  elimID A (λD. semI[D, a. IDesc A] → IDesc A)
          (λa D. D)
          (λA' a'. “K” A')
          (λD₁ D₂ rec₁ rec₂ p. rec₁ (fst p) “×” rec₂ (snd p))
@@ -653,7 +644,7 @@ collapse2 D X =
         (λA x u. “K” Unit)
         (λx ID. ID)
         (λD₁ D₂ f₁ f₂ x p. f₁ (fst x) (fst p) “×” f₂ (snd x) (snd p))
-        (λD₁ D₂ f₁ f₂ x. case x for x. lift' (D₁ “+” D₂) X (λx. IDesc X) x → IDesc X with
+        (λD₁ D₂ f₁ f₂ x. case x with
                            { inl x₁. f₁ x₁
                            ; inr x₂. f₂ x₂
                            })
@@ -665,11 +656,11 @@ step :
   (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
   lift' D (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
-  semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ;
+  semI[collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x), x. Φ x];
 step D Ψ Φ =
   elimD (λD'. (x : sem D' (µ D)) →
               lift' D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
-              semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ)
+              semI[collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x), x. Φ x])
     (λA x u. ⋄)
     (λx p. p)
     (λD₁ D₂ step₁ step₂ x p.
@@ -677,9 +668,7 @@ step D Ψ Φ =
       , step₂ (snd x) (snd p)
       »)
     (λD₁ D₂ step₁ step₂ x.
-      case x for x. lift' (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x →
-                    semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ
-                    with
+      case x with
         { inl x₁. step₁ x₁
         ; inr x₂. step₂ x₂
         })
@@ -690,11 +679,11 @@ unstep :
   (Ψ : µ D → IDesc (µ D)) →
   (Φ : µ D → Set 1) →
   (x : sem D (µ D)) →
-  semI (µ D) (collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
+  semI[collapse2 D (µ D) x (all D (µ D) (λx. IDesc (µ D)) Ψ x), x. Φ x] →
   lift' D (µ D) (semI' (µ D) (µ D) Ψ Φ) x;
 unstep D Ψ Φ =
   elimD (λD'. (x : sem D' (µ D)) →
-              semI (µ D) (collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
+              semI[collapse2 D' (µ D) x (all D' (µ D) (λx. IDesc (µ D)) Ψ x), x. Φ x] →
               lift' D' (µ D) (semI' (µ D) (µ D) Ψ Φ) x)
     (λA x u. ⋄)
     (λx p. p)
@@ -703,8 +692,7 @@ unstep D Ψ Φ =
       , unstep₂ (snd x) (snd p)
       »)
     (λD₁ D₂ unstep₁ unstep₂ x.
-      case x for x. semI (µ D) (collapse2 (D₁ “+” D₂) (µ D) x (all (D₁ “+” D₂) (µ D) (λx. IDesc (µ D)) Ψ x)) Φ →
-                    lift' (D₁ “+” D₂) (µ D) (semI' (µ D) (µ D) Ψ Φ) x with
+      case x with
         { inl x₁. unstep₁ x₁
         ; inr x₂. unstep₂ x₂
         })
@@ -772,9 +760,7 @@ apply D A Φ Ψ =
     (λx f. f)
     (λD₁ D₂ ap₁ ap₂ x f φ. « ap₁ (fst x) (fst f) (fst φ), ap₂ (snd x) (snd f) (snd φ) »)
     (λD₁ D₂ ap₁ ap₂ x.
-      case x for x. lift' (D₁ “+” D₂) A (λa. Φ a → Ψ a) x →
-                    lift' (D₁ “+” D₂) A Φ x →
-                    lift' (D₁ “+” D₂) A Ψ x with
+      case x with
         { inl x₁. ap₁ x₁
         ; inr x₂. ap₂ x₂
         })
@@ -793,7 +779,7 @@ unit A = elimD
   (λD₁ D₂ unit₁ unit₂ x.
     « unit₁ (fst x), unit₂ (snd x) »)
   (λD₁ D₂ unit₁ unit₂ x.
-    case x for x. lift' (D₁ “+” D₂) A (λx. Unit) x with
+    case x with
       { inl x₁. unit₁ x₁
       ; inr x₂. unit₂ x₂
       });
@@ -886,7 +872,7 @@ caseNat :
   (n : Nat) → Φ n;
 caseNat Φ φzero φsucc =
   induction NatDesc (λn. Φ n)
-    (λx p. case x for x. Φ (construct x) with
+    (λx p. case x with
              { inl u. φzero
              ; inr n. φsucc n
              });
@@ -897,7 +883,7 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc (λn. Φ n)
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+            (\x. case x with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
@@ -993,42 +979,42 @@ compare =
 project :
   (Φ : Nat → Set) →
   (n : Nat) →
-  semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
+  semI[fst (complete-inductor NatDesc) (succ n), n. Φ n] →
   Φ n;
 project Φ =
-  caseNat (λn. semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) → Φ n)
+  caseNat (λn. semI[fst (complete-inductor NatDesc) (succ n), n. Φ n] → Φ n)
   (λx. fst x)
   (λn x. fst x);
 
 stepDown :
   (Φ : Nat → Set) →
   (n : Nat) →
-  semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
-  semI Nat (fst (complete-inductor NatDesc) n) (λn. Φ n);
+  semI[fst (complete-inductor NatDesc) (succ n), n. Φ n] →
+  semI[fst (complete-inductor NatDesc) n, n. Φ n];
 stepDown Φ =
-  caseNat (λn. semI Nat (fst (complete-inductor NatDesc) (succ n)) (λn. Φ n) →
-               semI Nat (fst (complete-inductor NatDesc) n) (λn. Φ n))
+  caseNat (λn. semI[fst (complete-inductor NatDesc) (succ n), n. Φ n] →
+               semI[fst (complete-inductor NatDesc) n, n. Φ n])
   (λx. ⋄)
   (λn x. snd x);
 
 descend : (Φ : Nat → Set) →
           (k n₁ n₂ : Nat) →
           equalNat (succ (add n₁ k)) n₂ →
-          semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+          semI[fst (complete-inductor NatDesc) n₂, n. Φ n] →
           Φ k;
 descend Φ k =
   natInduction
     (λn₁. (n₂ : Nat) →
           equalNat (succ (add n₁ k)) n₂ →
-          semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+          semI[fst (complete-inductor NatDesc) n₂, n. Φ n] →
           Φ k)
     (λn₂ eq.
        equal-to-leibniz (succ k) n₂ eq
-         (λn₂. semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) → Φ k)
+         (λn₂. semI[fst (complete-inductor NatDesc) n₂, n. Φ n] → Φ k)
          (project Φ k))
     (λn₁ ih n₂ eq.
        equal-to-leibniz (succ (succ (add n₁ k))) n₂ eq
-        (λn₂. semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) → Φ k)
+        (λn₂. semI[fst (complete-inductor NatDesc) n₂, n. Φ n] → Φ k)
         (λφ. ih (succ (add n₁ k)) (equalNat-refl (succ (add n₁ k))) (stepDown Φ (succ (add n₁ k)) φ)));
 
 switch :
@@ -1043,7 +1029,7 @@ descend-gcd :
   (Φ : Nat → Set) →
   (k n₁ n₂ : Nat) →
   equalNat (succ (add (succ n₁) k)) n₂ →
-  semI Nat (fst (complete-inductor NatDesc) n₂) (λn. Φ n) →
+  semI[fst (complete-inductor NatDesc) n₂, n. Φ n] →
   Φ (succ k);
 descend-gcd Φ k n₁ n₂ eq =
   descend Φ (succ k) n₁ n₂
@@ -1076,14 +1062,14 @@ gcd : Nat → Nat → Nat;
 gcd n₁ n₂ =
   snd GCD-inductor (λp. Nat)
     (caseNatPair
-       (λn₁ n₂. semI (Nat × Nat) (fst GCD-inductor «n₁,n₂») (λn. Nat) → Nat)
+       (λn₁ n₂. semI[fst GCD-inductor «n₁,n₂», n. Nat] → Nat)
        (λφ. zero)
        (λn φ. n)
        (λn φ. n)
        (λn₁ n₂ φ.
-          case compare (succ n₁) (succ n₂) for x. Nat with
+          case compare (succ n₁) (succ n₂) with
             { inl e. succ n₁
-            ; inr s. case s for x. Nat with
+            ; inr s. case s with
                { inl lt. descend-gcd (λn. Nat) (fst lt) n₁ (succ n₂) (snd lt)
                          (commute2 Nat (Nat × Nat)
                                    (fst (complete-inductor NatDesc) (succ n₂))

@@ -139,6 +139,7 @@ data TermCon tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
     | IDesc_Elim
+    | SemI       tm Ident tm
     | MuI        tm tm
     | InductionI
 

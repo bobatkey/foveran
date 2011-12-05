@@ -1,15 +1,5 @@
 – fin, using explicit equalities
 
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Nat : Set :=
   | zero :
   | succ : Nat
@@ -53,7 +43,7 @@ finElim :
 finElim Φ φz φs =
   inductionI Nat finDesc Φ
     (λn x.
-      case fst x for b. (z : semI Nat (body n b) (λn. fin n)) →
+      case fst x for b. (z : semI[body n b, n. fin n]) →
                         liftI Nat (body n b) (λn. fin n) Φ z →
                         Φ n (construct «b,z») with
         { inl u. λx u.
@@ -89,8 +79,8 @@ elim-finzero :
   Φ i;
 elim-finzero Φ i =
   finElim (λn i. (i' : fin zero) → n ≡ zero → i ≡ i' → Φ i')
-    (λn i' eq₁ eq₂. elimEmpty (Φ i') (succ≢zero n eq₁))
-    (λn x φ i' eq₁ eq₂. elimEmpty (Φ i') (succ≢zero n eq₁))
+    (λn i' eq₁ eq₂. elimEmpty (succ≢zero n eq₁))
+    (λn x φ i' eq₁ eq₂. elimEmpty (succ≢zero n eq₁))
     zero
     i
     i

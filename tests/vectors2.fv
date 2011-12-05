@@ -1,13 +1,3 @@
-– FIXME: make this not Set 2 (need to fix Value.hs too)
-semI : (I : Set) → IDesc I → (I → Set 2) → Set 2;
-semI I D X = elimID I (λD. Set 2)
-                    (λi. X i)
-                    (λA. A)
-                    (λD₁ D₂ semD₁ semD₂. semD₁ × semD₂)
-                    (λA D semD. (a : A) × semD a)
-                    (λA D semD. (a : A) → semD a)
-                    D;
-
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Nat : Set :=
   | zero :
@@ -20,17 +10,18 @@ natInduction : (Φ : Nat → Set 2) →
                (n : Nat) → Φ n;
 natInduction Φ φ0 φS =
   induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
+            (\x. case x {-for x. lift NatDesc Nat Φ x → Φ (construct x)-} with
                     { inl u. \u'. φ0
                     ; inr n. \φn. φS n φn
                     });
 
 natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
-natCase A a f = induction NatDesc A
-                          (λx p. case x for x. A (construct x) with
-                                    { inl u. a
-                                    ; inr n. f n
-                                    });
+natCase A a f =
+  induction NatDesc A
+    (λx p. case x with
+      { inl u. a
+      ; inr n. f n
+      });
 
 one : Nat;
 one = succ zero;
@@ -63,7 +54,7 @@ which either ends in vec params index-value, or something else
 
 body : Set → Nat → Bool → IDesc Nat;
 body α n b =
-  case b for b. IDesc Nat with
+  case b with
     { inl u. “K” (zero ≡ n)
     ; inr u. “Σ” Nat (λn'. “Σ” α (λa. “IId” n' “×” “K” (succ n' ≡ n)))
     };
@@ -92,7 +83,7 @@ vecElim :
 vecElim α Φ φnil φcons =
   inductionI Nat (vecDesc α) Φ
     (λn x.
-      case fst x for b. (z : semI Nat (body α n b) (λn. vec α n)) →
+      case fst x for b. (z : semI[body α n b, n. vec α n]) →
                         liftI Nat (body α n b) (λn. vec α n) Φ z →
                         Φ n (construct «b,z») with
         { inl _. λz _. rewriteBy z for n p. Φ n (construct «inl (), p») then φnil

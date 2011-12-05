@@ -75,6 +75,7 @@ data TermCon tm
     | IDesc_Pi   tm tm
     | IDesc_Elim
     | MuI        tm tm
+    | SemI       tm tm Ident tm
     | InductionI
 
     | Hole       Ident [tm]
@@ -135,6 +136,7 @@ traverseSyn (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
 traverseSyn (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
 traverseSyn (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 traverseSyn IDesc_Elim       = pure IDesc_Elim
+traverseSyn (SemI tI tD x tA)= SemI <$> tI <*> tD <*> pure x <*> binder tA
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
@@ -202,7 +204,7 @@ toDisplay (Case t1 _ _ x t2 y t3 z t4)
     = bindK x t2 $ \x t2 ->
       bindK y t3 $ \y t3 ->
       bindK z t4 $ \z t4 -> DS.Case <$> t1
-                                    <*> pure x <*> pure t2
+                                    <*> (Just <$> ((,) <$> pure x <*> pure t2))
                                     <*> pure (DS.PatVar y) <*> pure t3
                                     <*> pure (DS.PatVar z) <*> pure t4
 toDisplay Unit                    = pure DS.Unit
@@ -234,6 +236,7 @@ toDisplay (IDesc_Pair t1 t2)      = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
+toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure x <*> pure tA
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
 toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
@@ -314,6 +317,7 @@ instance Eq Term where
   In (IDesc_Sg t1 t2)   == In (IDesc_Sg t1' t2')   = t1 == t1' && t2 == t2'
   In (IDesc_Pi t1 t2)   == In (IDesc_Pi t1' t2')   = t1 == t1' && t2 == t2'
   In IDesc_Elim == In IDesc_Elim     = True
+  In (SemI tI tD _ tA) == In (SemI tI' tD' _ tA') = tI == tI' && tD == tD' && tA == tA'
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
   In InductionI  == In InductionI    = True
   In (Hole nm tms)   == In (Hole nm' tms')    = nm == nm' && tms == tms'
