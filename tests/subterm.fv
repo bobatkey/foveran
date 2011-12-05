@@ -62,7 +62,7 @@ leqInduction P φzero φsucc n₁ n₂ =
   inductionI (Nat × Nat) LeqDesc
     (λp x. P (fst p) (snd p) x)
     (λp x. case fst x for b. (z : semI[body p b, p. Leq (fst p) (snd p)]) →
-                             liftI (Nat × Nat) (body p b) (λp. Leq (fst p) (snd p)) (λp x. P (fst p) (snd p) x) z →
+                             liftI[body p b, p. Leq (fst p) (snd p), p x. P (fst p) (snd p) x, z] →
                              P (fst p) (snd p) (construct «b, z») with
              { inl u. λz u.
                  elimEq z

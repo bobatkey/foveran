@@ -44,7 +44,7 @@ finElim Φ φz φs =
   inductionI Nat finDesc Φ
     (λn x.
       case fst x for b. (z : semI[body n b, n. fin n]) →
-                        liftI Nat (body n b) (λn. fin n) Φ z →
+                        liftI[body n b, n. fin n, n f. Φ n f, z] →
                         Φ n (construct «b,z») with
         { inl u. λx u.
             elimEq snd x for n' p. Φ n' (construct «inl (), fst x, p»)

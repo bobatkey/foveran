@@ -62,6 +62,7 @@ data TermCon tm
   | IDesc_Pi   tm tm
   | IDesc_Elim
   | SemI       tm Ident tm
+  | LiftI      tm Ident tm Ident Ident tm tm
   | MuI        tm tm
   | InductionI
 
@@ -168,7 +169,13 @@ toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (return $ t bv)
 toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (return $ t1 bv) (return $ t2 bv)
 toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (return $ t1 bv) (return $ t2 bv)
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
-toLN (DS.SemI tD x tA)    bv = Layer $ SemI (return $ tD bv) x (return $ tA (DS.PatVar x:bv))
+toLN (DS.SemI tD x tA)    bv =
+    Layer $ SemI (return $ tD bv) (identOfPattern x) (return $ tA (x:bv))
+toLN (DS.LiftI tD i tA i' a tP tx) bv =
+    Layer $ LiftI (return $ tD bv)
+                  (identOfPattern i) (return $ tA (i:bv))
+                  (identOfPattern i') (identOfPattern a) (return $ tP (a:i':bv))
+                  (return $ tx bv)
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
@@ -236,6 +243,8 @@ close' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (SemI tD x tA)   = SemI <$> tD <*> pure x <*> binder tA
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
+close' fnm (LiftI tD i tA i' a tP tx) =
+    LiftI <$> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 close' fnm InductionI       = pure InductionI
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms

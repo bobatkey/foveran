@@ -12,14 +12,12 @@ import Language.Foveran.Typing.DataDecl (checkDatatype)
 import Language.Foveran.Typing.IDataDecl (processIDataDecl)
 import Language.Foveran.Typing.Definition (processDefinition)
 import Language.Foveran.Typing.Conversion.Value ( vliftTy, vlift
-                                                , vliftITy, vliftI
                                                 )
 
 checkDeclarations :: [Declaration] -> IO ()
 checkDeclarations decls =
     runDeclCheck $ do
       extend undefined "lift" vliftTy (Just vlift)
-      extend undefined "liftI" vliftITy (Just vliftI)
       mapM_ checkDecl decls
 
 checkDecl :: Declaration -> DeclCheckM ()

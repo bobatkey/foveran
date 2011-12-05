@@ -76,6 +76,7 @@ data TermCon tm
     | IDesc_Elim
     | MuI        tm tm
     | SemI       tm tm Ident tm
+    | LiftI      tm tm Ident tm Ident Ident tm tm
     | InductionI
 
     | Hole       Ident [tm]
@@ -137,6 +138,8 @@ traverseSyn (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
 traverseSyn (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 traverseSyn IDesc_Elim       = pure IDesc_Elim
 traverseSyn (SemI tI tD x tA)= SemI <$> tI <*> tD <*> pure x <*> binder tA
+traverseSyn (LiftI tI tD i tA i' a tP tx) =
+    LiftI <$> tI <*> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
@@ -236,7 +239,11 @@ toDisplay (IDesc_Pair t1 t2)      = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
-toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure x <*> pure tA
+toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure (DS.PatVar x) <*> pure tA
+toDisplay (LiftI _ tD x tA i a tP tx) =
+    do (x', tA') <- bind x tA
+       (i', (a', tP')) <- bind i (bind a tP)
+       DS.LiftI <$> tD <*> pure (DS.PatVar x') <*> pure tA' <*> pure (DS.PatVar i') <*> pure (DS.PatVar a') <*> pure tP' <*> tx
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
 toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
@@ -319,6 +326,8 @@ instance Eq Term where
   In IDesc_Elim == In IDesc_Elim     = True
   In (SemI tI tD _ tA) == In (SemI tI' tD' _ tA') = tI == tI' && tD == tD' && tA == tA'
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
+  In (LiftI tI tD i tA i2 a tP tx) == In (LiftI tI' tD' i' tA' i2' a' tP' tx') =
+      tI == tI' && tD == tD' && tP == tP' && tx == tx'
   In InductionI  == In InductionI    = True
   In (Hole nm tms)   == In (Hole nm' tms')    = nm == nm' && tms == tms'
   

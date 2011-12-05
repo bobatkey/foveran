@@ -47,7 +47,7 @@ VecInduction :
   (n : Nat) → (v : Vec n) → Φ n v;
 VecInduction Φ φnil φcons =
   inductionI Nat VecDesc Φ
-    (natCase (λn. (x : semI[VecDesc n, i. Vec i]) → liftI Nat (VecDesc n) Vec Φ x → Φ n (construct x))
+    (natCase (λn. (x : semI[VecDesc n, i. Vec i]) → liftI[VecDesc n, n. Vec n, n v. Φ n v, x] → Φ n (construct x))
        (λx φ. φnil)
        (λn x φ. φcons n (fst x) (snd x) φ));
 

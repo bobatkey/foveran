@@ -129,6 +129,8 @@ eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 videsc_elim i p pId pK pPair pSg pPi d)
 eval (MuI t1 t2)        = vmuI <$> t1 <*> t2
 eval (SemI tI tD i tA)  = vsemI <$> tI <*> tD <*> pure i <*> binder tA
+eval (LiftI tI tD x tA i a tP tx) =
+    vliftI <$> tI <*> tD <*> pure x <*> binder tA <*> pure i <*> pure a <*> binder (binder tP) <*> tx
 eval InductionI         = pure (VLam "I" $ \vI ->
                                 VLam "D" $ \vD ->
                                 VLam "P" $ \vP ->

@@ -47,11 +47,11 @@ finElim :
   (n : Nat) → (x : fin n) → Φ n x;
 finElim Φ φz φs =
   inductionI Nat finDesc Φ
-    (natCase (λn. (x : semI[finDesc n, n. fin n]) → liftI Nat (finDesc n) (λn. fin n) Φ x → Φ n (construct x))
+    (natCase (λn. (x : semI[finDesc n, n. fin n]) → liftI[finDesc n, n. fin n, n f. Φ n f, x] → Φ n (construct x))
       (λx φ. elimEmpty x)
       (λn x. case fst x
                 for y. (z : semI[case y for y. IDesc Nat with { inl u. “K” Unit; inr u. “IId” n }, n. fin n]) →
-                       liftI Nat (case y for y. IDesc Nat with { inl u. “K” Unit; inr u. “IId” n }) (λn. fin n) Φ z →
+                       liftI[case y for y. IDesc Nat with { inl u. “K” Unit; inr u. “IId” n }, n. fin n, n f. Φ n f, z] →
                        Φ (succ n) (construct «y,z»)
                 with { inl u. λu u. φz n
                      ; inr u. λz p. φs n z p

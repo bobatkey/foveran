@@ -24,7 +24,6 @@ module Language.Foveran.Typing.Conversion.Value
     , vliftTy
     , vlift
     , vinduction
-    , vliftITy
     , vliftI
     , vmuI
     , vinductionI
@@ -331,46 +330,30 @@ vinduction vF vP vK = loop
       loop v = error ("internal: vinduction stuck on " ++ show v)
 
 {------------------------------------------------------------------------------}
-vliftITy :: Value
-vliftITy = forall "I" (VSet 0) $ \vI ->
-           forall "D" (VIDesc vI) $ \vD ->
-           forall "A" (vI .->. VSet 0) $ \vA ->
-           forall "P" (forall "i" vI $ \vi -> vA $$ vi .->. VSet 2) $ \_ ->
-           vsemI vI vD "i" (vA $$) .->.
-           VSet 2
-
-vliftI :: Value
-vliftI = VLam "I" $ \vI ->
-         VLam "D" $ \vD ->
-         VLam "A" $ \vA ->
-         VLam "P" $ \vP ->
-         VLam "x" $ \vx ->
-         videsc_elim vI (VLam "D" $ \vD ->
-                         vsemI vI vD "i" (vA $$) .->.
-                         VSet 2)
-           (VLam "i" $ \vi ->
-            VLam "a" $ \va ->
-            vP $$ vi $$ va)
-           (VLam "A'" $ \vA' ->
-            VLam "a" $ \va ->
-            VUnit)
-           (VLam "D1" $ \vD1 ->
-            VLam "D2" $ \vD2 ->
-            VLam "lift1" $ \lift1 ->
-            VLam "lift2" $ \lift2 ->
-            VLam "p" $ \p ->
-            (lift1 $$ vfst p) .*. (lift2 $$ vsnd p))
-           (VLam "B" $ \vB ->
-            VLam "D" $ \vD ->
-            VLam "liftD" $ \vliftD ->
-            VLam "p" $ \vp ->
-            vliftD $$ vfst vp $$ vsnd vp)
-           (VLam "B" $ \vB ->
-            VLam "D" $ \vD ->
-            VLam "liftD" $ \vliftD ->
-            VLam "f" $ \f ->
-            forall "b" vB $ \vb -> vliftD $$ vb $$ (f $$ vb))
-           vD $$ vx
+vliftI :: Value   -- ^ index type
+       -> Value   -- ^ description
+       -> Ident -> (Value -> Value)
+       -> Ident -> Ident -> (Value -> Value -> Value)
+       -> Value
+       -> Value
+vliftI vI vD x vA i a vP vx = loop vD vx
+    where
+      loop (VIDesc_Id i)       vx = vP i vx
+      loop (VIDesc_K vB)       vx = VUnit
+      loop (VIDesc_Pair d1 d2) vx = loop d1 (vfst vx) .*. loop d2 (vsnd vx)
+      loop (VIDesc_Sg vB d)    vx = loop (d $$ vfst vx) (vsnd vx)
+      loop (VIDesc_Pi vB d)    vx = forall "b" vB $ \vb -> loop (d $$ vb) (vx $$ vb)
+      loop (VNeutral tmD)      vx =
+          VNeutral (In <$> (LiftI <$> reifyType vI
+                                  <*> tmD
+                                  <*> pure x
+                                  <*> tmBound (\tmx -> let v = reflect vI tmx in reifyType (vA v))
+                                  <*> pure i
+                                  <*> pure a
+                                  <*> tmBound (\tmi -> let vi = reflect vI tmi in
+                                                       tmBound (\tma -> let va = reflect (vA vi) tma in
+                                                                        reifyType (vP vi va)))
+                                  <*> reify (vsemI vI (VNeutral tmD) x vA) vx))
 
 vallI :: Value
 vallI = VLam "I" $ \vI ->
@@ -381,7 +364,7 @@ vallI = VLam "I" $ \vI ->
         VLam "xs" $ \xs ->
         videsc_elim vI (VLam "D" $ \vD ->
                         forall "xs" (vsemI vI vD "i" (vA $$)) $ \xs ->
-                        vliftI $$ vI $$ vD $$ vA $$ vP $$ xs)
+                        vliftI vI vD "i" (vA $$) "i" "a" (\i a -> vP $$ i $$ a) xs)
           (VLam "x" $ \x ->
            VLam "xs" $ \xs ->
            vp $$ x $$ xs)
@@ -418,7 +401,7 @@ vinductionI vI vD vP vk = loop
                    `tmApp` reify (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) vP
                    `tmApp` reify (forall "i" vI $ \i ->
                                   forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
-                                  (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
+                                  (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
                                   vP $$ i $$ VConstruct x) vk
                    `tmApp` reify vI vi
                    `tmApp` n)

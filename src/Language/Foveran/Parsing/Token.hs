@@ -69,6 +69,7 @@ data Token
     | Quote_Pi
     | IDesc_Elim
     | SemI
+    | LiftI
     | MuI
     | InductionI
 
@@ -136,6 +137,7 @@ instance SyntaxHighlight Token where
     lexicalClass Quote_Pi    = Constructor
     lexicalClass IDesc_Elim  = Keyword
     lexicalClass SemI        = Keyword
+    lexicalClass LiftI       = Keyword
     lexicalClass MuI         = Type
     lexicalClass InductionI  = Keyword
     lexicalClass Eq          = Operator
@@ -207,6 +209,7 @@ instance Show Token where
   show IDesc_Elim  = "elimID"
   show Sem         = "sem"
   show SemI        = "semI"
+  show LiftI       = "liftI"
   show MuI         = "µI"
   show InductionI  = "inductionI"
   show Eq          = "≡"

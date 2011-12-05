@@ -88,7 +88,12 @@ pprint (IDesc_Id t)        = paren 01 ("“IId”" <+> down t)
 pprint (IDesc_Sg t1 t2)    = paren 01 ("“Σ”" <+> (down t1 $$ down t2))
 pprint (IDesc_Pi t1 t2)    = paren 01 ("“Π”" <+> down t1 <+> down t2)
 pprint IDesc_Elim          = "elimID"
-pprint (SemI tD i tA)      = "semI[" <> resetPrec tD <> "," <+> ppIdent i <> "." <+> resetPrec tA <> "]"
+pprint (SemI tD i tA)      = "semI[" <> resetPrec tD <> "," <+> ppPattern i <> "." <+> resetPrec tA <> "]"
+pprint (LiftI tD x tA i a tP tx) =
+    resetPrec ("liftI[" <> tD <+>
+                    "," <+> ppPattern x <> "." <+> tA <+>
+                    "," <+> ppPattern i <+> ppPattern a <> "." <+> tP <+>
+                    "," <+> tx <> "]")
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
 pprint InductionI          = "inductionI"
 

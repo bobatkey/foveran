@@ -70,6 +70,12 @@ evalWith :: DefinitionContext ctxt =>
 evalWith term arguments =
     evalInWith <$> pure term <*> getFullContext <*> getCurrentHoles <*> pure arguments
 
+evalA :: DefinitionContext ctxt =>
+         CS.Term
+      -> TypingMonad ctxt ([Value] -> Value)
+evalA term =
+    evalInWith <$> pure term <*> getFullContext <*> getCurrentHoles
+
 eval :: DefinitionContext ctxt =>
         CS.Term
      -> TypingMonad ctxt Value
@@ -163,6 +169,21 @@ isType (Annot p (SemI tD x tA)) = do
       return (In $ CS.SemI tmI tmD x tmA)
     v ->
       raiseError p (ExpectingIDescForSemI v)
+isType (Annot p (LiftI tD x tA i a tP tx)) = do
+  (tyD, tmD) <- synthesiseTypeFor tD
+  case tyD of
+    VIDesc vI -> do
+      tmA <- bindVar x vI tA $ \x tA -> isType tA
+      vA  <- evalA tmA
+      tmP <- bindVar' 1 i vI tP $ \vi tP -> do
+               bindVar a (vA [vi]) tP $ \va tP -> do
+                 isType tP
+      vD <- eval tmD
+      tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
+      let tmI = reifyType0 vI
+      return (In $ CS.LiftI tmI tmD x tmA i a tmP tmx)
+    v ->
+        raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
 isType (Annot p UserHole) = do
   generateHole p Nothing Nothing
 isType term@(Annot p _) = do
@@ -227,7 +248,24 @@ hasType (Annot p (SemI tD x tA)) (VSet l) = do
     v ->
       raiseError p (ExpectingIDescForSemI v)
 
--- FIXME: all the error cases too.
+hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
+  (tyD, tmD) <- synthesiseTypeFor tD
+  case tyD of
+    VIDesc vI -> do
+      tmA <- bindVar x vI tA $ \x tA -> hasType tA (VSet l)
+      vA  <- evalA tmA
+      tmP <- bindVar' 1 i vI tP $ \vi tP -> do
+               bindVar a (vA [vi]) tP $ \va tP -> do
+                 hasType tP (VSet l)
+      vD <- eval tmD
+      tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
+      let tmI = reifyType0 vI
+      return (In $ CS.LiftI tmI tmD x tmA i a tmP tmx)
+    v ->
+        raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
+
+-- FIXME: all the error cases for Set too.
+
 {------------------------------}
 hasType (Annot p (Lam x tm)) (VPi _ tA tB) = do
   tm' <- bindVar x tA tm $ \x tm -> tm `hasType` (tB x)
@@ -583,7 +621,7 @@ synthesiseTypeFor (Annot p InductionI) = do
            forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
            forall "k" (forall "i" vI $ \i ->
                        forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
-                       (vliftI $$ vI $$ (vD $$ i) $$ vmuI vI vD $$ vP $$ x) .->.
+                       (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
                        (vP $$ i $$ VConstruct x)) $ \k ->
            forall "i" vI $ \i ->
            forall "x" (vmuI vI vD $$ i) $ \x ->

@@ -71,6 +71,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "then" :==>            emit Then
     , "absurdBy" :==>        emit AbsurdBy
     , "semI" :==>            emit SemI
+    , "liftI" :==>           emit LiftI
     , "[" :==>               emit LSqBracket
     , "]" :==>               emit RSqBracket
     , "?" :==>               emit Hole

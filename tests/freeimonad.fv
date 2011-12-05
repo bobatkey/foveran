@@ -90,10 +90,10 @@ dropI : (I : Set) ->
         (D : IDesc I) ->
         (A B : I -> Set) ->
         (x : semI[D, i. A i]) ->
-        liftI I D (λi. A i) (λi x. B i) x ->
+        liftI[D, i. A i, i x. B i, x] ->
         semI[D, i. B i]
 dropI I D A B =
-  elimID I (λD'. (x : semI[D', i. A i]) -> liftI I D' (λi. A i) (λi x. B i) x -> semI[D', i. B i])
+  elimID I (λD'. (x : semI[D', i. A i]) -> liftI[D', i. A i, i x. B i, x] -> semI[D', i. B i])
          (λi a b. b)
          (λA a _. a)
          (λF G f g «x,y» «p,q». «f x p, g y q»)
@@ -119,7 +119,7 @@ bind I D A B f =
   inductionI I (DescFM I D A) (λi _. FreeMonad I D B i)
     (λi «b, x».
       case b for b. (z : semI[case b for b. IDesc I with { inl _. “K” (A i); inr _. D i }, i. FreeMonad I D A i]) ->
-                    liftI I (case b with { inl _. “K” (A i); inr _. D i }) (λi. FreeMonad I D A i) (λi _. FreeMonad I D B i) z ->
+                    liftI[case b for b. IDesc I with { inl _. “K” (A i); inr _. D i }, i. FreeMonad I D A i, i _. FreeMonad I D B i, z] ->
                     FreeMonad I D B i with
         { inl _. λa _. f i a
         ; inr _. λd p. construct «inr (), dropI I (D i) (µI I (DescFM I D A)) (λi. FreeMonad I D B i) d p»
@@ -142,7 +142,6 @@ free monads, and that use the two built-in combinators.
 Other things that should be built-in:
  - monad laws for the descriptions
  - knowledge that semI is a monad morphism (needs semI to be built in)
- - built-in liftI (possibly)
 
 -}
 

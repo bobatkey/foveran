@@ -84,7 +84,7 @@ vecElim α Φ φnil φcons =
   inductionI Nat (vecDesc α) Φ
     (λn x.
       case fst x for b. (z : semI[body α n b, n. vec α n]) →
-                        liftI Nat (body α n b) (λn. vec α n) Φ z →
+                        liftI[body α n b, n. vec α n, n v. Φ n v, z] →
                         Φ n (construct «b,z») with
         { inl _. λz _. rewriteBy z for n p. Φ n (construct «inl (), p») then φnil
         ; inr _. λz φ. rewriteBy snd (snd (snd z)) for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p») then

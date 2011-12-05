@@ -10,7 +10,7 @@ elimtype :
 elimtype I C body P =
   λi c.
     (z : semI[body i c, i. µI I (λi. “Σ” C (body i)) i]) ->
-    liftI I (body i c) (λi. µI I (λi. “Σ” C (body i)) i) P z ->
+    liftI[body i c, i. µI I (λi. “Σ” C (body i)) i, i x. P i x, z] ->
     P i (construct «c,z»)
 
 --------------------------------------------------------------------------------
@@ -145,12 +145,12 @@ drop : (I : Set) →
        (A : I → Set) →
        (i : I) →
        (x : semI[D i, i. µI I D i]) →
-       liftI I (D i) (λi. µI I D i) (λi x. A i) x →
+       liftI[D i, i. µI I D i, i x. A i, x] →
        semI[D i, i. A i]
 drop I D A i =
   elimID I
     (λD'. (x : semI[D', i. µI I D i]) →
-          liftI I D' (λi. µI I D i) (λi x. A i) x →
+          liftI[D', i. µI I D i, i x. A i, x] →
           semI[D', i. A i])
     (λi x a. a)
     (λX x u. x)
