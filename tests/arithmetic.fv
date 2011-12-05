@@ -41,22 +41,22 @@ equal-symm : (n₁ n₂ : Nat) → equal n₁ n₂ → equal n₂ n₁;
 equal-symm = natInduction (λn₁. (n₂ : Nat) → equal n₁ n₂ → equal n₂ n₁)
                           (natCase (λn₂. equal zero n₂ → equal n₂ zero)
                                    (λeq. ⋄)
-                                   (λn₂ eq. elimEmpty (equal (succ n₂) zero) eq))
+                                   (λn₂ eq. elimEmpty eq))
                           (λn₁ ih.
                              natCase (λn₂. equal (succ n₁) n₂ → equal n₂ (succ n₁))
-                                     (λeq. elimEmpty (equal zero (succ n₁)) eq)
+                                     (λeq. elimEmpty eq)
                                      ih);
 
 equal-trans : (n₁ n₂ n₃ : Nat) → equal n₁ n₂ → equal n₂ n₃ → equal n₁ n₃;
 equal-trans = natInduction (λn₁. (n₂ n₃ : Nat) → equal n₁ n₂ → equal n₂ n₃ → equal n₁ n₃)
                            (natCase (λn₂. (n₃ : Nat) → equal zero n₂ → equal n₂ n₃ → equal zero n₃)
                                     (λn₃ eq₁ eq₂. eq₂)
-                                    (λn₂ n₃ eq₁ eq₂. elimEmpty (equal zero n₃) eq₁))
+                                    (λn₂ n₃ eq₁ eq₂. elimEmpty eq₁))
                            (λn₁ ih.
                               natCase (λn₂. (n₃ : Nat) → equal (succ n₁) n₂ → equal n₂ n₃ → equal (succ n₁) n₃)
-                                      (λn₃ eq₁ eq₂. elimEmpty (equal (succ n₁) n₃) eq₁)
+                                      (λn₃ eq₁ eq₂. elimEmpty eq₁)
                                       (λn₂. natCase (λn₃. equal (succ n₁) (succ n₂) → equal (succ n₂) n₃ → equal (succ n₁) n₃)
-                                                     (λeq₁ eq₂. elimEmpty (equal (succ n₁) zero) eq₂)
+                                                     (λeq₁ eq₂. elimEmpty eq₂)
                                                      (λn₃ eq₁ eq₂. ih n₂ n₃ eq₁ eq₂)));
 
 add-zero : (n : Nat) → equal (add n zero) n;
