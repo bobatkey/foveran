@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TypeSynonymInstances, OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor, TypeSynonymInstances, OverloadedStrings, TupleSections #-}
 
 module Language.Foveran.Syntax.LocallyNameless
     ( TermPos
@@ -10,7 +10,7 @@ module Language.Foveran.Syntax.LocallyNameless
     where
 
 import           Data.List (elemIndex)
-import           Data.Traversable (sequenceA)
+import           Data.Traversable (sequenceA, traverse)
 import           Control.Applicative
 import           Data.Rec
 import           Text.Position (Span)
@@ -35,7 +35,7 @@ data TermCon tm
   | Sum   tm tm
   | Inl   tm
   | Inr   tm
-  | Case  tm Ident tm Ident tm Ident tm
+  | Case  tm (Maybe (Ident, tm)) Ident tm Ident tm
   | Unit
   | UnitI
   | Empty
@@ -124,10 +124,16 @@ toLN (DS.Proj2 t)         bv = Layer $ Proj2 (return $ t bv)
 toLN (DS.Sum t1 t2)       bv = Layer $ Sum (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Inl t)           bv = Layer $ Inl (return $ t bv)
 toLN (DS.Inr t)           bv = Layer $ Inr (return $ t bv)
-toLN (DS.Case t1 x t2 y t3 z t4) bv =
+toLN (DS.Case t1 Nothing y t3 z t4) bv =
     Layer $ Case (return $ t1 bv)
-                 x
-                 (return $ t2 (DS.PatVar x:bv))
+                 Nothing
+                 (identOfPattern y)
+                 (return $ t3 (y:bv))
+                 (identOfPattern z)
+                 (return $ t4 (z:bv))
+toLN (DS.Case t1 (Just (x, t2)) y t3 z t4) bv =
+    Layer $ Case (return $ t1 bv)
+                 (Just (x, return $ t2 (DS.PatVar x:bv)))
                  (identOfPattern y)
                  (return $ t3 (y:bv))
                  (identOfPattern z)
@@ -195,10 +201,11 @@ close' fnm (Proj2 t)        = Proj2 <$> t
 close' fnm (Sum t1 t2)      = Sum <$> t1 <*> t2
 close' fnm (Inl t)          = Inl <$> t
 close' fnm (Inr t)          = Inr <$> t
-close' fnm (Case t1 x t2 y t3 z t4) = Case <$> t1
-                                           <*> pure x <*> binder t2
-                                           <*> pure y <*> binder t3
-                                           <*> pure z <*> binder t4
+close' fnm (Case t1 tP y t3 z t4) =
+    Case <$> t1
+         <*> traverse (\(x,tP) -> (x,) <$> binder tP) tP
+         <*> pure y <*> binder t3
+         <*> pure z <*> binder t4
 close' fnm Unit             = pure Unit
 close' fnm UnitI            = pure UnitI
 close' fnm Empty            = pure Empty

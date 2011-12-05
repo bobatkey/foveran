@@ -363,7 +363,7 @@ hasType (Annot p (ElimEq t Nothing tp)) tP =
                 let tmP  = reifyType0 tP
                     tmPg = CS.generalise [eq,tb] tmP
                 vP'  <- tmPg `evalWith` [VRefl, va]
-                tm_p <- hasType tp vP'
+                tm_p <- tp `hasType` vP'
                 return (In $ CS.ElimEq tA ta tb tm "a" "eq" tmPg tm_p)
          ty ->
              raiseError p (ExpectingEqualityType ty)
@@ -373,6 +373,25 @@ hasType (Annot p (ElimEmpty t1 Nothing)) v =
     do tm1     <- hasType t1 VEmpty
        let tm2 = reifyType0 v
        return (In $ CS.ElimEmpty tm1 tm2)
+
+hasType (Annot p (Case t Nothing y tL z tR)) tP = do
+  (tS,tmS) <- synthesiseTypeFor t
+  case tS of
+    VSum tA tB ->
+        do tmS' <- reify tS <$> eval tmS <*> pure 0
+           let tmP = CS.generalise [tmS'] $ reifyType0 tP
+           tmL <- bindVar y tA tL $ \y tL -> do
+                    vP <- tmP `evalWith` [VInl y]
+                    tL `hasType` vP
+           tmR <- bindVar z tB tR $ \z tR -> do
+                    vP <- tmP `evalWith` [VInr z]
+                    tR `hasType` vP
+           let tmA = reifyType0 tA
+               tmB = reifyType0 tB
+           return (In $ CS.Case tmS tmA tmB "x" tmP y tmL z tmR)
+    v ->
+        do raiseError p (CaseOnNonSum v)
+
 
 {------------------------------}
 {- Fall through case -}
@@ -406,7 +425,7 @@ synthesiseTypeFor (Annot p (App t t')) = do
                       return (tB vtm', In $ CS.App tm tm')
     ty          -> do raiseError p (ApplicationOfNonFunction ty)
 
-synthesiseTypeFor (Annot p (Case t x tP y tL z tR)) = do
+synthesiseTypeFor (Annot p (Case t (Just (x, tP)) y tL z tR)) = do
   (tS,tmS) <- synthesiseTypeFor t
   case tS of
     VSum tA tB ->

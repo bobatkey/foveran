@@ -111,7 +111,7 @@ data TermCon tm
     | Sum   tm tm
     | Inl   tm
     | Inr   tm
-    | Case  tm Ident tm Pattern tm Pattern tm
+    | Case  tm (Maybe (Ident, tm)) Pattern tm Pattern tm
     | Unit
     | UnitI
     | Empty

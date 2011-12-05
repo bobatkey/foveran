@@ -222,7 +222,7 @@ codeBody d bv idxVar []       =
 codeBody d bv idxVar [constr] =
     consCode d constr bv idxVar
 codeBody d bv idxVar (constr:constrs) =
-    p @| LN.Case discrimVar "x" resultType "a" thisCase "b" otherCases
+    p @| LN.Case discrimVar (Just ("x", resultType)) "a" thisCase "b" otherCases
     where
       p          = dataPos d
 

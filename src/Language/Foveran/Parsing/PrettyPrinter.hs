@@ -51,8 +51,8 @@ pprint (Tuple tms)       = "«" <> (sep $ punctuate "," $ map resetPrec tms) <> 
 pprint (Sum t1 t2)             = paren 09 (down t1 <+> "+" <+> t2)
 pprint (Inl t)                 = paren 01 ("inl" <+> down t)
 pprint (Inr t)                 = paren 01 ("inr" <+> down t)
-pprint (Case t x tP y tL z tR) =
-    ("case" <+> t <+> "for" <+> ppIdent x <> "." <+> resetPrec tP <+> "with")
+pprint (Case t tP y tL z tR) =
+    ("case" <+> t <+> (maybe "" (\(x,tP) -> "for" <+> ppIdent x <> "." <+> resetPrec tP) tP) <+> "with")
     $$
     nest 2 (("{" <+> hang ("inl" <+> ppPattern y <> ".") 3 (resetPrec tL))
             $$

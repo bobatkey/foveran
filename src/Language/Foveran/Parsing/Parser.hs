@@ -268,13 +268,14 @@ term00 =
       <*> token Tok.RDoubleAngle
     <|>
     delimited <$> token Tok.Case
-              <* commit
+              <*  commit
               <*> (Case <$> term10
-                        <* token Tok.For <*> identifier <* token Tok.FullStop <*> term10 <* token Tok.With
-                        <* token Tok.LBrace
-                        <* token Tok.Inl <*> pattern <* token Tok.FullStop <*> term10
-                        <* token Tok.Semicolon
-                        <* token Tok.Inr <*> pattern <* token Tok.FullStop <*> term10)
+                        <*> optional ((,) <$ token Tok.For <*> identifier <* token Tok.FullStop <*> term10)
+                        <*  token Tok.With
+                        <*  token Tok.LBrace
+                        <*  token Tok.Inl <*> pattern <* token Tok.FullStop <*> term10
+                        <*  token Tok.Semicolon
+                        <*  token Tok.Inr <*> pattern <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
