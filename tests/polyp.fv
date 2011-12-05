@@ -1,0 +1,210 @@
+-- the generic elimination type for datatypes constructed by the 'data' declaration
+elimtype :
+  (I    : Set) ->
+  (C    : Set) ->
+  (body : I -> C -> IDesc I) ->
+  (P    : (i : I) -> µI I (λi. “Σ” C (body i)) i -> Set 2) ->
+  (i    : I) ->
+  (c    : C) ->
+  Set 2
+elimtype I C body P =
+  λi c.
+    (z : semI[body i c, i. µI I (λi. “Σ” C (body i)) i]) ->
+    liftI I (body i c) (λi. µI I (λi. “Σ” C (body i)) i) P z ->
+    P i (construct «c,z»)
+
+--------------------------------------------------------------------------------
+data Code : Set where
+  param : Code
+  rec   : Code
+  pair  : Code -> Code -> Code
+  sum   : Code -> Code -> Code
+  unit  : Code
+
+– These should all be generated automatically
+param : Code
+param = construct «inl (), refl»
+
+rec : Code
+rec = construct «inr (inl ()), refl»
+
+pair : Code -> Code -> Code
+pair c₁ c₂ = construct «inr (inr (inl ())), c₁, c₂, refl»
+
+sum : Code -> Code -> Code
+sum c₁ c₂ = construct «inr (inr (inr (inl ()))), c₁, c₂, refl»
+
+unit : Code
+unit = construct «inr (inr (inr (inr ()))), refl»
+
+--------------------------------------------------------------------------------
+Code:constructors : Set
+Code:constructors = Unit + Unit + Unit + Unit + Unit
+
+Code:body : Code:constructors -> IDesc Unit
+Code:body = λd.
+             case d for x. IDesc 𝟙 with
+               { inl a. “K” (() ≡ ())
+               ; inr b.
+                    case b for x. IDesc 𝟙 with
+                      { inl a. “K” (() ≡ ())
+                      ; inr b0.
+                           case b0 for x. IDesc 𝟙 with
+                             { inl a. “IId” () “×” “IId” () “×” “K” (() ≡ ())
+                             ; inr b1.
+                                  case b1 for x. IDesc 𝟙 with
+                                    { inl a. “IId” () “×” “IId” () “×” “K” (() ≡ ())
+                                    ; inr b2. “K” (() ≡ ())
+                                    }
+                             }
+                      }
+               }
+
+Code:elimtype : (Code -> Set 2) -> Code:constructors -> Set 2
+Code:elimtype P c = elimtype Unit Code:constructors (λ_. Code:body) (λ_. P) () c
+
+-- an eliminator for Codes
+-- this should be generated automatically
+elimCode : (P : Code -> Set 2) ->
+           P param ->
+           P rec ->
+           ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (pair c₁ c₂)) ->
+           ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (sum c₁ c₂)) ->
+           P unit ->
+           (c : Code) -> P c
+elimCode P Pparam Prec Ppair Psum Punit =
+  inductionI Unit Code:code (λ_. P)
+    (λ_ «c,d».
+      case c for c. Code:elimtype P c with
+        { inl _. λz _. rewriteBy z then Pparam
+        ; inr c.
+          case c for c. Code:elimtype P (inr c) with
+            { inl _. λz _. rewriteBy z then Prec
+            ; inr c.
+              case c for c. Code:elimtype P (inr (inr c)) with
+                { inl _. λ«c₁,c₂, eq» «d₁,d₂,_». rewriteBy eq then Ppair c₁ c₂ d₁ d₂
+                ; inr c.
+                  case c for c. Code:elimtype P (inr (inr (inr c))) with
+                    { inl _. λ«c₁,c₂,eq» «d₁,d₂,_». rewriteBy eq then Psum c₁ c₂ d₁ d₂
+                    ; inr _. λz _. rewriteBy z then Punit
+                    }
+                }
+            }
+        } d)
+    ()
+
+toDesc : Code -> Set -> Unit -> IDesc Unit
+toDesc C A _ =
+  elimCode (λ_. IDesc Unit)
+    (“K” A)
+    (“IId” ())
+    (λC₁ C₂ D₁ D₂. D₁ “×” D₂)
+    (λC₁ c₂ D₁ D₂. “Σ” (Unit + Unit) (λc. case c for c. IDesc Unit with { inl _. D₁; inr _. D₂ }))
+    (“K” Unit)
+    C
+
+{-
+-- What I want to be able to write:
+toDesc2 : Code -> Set -> Unit -> IDesc Unit
+toDesc2 C A _ =
+  eliminate C with
+    param.      “K” A
+    rec.        “IId” ()
+    pair C₁ C₂. recurse C₁ “×” recurse C₂
+    sum C₁ C₂.  “Σ” (Unit + Unit) (λc. case c with { inl _. recurse C₁; inr _. recurse C₂ })
+    unit.       “K” ()
+-}
+
+reify : (C : Code) ->
+        (A : Set) ->
+        Set
+reify C A = µI Unit (toDesc C A) ()
+
+mapC : (C : Code) ->
+       (A B : Set) ->
+       (f : A -> B) ->
+       (X : Unit -> Set 2) ->
+       semI[toDesc C A (), u. X u] ->
+       semI[toDesc C B (), u. X u]
+mapC C A B f X =
+  elimCode (λC. semI[toDesc C A (), u. X u] -> semI[toDesc C B (), u. X u])
+    f
+    (λx. x)
+    (λC₁ C₂ f₁ f₂ «a₁,a₂». «f₁ a₁, f₂ a₂»)
+    (λC₁ C₂ f₁ f₂ «c,a».
+      case c for c. semI[case c for c. IDesc Unit with {inl _.toDesc C₁ A ();inr _.toDesc C₂ A ()}, u. X u] ->
+                    semI[toDesc (sum C₁ C₂) B (), u. X u] with
+        { inl _. λa₁. «inl (), f₁ a₁»
+        ; inr _. λa₂. «inr (), f₂ a₂»
+        } a)
+    (λx. x)
+    C
+
+drop : (I : Set) →
+       (D : I → IDesc I) →
+       (A : I → Set) →
+       (i : I) →
+       (x : semI[D i, i. µI I D i]) →
+       liftI I (D i) (λi. µI I D i) (λi x. A i) x →
+       semI[D i, i. A i]
+drop I D A i =
+  elimID I
+    (λD'. (x : semI[D', i. µI I D i]) →
+          liftI I D' (λi. µI I D i) (λi x. A i) x →
+          semI[D', i. A i])
+    (λi x a. a)
+    (λX x u. x)
+    (λD₁ D₂ drop₁ drop₂ x a.
+      «drop₁ (fst x) (fst a), drop₂ (snd x) (snd a)»)
+    (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
+    (λX D drop f a. λx. drop x (f x) (a x))
+    (D i)
+
+-- Set-level catamorphisms
+icata : (I : Set) →
+        (D : I → IDesc I) →
+        (A : I → Set) →
+        ((i : I) → semI[D i, i. A i] → A i) →
+        (i : I) → µI I D i → A i
+icata I D A k =
+  inductionI I D
+    (λi x. A i)
+    (λi x φ. k i (drop I D A i x φ))
+
+– generic map for all codes
+map : (C : Code) ->
+      (A B : Set) ->
+      (f : A -> B) ->
+      reify C A -> reify C B
+map C A B f =
+  icata Unit (toDesc C A) (λ_. reify C B)
+    (λ_ x. construct (mapC C A B f (λ_. reify C B) x))
+    ()
+
+--------------------------------------------------------------------------------
+– A example with lists
+listcode : Code
+listcode = sum unit (pair param rec)
+
+list : Set -> Set
+list A = reify listcode A
+
+nil : (A : Set) -> list A
+nil A = construct «inl (), ()»
+
+cons : (A : Set) -> A -> list A -> list A
+cons A a l = construct «inr (), a, l»
+
+– let's make a list and apply map to it...
+assume A : Set
+assume a : A
+assume b : A
+assume B : Set
+assume f : A -> B
+
+l : list A
+l = cons A a (cons A b (nil A))
+
+normalise map listcode A B f l
+
+;

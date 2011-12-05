@@ -1,0 +1,159 @@
+fmap : (I : Set) ->
+       (D : IDesc I) ->
+       (A B : I -> Set 2) ->
+       (f : (i : I) -> A i -> B i) ->
+       semI[D, i. A i] -> semI[D, i. B i]
+fmap I D A B f =
+  elimID I (λD. semI[D, i. A i] -> semI[D, i. B i])
+    f
+    (λA a. a)
+    (λD₁ D₂ f₁ f₂ «x,y». «f₁ x, f₂ y»)
+    (λA D h «a,x». «a,h a x»)
+    (λA D h f a. h a (f a))
+    D
+
+– elimID D for D. P with
+–   { “IId” i. ?
+–   ; “K” A.   ?
+–   ; F “×” G. ?        – fixme: with recursion
+–   ; “Σ” A f. ?        – fixme: with recursion
+–   ; “Π” A f. ?        – fixme: with recursion
+–   }
+
+-- two dependent types:
+– semI[D; i. A] type
+– liftI[D; i. A; i a. P; x] type
+
+– semI[“K” C;     i. A] = C
+– semI[“IId” i;   i. A] = A[i/i]
+– semI[D₁ “×” D₂; i. A] = semI[D₁; i. A] × semI[D₂; i. A]
+– semI[“Σ” C D;   i. A] = (c : C) × semI[D c; i. A]
+– semI[“Π” C D;   i. A] = (c : C) -> semI[D c; i. A]
+
+– Also, a set-based version of semI
+
+– liftI[“K” C;     i. A; i a. P; c]     = Unit
+– liftI[“IId” i;   i. A; i a. P; a]     = P i a
+– liftI[D₁ “×” D₂; i. A; i a. P; «x,y»] = liftI[D₁; i. A; i a. P; x] × liftI[D₂; i. A; i a. P; y]
+– liftI[“Σ” C D;   i. A; i a. P; «c,x»] = liftI[D c; i. A; i a. P; x]
+– liftI[“Π” C D;   i. A; i a. P; f]     = (c : C) -> liftI[D c; i. A; i a. P; f c]
+
+–   fmapI[D; i. A; i. B] : ((i : I) -> A -> B) -> semI[D; i. A] -> semI[D; i. B]
+– and the type checker knows that this is a functorial operation...
+
+– what about levitation? Need codes at every level then.
+– IDesc@l : Set l -> Set (l + 1)
+– needn't really be any connection between the two parameters.
+
+– and IDesc is a relative monad, and sem is a monad morphism (sort of,
+– now). Relative monads?
+
+– two families of morphisms:
+
+– allI[D; i. A; i a. P] :
+–    (k : (i : I) -> (a : A) -> P) ->
+–    (x : semI[D; i. A]) -> liftI[D; i. A; i a. P; x]
+
+– allI[“K” C;     i. A; i a. P] k c     = ()
+– allI[“IId” i;   i. A; i a. P] k a     = k i a
+– allI[D₁ “×” D₂; i. A; i a. P] k «x,y» = «allI[D₁; i. A; i a. P] k x, allI[D₂; i. A; i a. P] k y»
+– allI[“Σ” C D;   i. A; i a. P] k «c,x» = allI[D c; i. A; i a. P] k x
+– allI[“Π” C D;   i. A; i a. P] k f     = λc. allI[D c; i. A; i a. P] k (f c)
+
+– inductionI[D; i x. P] :
+–    ((i : I) -> (x : semI[D; i. µI I D i]) -> liftI[D; i. µI I D i; i x. P; x] -> P[i/i, construct x/x]) ->
+–    (i : I) -> (x : µI I D i) -> P
+
+–   inductionI[D; i x. P] k i (construct x)
+– =
+–   k i x (allI[D; i. µI I D i; i x. P] (inductionI[D; i x. P] k)) : P i (construct x)
+
+– advantage of this is that we don't have to work out the set-level of
+– things when we generate the code for an eliminator. Disadvantage is
+– that there is something special about these framework-level things
+– that cannot be replicated by the rest of the system.
+
+--------------------------------------------------------------------------------
+DescFM : (I : Set) -> (I -> IDesc I) -> (I -> Set) -> (I -> IDesc I)
+DescFM I D A = λi. “Σ” (Unit + Unit) (λb. case b with { inl _. “K” (A i); inr _. D i })
+
+FreeMonad : (I : Set) -> (I -> IDesc I) -> (I -> Set) -> (I -> Set)
+FreeMonad I D A = µI I (DescFM I D A)
+
+{-
+data FreeMonad (I : Set) (D : I -> IDesc I) (A : I -> Set) : I -> Set where
+  variable : A i -> FreeMonad I D A i – why not allow for the ‘i’ to be passed in as a parameter?
+  term     : semI[D i; i. FreeMonad I D A i] -> FreeMonad I D A i
+-}
+
+dropI : (I : Set) ->
+        (D : IDesc I) ->
+        (A B : I -> Set) ->
+        (x : semI[D, i. A i]) ->
+        liftI I D (λi. A i) (λi x. B i) x ->
+        semI[D, i. B i]
+dropI I D A B =
+  elimID I (λD'. (x : semI[D', i. A i]) -> liftI I D' (λi. A i) (λi x. B i) x -> semI[D', i. B i])
+         (λi a b. b)
+         (λA a _. a)
+         (λF G f g «x,y» «p,q». «f x p, g y q»)
+         (λA F f «a,x» p. «a,f a x p»)
+         (λA F f h p a. f a (h a) (p a))
+         D
+
+return : (I : Set) ->
+         (D : I -> IDesc I) ->
+         (A : I -> Set) ->
+         (i : I) ->
+         A i -> FreeMonad I D A i
+return I D A i a = construct «inl (), a»
+
+bind : (I : Set) ->
+       (D : I -> IDesc I) ->
+       (A B : I -> Set) ->
+       ((i : I) -> A i -> FreeMonad I D B i) ->
+       (i : I) ->
+       FreeMonad I D A i ->
+       FreeMonad I D B i
+bind I D A B f =
+  inductionI I (DescFM I D A) (λi _. FreeMonad I D B i)
+    (λi «b, x».
+      case b for b. (z : semI[case b for b. IDesc I with { inl _. “K” (A i); inr _. D i }, i. FreeMonad I D A i]) ->
+                    liftI I (case b with { inl _. “K” (A i); inr _. D i }) (λi. FreeMonad I D A i) (λi _. FreeMonad I D B i) z ->
+                    FreeMonad I D B i with
+        { inl _. λa _. f i a
+        ; inr _. λd p. construct «inr (), dropI I (D i) (µI I (DescFM I D A)) (λi. FreeMonad I D B i) d p»
+        } x)
+
+{-
+bind I D A B i c f =
+  eliminate c with
+    variable i a. f i a
+    term i x.     term ... something that does the right thing here
+-}
+
+{-
+
+Plan is to build in the return and bind so that the monad laws become
+part of the definitional equality. This means we always normalise
+everything with respect to the monad laws, for things that look like
+free monads, and that use the two built-in combinators.
+
+Other things that should be built-in:
+ - monad laws for the descriptions
+ - knowledge that semI is a monad morphism (needs semI to be built in)
+ - built-in liftI (possibly)
+
+-}
+
+assume I : Set
+assume D : I -> IDesc I
+assume A : I -> Set
+assume B : I -> Set
+assume f : (i : I) -> A i -> FreeMonad I D B i
+assume i : I
+assume a : A i
+
+normalise bind I D A B f i (return I D A i a)
+
+;
