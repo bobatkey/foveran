@@ -27,10 +27,10 @@ Bool = Unit + Unit;
 
 body : Nat × Nat → Bool → IDesc (Nat × Nat);
 body p x =
-  case x for x. IDesc (Nat × Nat) with
+  case x with
     { inl u. “K” (zero ≡ fst p)
     ; inr u. “Σ” Nat (λn₁. “Σ” Nat (λn₂. “IId” «n₁,n₂» “×” “K” (succ n₁ ≡ fst p) “×” “K” (succ n₂ ≡ snd p)))
-    };
+    }
 
 LeqDesc : (Nat × Nat) → IDesc (Nat × Nat);
 LeqDesc p =
@@ -146,10 +146,7 @@ mkPair : (α β : Set) → α → β → α × β;
 mkPair α β a b = «a,b»;
 
 split : (α β : Set) → (x y : α × β) → fst x ≡ fst y → snd x ≡ snd y → x ≡ y;
-split α β x y eq₁ eq₂ =
-  elimEq eq₁ for a p. x ≡ mkPair α β a (snd y)
-    with (elimEq eq₂ for b p. x ≡ mkPair α β (fst x) b
-            with refl);
+split α β x y eq₁ eq₂ = rewriteBy eq₁ then rewriteBy eq₂ then refl
 
 lem : injective (Nat × Nat) (Nat × Nat) f;
 lem p₁ p₂ eq =
@@ -157,4 +154,4 @@ lem p₁ p₂ eq =
     (succ-inj (fst p₁) (fst p₂) (fst-eq Nat Nat «succ (fst p₁), snd p₁» «succ (fst p₂), snd p₂» eq))
     (snd-eq Nat Nat «succ (fst p₁), snd p₁» «succ (fst p₂), snd p₂» eq);
 
-normalise lem;
+;

@@ -104,16 +104,17 @@ lists0 A i j = « Unit + A
 refinement : (I : Set) ->
              (J : Set) ->
              (D : I -> IDesc I) ->
-             Set 2;
+             Set 1
 refinement I J D =
   (f : J -> I) ×
-  ((j : J) -> (X : Set) × (X -> semI[D (f j), i. (j : J) × f j ≡ i]))
+  (X : J -> Set) ×
+  ((j : J) -> X j -> semI[D (f j), i. (j : J) × f j ≡ i])
 
 {-
 record refinement (I : Set) (J : Set) (D : I -> IDesc I) : Set 1 where
-  f      : J -> I
-  data   : J -> Set
-  forget : (j : J) -> data j -> semI[D (f j), i. (j : J) × f j ≡ i]
+  f : J -> I
+  X : J -> Set
+  h : (j : J) -> X j -> semI[D (f j), i. (j : J) × f j ≡ i]
 -}
 
 realiseBody : (I J : Set) ->
@@ -131,8 +132,8 @@ refinement:code : (I J : Set) ->
                   (D : I -> IDesc I) ->
                   refinement I J D ->
                   J -> IDesc J
-refinement:code I J D «f, h» =
-  λj. “Σ” (fst (h j)) (λx. realiseBody I J f (D (f j)) j (snd (h j) x))
+refinement:code I J D «f, X, h» =
+  λj. “Σ” (X j) (λx. realiseBody I J f (D (f j)) j (h j x))
 
 refinementSet : (I J : Set) ->
                 (D : I -> IDesc I) ->
@@ -158,10 +159,10 @@ goodElem : (I J : Set) ->
            (R : refinement I J D) ->
            ((j : J) × µI I D (fst R j)) ->
            Set
-goodElem I J D «f,h» =
+goodElem I J D «f,X,h» =
   µI ((j : J) × µI I D (f j))
      (λ«j, x».
-       “Σ” (fst (h j))
+       “Σ” (X j)
            (λd. mapIDesc
              ((i : I) × µI I D i × ((j : J) × f j ≡ i))
              ((j : J) × µI I D (f j))
@@ -170,7 +171,7 @@ goodElem I J D «f,h» =
                (λi. µI I D i)
                (λi. (j : J) × f j ≡ i)
                (deconstruct I D (f j) x)
-               (snd (h j) d))))
+               (h j d))))
 
 realiseRefinementExt : (I J : Set) ->
                        (D : I -> IDesc I) ->
@@ -221,12 +222,11 @@ assume iso2 : (I J : Set) ->
 listRefinement : (A : Set) -> refinement Unit Unit Nat:code
 listRefinement A =
   « λ_. ()
-  , λ_. « Unit + A
-        , λc. case c with
-                { inl _. «inl (), refl»
-                ; inr _. «inr (), «(), refl», refl»
-                }
-        »
+  , λ_. Unit + A
+  , λ_ c. case c with
+      { inl _. «inl (), refl»
+      ; inr _. «inr (), «(), refl», refl»
+      }
   »
 
 list:code : Set -> Unit -> IDesc Unit
@@ -251,30 +251,11 @@ l = cons A a (cons A b (nil A))
 --------------------------------------------------------------------------------
 – catamorphisms on indexed data; need to get the universe levels sorted out
 algebra : (I : Set) -> (D : I -> IDesc I) -> Set 1
-algebra I D = (A : I -> Set) × (i : I) -> semI[D i, i. A i] -> A i
+algebra I D =
+  (A : I -> Set) ×
+  (i : I) -> semI[D i, i. A i] -> A i
 
-
-– algebra I D = (A : I -> Set) × (i : I) -> [D i](i. A i) -> A i
-
-– or one indexed by levels, semI@i : IDesc I -> (I -> Set i) -> Set i
-– then Conor's lifty thing gets us to the right level
-
-– lift@l : (I : Set) -> (D : IDesc I) -> (A : I -> Set l) -> (P : (i : I) -> A i -> Set l) -> semI@l I D A -> Set l
-
-– why do 'A' and 'P' end up at the same level? Just because it is easier?
-
-– up lift@l = lift@(l+1)
-
-– inductionI@l : (I : Set) ->
-–                (D : I -> IDesc I) ->
-–                (P : (i : I) -> µI I D i -> Set l) ->
-–                (k : (i : I) -> (x : semI@l I (D i) (µI I D)) -> liftI@l I (D i) (µI I D) P x -> P i (construct x)) ->
-–                (i : I) -> (x : µI I D i) -> P i x
-
-– allI@l : ...
-
-– these look better than the type-level ones
-
+– This is basically the same as zip0, below
 drop : (I : Set) ->
        (D : I -> IDesc I) ->
        (A : I -> Set) ->
@@ -295,17 +276,6 @@ drop I D A i =
     (λX D drop f a. λx. drop x (f x) (a x))
     (D i)
 
--- Set-level catamorphisms
-icata : (I : Set) ->
-        (D : I -> IDesc I) ->
-        (A : I -> Set) ->
-        ((i : I) -> semI[D i, i. A i] -> A i) ->
-        (i : I) -> µI I D i -> A i
-icata I D A k =
-  inductionI I D
-    (λi x. A i)
-    (λi x φ. k i (drop I D A i x φ))
-
 cata : (I : Set) ->
        (D : I -> IDesc I) ->
        (A : algebra I D) ->
@@ -325,11 +295,11 @@ zip0 :
   (i : I) ->
   (j : J i) ->
   (x : semI[D i, i. J i]) ->
-  semI[liftIDesc I (D i) (λi. J i) x,  i. B (fst i)] ->
+  semI[liftIDesc I (D i) J x,  i. B (fst i)] ->
   semI[D i, i. B i]
 zip0 I J B D i j =
   elimID I (λD. (x : semI[D, i. J i]) ->
-                semI[liftIDesc I D (λi. J i) x, i. B (fst i)] ->
+                semI[liftIDesc I D J x, i. B (fst i)] ->
                 semI[D, i. B i])
     (λi j b. b)
     (λA a _. a)
@@ -365,7 +335,7 @@ forgetAlg : (I J : Set) ->
             semI[refinement:code I J D R j, j. µI I D (fst R j)] ->
             µI I D (fst R j)
 forgetAlg I J D R j «a,x» =
-  construct (zip I J (fst R) (µI I D) (D (fst R j)) j (snd (snd R j) a) x)
+  construct (zip I J (fst R) (µI I D) (D (fst R j)) j (snd (snd R) j a) x)
 
 forget : (I J : Set) ->
          (D : I -> IDesc I) ->
@@ -374,7 +344,7 @@ forget : (I J : Set) ->
          µI J (refinement:code I J D R) j ->
          µI I D (fst R j)
 forget I J D R =
-  icata J (refinement:code I J D R) (λj. µI I D (fst R j)) (forgetAlg I J D R)
+  cata J (refinement:code I J D R) «λj. µI I D (fst R j), forgetAlg I J D R»
 
 two : Nat
 two = succ (succ zero)
@@ -400,14 +370,12 @@ algRefinement :
   refinement I ((i : I) × fst A i) D
 algRefinement I D A =
   « λ«i, a». i
-  , λ«i, a».
-     « (x : semI[D i, i. fst A i]) × snd A i x ≡ a
-     , λ«x, _».
-         mapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
-           (λi a. ««i, a», refl»)
-           x
-     »
- »
+  , λ«i, a». (x : semI[D i, i. fst A i]) × snd A i x ≡ a
+  , λ«i, a» «x, _».
+      mapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+        (λi a. ««i, a», refl»)
+        x
+  »
 
 vectorRefinement : (A : Set) -> refinement Unit ((u : Unit) × Nat) (list:code A)
 vectorRefinement A =
