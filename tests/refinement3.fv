@@ -24,18 +24,6 @@ mapI I D X Y f =
     (λA D f h. λa. f a (h a))
     D
 
-– This should also be built-in, along with the monad-like properties of IDesc
-mapIDesc : (I J : Set) ->
-           (f : I -> J) ->
-           IDesc I -> IDesc J
-mapIDesc I J f =
-  elimID I (λD. IDesc J)
-    (λi. “IId” (f i))
-    (λA. “K” A)
-    (λ_ _ D₁ D₂. D₁ “×” D₂)
-    (λA _ D. “Σ” A D)
-    (λA _ D. “Π” A D)
-
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 liftIDesc : (I : Set) ->
             (D : IDesc I) ->
@@ -124,9 +112,8 @@ realiseBody : (I J : Set) ->
               (x : semI[D, i. (j : J) × f j ≡ i]) ->
               IDesc J
 realiseBody I J f D j x =
-  mapIDesc ((i : I) × (j : J) × f j ≡ i) J
-    (λ«i,j,_». j)
-    (liftIDesc I D (λi. (j : J) × f j ≡ i) x)
+  bind «i,j,_» <- liftIDesc I D (λi. (j : J) × f j ≡ i) x in
+    “IId” j
 
 refinement:code : (I J : Set) ->
                   (D : I -> IDesc I) ->
@@ -163,15 +150,9 @@ goodElem I J D «f,X,h» =
   µI ((j : J) × µI I D (f j))
      (λ«j, x».
        “Σ” (X j)
-           (λd. mapIDesc
-             ((i : I) × µI I D i × ((j : J) × f j ≡ i))
-             ((j : J) × µI I D (f j))
-             (λ«i, x, j, eq». «j, rewriteBy symm I (f j) i eq then x»)
-             (relIDesc I (D (f j))
-               (λi. µI I D i)
-               (λi. (j : J) × f j ≡ i)
-               (deconstruct I D (f j) x)
-               (h j d))))
+           (λd. bind «i, x, j, eq» <- relIDesc I (D (f j)) (λi. µI I D i) (λi. (j : J) × f j ≡ i)
+                                               (deconstruct I D (f j) x) (h j d) in
+                 “IId” «j, rewriteBy symm I (f j) i eq then x»))
 
 realiseRefinementExt : (I J : Set) ->
                        (D : I -> IDesc I) ->
@@ -195,13 +176,6 @@ Now, any refinement should give an isomorphism:
 
 this will likely be a nightmare to prove...
 -}
-
-assume iso1 : (I J : Set) ->
-              (D : I -> IDesc I) ->
-              (R : refinement I J D) ->
-              (j : J) ->
-              refinementSet I J D R j ->
-              (x : µI I D (fst R j)) × goodElem I J D R «j, x»
 
 {- presumably by recursion on the realised refinement. Might be
 relatively easy.  -}
@@ -308,6 +282,7 @@ zip0 I J B D i j =
     (λA D h f g a. h a (f a) (g a))
     (D i);
 
+-- this should be split into an application of zip0, then something that deals with the mapIDesc.
 zip :
   (I J : Set) ->
   (f : J -> I) ->
@@ -422,6 +397,20 @@ forget I ((i : I) × fst alg i) D (algRefinement I D alg)
     µI I D (fst j)
 -}
 
+iso1 : (I J : Set) ->
+       (D : I -> IDesc I) ->
+       (R : refinement I J D) ->
+       (j : J) ->
+       refinementSet I J D R j ->
+       (x : µI I D (fst R j)) × goodElem I J D R «j, x»
+iso1 I J D R =
+  inductionI J (refinement:code I J D R)
+    (λj _. (x : µI I D (fst R j)) × goodElem I J D R «j,x»)
+    (λj «a,x» φ. ?)
+–      « construct (zip I J (fst R) (µI I D) (D (fst R j)) j (snd (snd R) j a) x)
+–      , ? »)
+
+{-
 decorate :
   (I : Set) ->
   (D : I -> IDesc I) ->
@@ -430,7 +419,7 @@ decorate :
   (x : µI I D i) ->
   µI ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) «i, cata I D A i x»
 decorate I D A = ?
-
+-}
 – such that decorate and forget are mutually inverse
 
 – icata alg (forget I J D (algRefinement I D alg) j x) ≡ j

@@ -67,11 +67,14 @@ lexicalSpec = $([|compileLexicalSpecification
     , "rewriteBy" :==>       emit RewriteBy
     , "elimEq" :==>          emit ElimEq
     , "where" :==>           emit Where
+    , "in" :==>              emit In
     , "_" :==>               emit Underscore
     , "then" :==>            emit Then
     , "absurdBy" :==>        emit AbsurdBy
     , "semI" :==>            emit SemI
     , "liftI" :==>           emit LiftI
+    , "bind" :==>            emit Bind
+    , "<-" :==>              emit LeftArrow
     , "[" :==>               emit LSqBracket
     , "]" :==>               emit RSqBracket
     , "?" :==>               emit Hole

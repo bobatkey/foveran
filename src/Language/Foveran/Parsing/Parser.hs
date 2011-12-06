@@ -234,6 +234,14 @@ term01 =
       <*  (token Tok.With <|> token Tok.Then)
       <*> term10
     <|>
+    (\p x t1 t2 -> Annot (makeSpan p t2) (IDesc_Bind t1 x t2))
+      <$> token Tok.Bind
+      <*> pattern
+      <*  token Tok.LeftArrow
+      <*> term10
+      <*  token Tok.In
+      <*> term10
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t

@@ -91,6 +91,8 @@ pprint IDesc               = "IDesc"
 pprint (IDesc_Id t)        = paren 01 ("“IId”" <+> down t)
 pprint (IDesc_Sg t1 t2)    = paren 01 ("“Σ”" <+> (down t1 $$ down t2))
 pprint (IDesc_Pi t1 t2)    = paren 01 ("“Π”" <+> down t1 <+> down t2)
+pprint (IDesc_Bind t1 x t2) = paren 01 ("bind" <+> ppPattern x <+> "<-" <+> resetPrec t1 <+> "in"
+                                        $$ nest 2 (resetPrec t2))
 pprint IDesc_Elim          = "elimID"
 pprint (SemI tD i tA)      =
     resetPrec $ "semI" <> (cat [ "[" <+> tD

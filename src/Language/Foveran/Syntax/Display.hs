@@ -139,6 +139,7 @@ data TermCon tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
     | IDesc_Elim
+    | IDesc_Bind tm Pattern tm
     | SemI       tm Pattern tm
     | LiftI      tm Pattern tm Pattern Pattern tm tm
     | MuI        tm tm

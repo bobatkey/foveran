@@ -19,6 +19,7 @@ data Token
     | Equals
     | Lambda
     | Arrow
+    | LeftArrow
     | LParen
     | RParen
     | QuoteArrow
@@ -57,6 +58,7 @@ data Token
     | Data
     | Normalise
     | Where
+    | In
 
     | Eq
     | Refl
@@ -67,6 +69,7 @@ data Token
     | Quote_IId
     | Quote_Sg
     | Quote_Pi
+    | Bind
     | IDesc_Elim
     | SemI
     | LiftI
@@ -92,6 +95,7 @@ instance SyntaxHighlight Token where
     lexicalClass Equals      = Operator
     lexicalClass Lambda      = Keyword
     lexicalClass Arrow       = Operator
+    lexicalClass LeftArrow   = Punctuation
     lexicalClass LParen      = Punctuation
     lexicalClass RParen      = Punctuation
     lexicalClass LSqBracket  = Punctuation
@@ -135,6 +139,7 @@ instance SyntaxHighlight Token where
     lexicalClass Quote_IId   = Constructor
     lexicalClass Quote_Sg    = Constructor
     lexicalClass Quote_Pi    = Constructor
+    lexicalClass Bind        = Keyword
     lexicalClass IDesc_Elim  = Keyword
     lexicalClass SemI        = Keyword
     lexicalClass LiftI       = Keyword
@@ -145,6 +150,7 @@ instance SyntaxHighlight Token where
     lexicalClass ElimEq      = Keyword
     lexicalClass RewriteBy   = Keyword
     lexicalClass Where       = Keyword
+    lexicalClass In          = Keyword
     lexicalClass Underscore  = Punctuation
     lexicalClass Then        = Keyword
     lexicalClass AbsurdBy    = Keyword
@@ -164,7 +170,8 @@ instance Show Token where
   show Semicolon   = ";"
   show Equals      = "="
   show Lambda      = "\\"
-  show Arrow       = "→"
+  show Arrow       = "->"
+  show LeftArrow   = "<-"
   show LParen      = "("
   show RParen      = ")"
   show LSqBracket  = "["
@@ -206,6 +213,7 @@ instance Show Token where
   show Quote_IId   = "“IId”"
   show Quote_Sg    = "“Σ”"
   show Quote_Pi    = "“Π”"
+  show Bind        = "bind"
   show IDesc_Elim  = "elimID"
   show Sem         = "sem"
   show SemI        = "semI"
@@ -218,6 +226,7 @@ instance Show Token where
   show RewriteBy   = "rewriteBy"
   show Normalise   = "normalise"
   show Where       = "where"
+  show In          = "in"
   show Underscore  = "_"
   show Then        = "then"
   show AbsurdBy    = "absurdBy"

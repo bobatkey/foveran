@@ -386,6 +386,21 @@ hasType (Annot p (IDesc_Pi t1 t2)) (VIDesc v) = do
 hasType (Annot p (IDesc_Pi t1 t2)) v = do
   raiseError p (ExpectingDescTypeForDesc v)
 
+hasType (Annot p (IDesc_Bind t1 x t2)) (VIDesc tyB) = do
+  (ty1, tm1) <- synthesiseTypeFor t1
+  case ty1 of
+    VIDesc tyA -> do
+      tm2 <- bindVar x tyA t2 $ \x t2 -> t2 `hasType` (VIDesc tyB)
+      let tmA = reifyType0 tyA
+          tmB = reifyType0 tyB
+      return (In $ CS.IDesc_Bind tmA tmB tm1 x tm2)
+    v ->
+        raiseError p (ExpectingDescTypeForDesc v) -- FIXME: better error message, and position
+
+hasType (Annot p (IDesc_Bind t1 x t2)) v = do
+  raiseError p (ExpectingDescTypeForDesc v)
+
+
 hasType (Annot p Refl) (VEq vA vB va vb) = do
   let tA = reifyType0 vA
       tB = reifyType0 vB

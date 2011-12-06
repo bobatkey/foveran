@@ -60,6 +60,7 @@ data TermCon tm
   | IDesc_Id   tm
   | IDesc_Sg   tm tm
   | IDesc_Pi   tm tm
+  | IDesc_Bind tm Ident tm
   | IDesc_Elim
   | SemI       tm Ident tm
   | LiftI      tm Ident tm Ident Ident tm tm
@@ -168,6 +169,8 @@ toLN DS.IDesc             bv = Layer $ IDesc
 toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (return $ t bv)
 toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (return $ t1 bv) (return $ t2 bv)
 toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (return $ t1 bv) (return $ t2 bv)
+toLN (DS.IDesc_Bind t1 x t2) bv =
+    Layer $ IDesc_Bind (return $ t1 bv) (identOfPattern x) (return $ t2 (x:bv))
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
 toLN (DS.SemI tD x tA)    bv =
     Layer $ SemI (return $ tD bv) (identOfPattern x) (return $ tA (x:bv))
@@ -240,6 +243,7 @@ close' fnm IDesc            = pure IDesc
 close' fnm (IDesc_Id t)     = IDesc_Id <$> t
 close' fnm (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
 close' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
+close' fnm (IDesc_Bind t1 x t2) = IDesc_Bind <$> t1 <*> pure x <*> binder t2
 close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (SemI tD x tA)   = SemI <$> tD <*> pure x <*> binder tA
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2

@@ -18,6 +18,8 @@ module Language.Foveran.Typing.Conversion.Value
     , vdesc_elim
     , videsc_elim
 
+    , videsc_bind
+
     , vsem
     , vsemI
 
@@ -330,6 +332,25 @@ vinduction vF vP vK = loop
       loop v = error ("internal: vinduction stuck on " ++ show v)
 
 {------------------------------------------------------------------------------}
+videsc_bind :: Value
+            -> Value
+            -> Value
+            -> Ident
+            -> (Value -> Value)
+            -> Value
+videsc_bind vA vB vc x vf = loop vc
+    where
+      loop (VIDesc_Id i)       = vf i
+      loop (VIDesc_K vB)       = VIDesc_K vB
+      loop (VIDesc_Pair d1 d2) = VIDesc_Pair (loop d1) (loop d2)
+      loop (VIDesc_Sg vB d)    = VIDesc_Sg vB (VLam "b" $ \v -> loop (d $$ v)) -- FIXME: get the binder name from 'd'
+      loop (VIDesc_Pi vB d)    = VIDesc_Pi vB (VLam "b" $ \v -> loop (d $$ v))
+      loop (VNeutral tmc)      =
+          VNeutral (In <$> (IDesc_Bind <$> reifyType vA
+                                       <*> reifyType vB
+                                       <*> tmc
+                                       <*> pure x <*> tmBound (\tmx -> let v = reflect vA tmx in reify (VIDesc vB) (vf v))))
+
 vliftI :: Value   -- ^ index type
        -> Value   -- ^ description
        -> Ident -> (Value -> Value)

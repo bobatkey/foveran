@@ -108,14 +108,14 @@ return : (I : Set) ->
          A i -> FreeMonad I D A i
 return I D A i a = construct «inl (), a»
 
-bind : (I : Set) ->
-       (D : I -> IDesc I) ->
-       (A B : I -> Set) ->
-       ((i : I) -> A i -> FreeMonad I D B i) ->
-       (i : I) ->
-       FreeMonad I D A i ->
-       FreeMonad I D B i
-bind I D A B f =
+bindFM : (I : Set) ->
+         (D : I -> IDesc I) ->
+         (A B : I -> Set) ->
+         ((i : I) -> A i -> FreeMonad I D B i) ->
+         (i : I) ->
+         FreeMonad I D A i ->
+         FreeMonad I D B i
+bindFM I D A B f =
   inductionI I (DescFM I D A) (λi _. FreeMonad I D B i)
     (λi «b, x».
       case b for b. (z : semI[case b for b. IDesc I with { inl _. “K” (A i); inr _. D i }, i. FreeMonad I D A i]) ->
@@ -153,6 +153,6 @@ assume f : (i : I) -> A i -> FreeMonad I D B i
 assume i : I
 assume a : A i
 
-normalise bind I D A B f i (return I D A i a)
+normalise bindFM I D A B f i (return I D A i a)
 
 ;

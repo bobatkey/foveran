@@ -118,6 +118,8 @@ eval (IDesc_Id t)       = VIDesc_Id <$> t
 eval (IDesc_Pair t1 t2) = VIDesc_Pair <$> t1 <*> t2
 eval (IDesc_Sg t1 t2)   = VIDesc_Sg <$> t1 <*> t2
 eval (IDesc_Pi t1 t2)   = VIDesc_Pi <$> t1 <*> t2
+eval (IDesc_Bind tA tB t1 x t2) =
+    videsc_bind <$> tA <*> tB <*> t1 <*> pure x <*> binder t2
 eval IDesc_Elim         = pure (VLam "I" $ \i ->
                                 VLam "P" $ \p ->
                                 VLam "pId" $ \pId ->

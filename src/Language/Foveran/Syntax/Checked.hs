@@ -73,6 +73,7 @@ data TermCon tm
     | IDesc_Pair tm tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
+    | IDesc_Bind tm tm tm Ident tm
     | IDesc_Elim
     | MuI        tm tm
     | SemI       tm tm Ident tm
@@ -136,6 +137,7 @@ traverseSyn (IDesc_Id t)     = IDesc_Id <$> t
 traverseSyn (IDesc_Pair t1 t2) = IDesc_Pair <$> t1 <*> t2
 traverseSyn (IDesc_Sg t1 t2) = IDesc_Sg <$> t1 <*> t2
 traverseSyn (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
+traverseSyn (IDesc_Bind tA tB t1 x t2) = IDesc_Bind <$> tA <*> tB <*> t1 <*> pure x <*> binder t2
 traverseSyn IDesc_Elim       = pure IDesc_Elim
 traverseSyn (SemI tI tD x tA)= SemI <$> tI <*> tD <*> pure x <*> binder tA
 traverseSyn (LiftI tI tD i tA i' a tP tx) =
@@ -238,6 +240,8 @@ toDisplay (IDesc_K t)             = DS.Desc_K <$> t
 toDisplay (IDesc_Pair t1 t2)      = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
+toDisplay (IDesc_Bind tA tB t1 x t2) =
+    bindK x t2 $ \x t2 -> DS.IDesc_Bind <$> t1 <*> pure (DS.PatVar x) <*> pure t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure (DS.PatVar x) <*> pure tA
 toDisplay (LiftI _ tD x tA i a tP tx) =
@@ -323,6 +327,8 @@ instance Eq Term where
   In (IDesc_Pair t1 t2) == In (IDesc_Pair t1' t2') = t1 == t1' && t2 == t2'
   In (IDesc_Sg t1 t2)   == In (IDesc_Sg t1' t2')   = t1 == t1' && t2 == t2'
   In (IDesc_Pi t1 t2)   == In (IDesc_Pi t1' t2')   = t1 == t1' && t2 == t2'
+  In (IDesc_Bind tA tB t1 x t2) == In (IDesc_Bind tA' tB' t1' x' t2') =
+      tA == tA' && tB == tB' && t1 == t1' && t2 == t2'
   In IDesc_Elim == In IDesc_Elim     = True
   In (SemI tI tD _ tA) == In (SemI tI' tD' _ tA') = tI == tI' && tD == tD' && tA == tA'
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
