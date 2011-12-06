@@ -22,7 +22,7 @@ NoConfusion Φ x y =
 
 noconfusion : (Φ : Set 1) → (x y : Nat) → x ≡ y → NoConfusion Φ x y;
 noconfusion Φ x y eq =
-  elimEq eq for y p. NoConfusion Φ x y
-    with (natCase (λx. NoConfusion Φ x x)
+  elimEq eq 
+    with natCase (λx. NoConfusion Φ x x)
            (λp. p)
-           (λn p. p refl) x);
+           (λn p. p refl) x;

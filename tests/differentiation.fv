@@ -58,7 +58,7 @@ append α = foldList α (List α → List α)
 
 up : (F : Desc) → (X : Set) → X → sem (∂ F) X → sem F X ;
 up F X x = elimD (\F. sem (∂ F) X → sem F X)
-                 (\A x. elimEmpty A x)
+                 (\A x. elimEmpty x)
                  (\x'. x)
                  (\F G f g s. case s for a. sem (F “×” G) X with
                                  { inl s. «f (fst s), snd s»

@@ -45,15 +45,9 @@ b = inr ();
 
 symbol-eq : alphabet → alphabet → bool;
 symbol-eq s₁ s₂ =
-  case s₁ for s₁. bool with
-    { inl u. case s₂ for s₂. bool with
-                { inl u. true
-                ; inr u. false
-                }
-    ; inr u. case s₂ for s₂. bool with
-                { inl u. false
-                ; inr u. true
-                }
+  case s₁ with
+    { inl u. case s₂ with { inl u. true; inr u. false }
+    ; inr u. case s₂ with { inl u. false; inr u. true }
     };
 
 data regexp : Set :=
@@ -76,24 +70,19 @@ regexpInduction : (Φ : regexp → Set 2) →
                   (r : regexp) → Φ r;
 regexpInduction Φ φeps φemp φalt φseq φstar φtok =
   induction regexpDesc Φ
-  (λr. case r for r. lift regexpDesc regexp Φ r →
-                      Φ (construct r) with
+  (λr. case r with
           { inl u. λu'. φeps
           ; inr r.
-             case r for r. lift regexpDesc regexp Φ (inr r) →
-                           Φ (construct (inr r)) with
+             case r with
                { inl u. λu'. φemp
                ; inr r.
-                  case r for r. lift regexpDesc regexp Φ (inr (inr r)) →
-                                Φ (construct (inr (inr r))) with
+                  case r with
                     { inl p. λφ. φalt (fst p) (snd p) (fst φ) (snd φ)
                     ; inr r.
-                       case r for r. lift regexpDesc regexp Φ (inr (inr (inr r))) →
-                                     Φ (construct (inr (inr (inr r)))) with
+                       case r with
                          { inl p. λφ. φseq (fst p) (snd p) (fst φ) (snd φ)
                          ; inr r.
-                            case r for r. lift regexpDesc regexp Φ (inr (inr (inr (inr r)))) →
-                                          Φ (construct (inr (inr (inr (inr r))))) with
+                            case r with
                               { inl r. λφ. φstar r φ
                               ; inr s. λu. φtok s
                               }
@@ -119,12 +108,12 @@ step r s =
                   (emp)
                   (λr₁ r₂ step₁ step₂. alt step₁ step₂)
                   (λr₁ r₂ step₁ step₂.
-                      case acceptsEmpty r₁ for b. regexp with
+                      case acceptsEmpty r₁ with
                         { inl u. alt (seq step₁ r₂) step₂
 			; inr u. seq step₁ r₂
                         })
                   (λr step. seq step (star r))
-                  (λs'. case symbol-eq s s' for b. regexp with
+                  (λs'. case symbol-eq s s' with
                            { inl u. eps
                            ; inr u. emp
                            })
@@ -143,7 +132,7 @@ listInduction : (A : Set) →
                 (l : List A) → Φ l;
 listInduction A Φ pnil pcons =
   induction (ListDesc A) Φ
-    (\x. case x for x. lift (ListDesc A) (List A) Φ x → Φ (construct x) with
+    (\x. case x with
             { inl u. λu'. pnil
             ; inr p. λih. pcons (fst p) (snd p) (snd ih)
             });

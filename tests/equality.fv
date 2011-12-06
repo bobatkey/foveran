@@ -7,8 +7,8 @@
 leibniz : (A : Set) → A → A → Set 1;
 leibniz A a₁ a₂ = (F : A → Set) → F a₁ → F a₂;
 
-refl : (A : Set) → (a : A) → leibniz A a a;
-refl A a = λF x. x;
+reflexivity : (A : Set) → (a : A) → leibniz A a a;
+reflexivity A a = λF x. x;
 
 symm : (A : Set) → (a₁ a₂ : A) → leibniz A a₁ a₂ → leibniz A a₂ a₁;
 symm A a₁ a₂ e = λF x. e (λa. F a → F a₁) (λx. x) x;
@@ -113,10 +113,10 @@ equal-to-leibniz : (n₁ n₂ : Nat) → equal n₁ n₂ → leibniz Nat n₁ n�
 equal-to-leibniz =
   natInduction (λn₁. (n₂ : Nat) → equal n₁ n₂ → leibniz Nat n₁ n₂)
                (natCase (λn₂. equal zero n₂ → leibniz Nat zero n₂)
-                        (λu. refl Nat zero)
-                        (λn₂ e. elimEmpty (leibniz Nat zero (succ n₂)) e))
+                        (λu. reflexivity Nat zero)
+                        (λn₂ e. elimEmpty e))
                (λn₁ ih. natCase (λn₂. equal (succ n₁) n₂ → leibniz Nat (succ n₁) n₂)
-                                 (λe. elimEmpty (leibniz Nat (succ n₁) zero) e)
+                                 (λe. elimEmpty e)
                                  (λn₂ eq. λF f₁. ih n₂ eq (λn. F (succ n)) f₁));
 
 – define generic equality for any data type?, and prove it reflects

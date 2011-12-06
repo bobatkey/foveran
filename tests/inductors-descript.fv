@@ -228,7 +228,7 @@ map A D Φ Ψ f =
 inductor : Set → Set 2;
 inductor A = (H : A → IDesc A) ×
              ((Φ : A → Set 1) →
-              ((x : A) → semI' A A H Φ x → Φ x) →
+              ((x : A) → semI[H x, a. Φ a] → Φ x) →
               (x : A) → Φ x);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -256,9 +256,9 @@ lift-to-lift2 : (D : Desc) →
                 (Φ : A → Set 1) →
                 (x : sem D A) →
                 lift' D A Φ x →
-                semI' (sem D A) A (lift2 D A) Φ x;
+                semI[lift2 D A x, a. Φ a];
 lift-to-lift2 D A Φ =
-  elimD (λD'. (x : sem D' A) → lift' D' A Φ x → semI' (sem D' A) A (lift2 D' A) Φ x)
+  elimD (λD'. (x : sem D' A) → lift' D' A Φ x → semI[lift2 D' A x, a. Φ a])
         (λA x u. ⋄)
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
@@ -273,10 +273,10 @@ lift2-to-lift : (D : Desc) →
                 (A : Set) →
                 (Φ : A → Set 1) →
                 (x : sem D A) →
-                semI' (sem D A) A (lift2 D A) Φ x →
+                semI[lift2 D A x, a. Φ a] →
                 lift' D A Φ x;
 lift2-to-lift D A Φ =
-  elimD (λD'. (x : sem D' A) → semI' (sem D' A) A (lift2 D' A) Φ x → lift' D' A Φ x)
+  elimD (λD'. (x : sem D' A) → semI[lift2 D' A x, a. Φ a] → lift' D' A Φ x)
         (λA x u. ⋄)
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
@@ -477,8 +477,8 @@ with-top A AI =
 – functor.
 comonad : Set → Set 3;
 comonad A = (W      : A → IDesc A) ×
-            (counit : (P : A → Set 1) → (a : A) → semI' A A W P a → P a) ×
-	    (cojoin : (P : A → Set 1) → (a : A) → semI' A A W P a → semI' A A W (semI' A A W P) a) ×
+            (counit : (P : A → Set 1) → (a : A) → semI[W a, a. P a] → P a) ×
+	    (cojoin : (P : A → Set 1) → (a : A) → semI[W a, a. P a] → semI[W a, a. semI[W a, a. P a]]) ×
             Unit;
 
 – Projection functions for comonads. We’ll just use ‘fst W’ to get the
@@ -486,15 +486,15 @@ comonad A = (W      : A → IDesc A) ×
 counit : (A : Set) → (W : comonad A) →
          (P : A → Set 1) →
          (a : A) →
-         semI' A A (fst W) P a →
+         semI[fst W a, a. P a] →
          P a;
 counit A W = fst (snd W);
 
 cojoin : (A : Set) → (W : comonad A) →
          (P : A → Set 1) →
          (a : A) →
-         semI' A A (fst W) P a →
-         semI' A A (fst W) (semI' A A (fst W) P) a;
+         semI[fst W a, a. P a] →
+         semI[fst W a, a. semI[fst W a, a. P a]];
 cojoin A W = fst (snd (snd W));
 
 – Given a inductor some type ‘A’, a comonad on ‘A’-indexed sets, and a

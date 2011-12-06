@@ -71,7 +71,7 @@ completeNatInduction : (Φ : Nat → Set 2) →
 completeNatInduction Φ k n =
   natInduction
     (λn. (m : Nat) → lt m n → Φ m)
-    (λm p. elimEmpty (Φ m) (ltZero m p))
+    (λm p. elimEmpty ltZero m p)
     (λn p₁ m p₂. k m (λo p₃. p₁ o (lt_le_trans o m n p₃ p₂)))
     (succ n)
     n
