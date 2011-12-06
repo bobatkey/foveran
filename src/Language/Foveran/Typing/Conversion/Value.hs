@@ -83,6 +83,7 @@ data Value
     | VIDesc_Pair Value Value
     | VIDesc_Sg   Value Value
     | VIDesc_Pi   Value Value
+    | VIDesc_Bind Value (Int -> Term) Ident (Value -> Value) -- ^ suspended 'bind' applications
 
     | VNeutral   (Int -> Term)
     deriving Show
@@ -176,10 +177,12 @@ vsemI vI vD x vA = loop vD
       loop (VIDesc_Pair d1 d2) = loop d1 .*. loop d2
       loop (VIDesc_Sg a d)     = VSigma (Just "a") a (\a -> loop (d $$ a))
       loop (VIDesc_Pi a d)     = VPi (Just "a") a (\a -> loop (d $$ a))
-      loop (VNeutral tm)       = VNeutral (In <$> (SemI <$> reifyType vI
-                                                        <*> tm
-                                                        <*> pure x
-                                                        <*> tmBound (\tmx -> let v = reflect vI tmx in reifyType (vA v))))
+      loop (VIDesc_Bind vI tm y vf) =
+          VNeutral (In <$> (SemI
+                            <$> reifyType vI
+                            <*> tm
+                            <*> pure y
+                            <*> tmBound (\tmy -> let v = reflect vI tmy in reifyType (loop (vf v)))))
 
 {------------------------------------------------------------------------------}
 vdesc_elim vP vK vI vPr vSu = loop
@@ -217,7 +220,7 @@ videsc_elim vI vP vId vK vPair vSg vPi = loop
       loop (VIDesc_Pair d1 d2) = vPair $$ d1 $$ d2 $$ loop d1 $$ loop d2
       loop (VIDesc_Sg a d)     = vSg $$ a $$ d $$ (VLam "a" $ \a -> loop (d $$ a))
       loop (VIDesc_Pi a d)     = vPi $$ a $$ d $$ (VLam "a" $ \a -> loop (d $$ a))
-      loop (VNeutral n)        = reflect (vP $$ VNeutral n)
+      loop v                   = reflect (vP $$ v)
                                          (pure (In IDesc_Elim)
                                           `tmApp` reify (VSet 0) vI
                                           `tmApp` reify (VIDesc vI .->. VSet 10) vP
@@ -236,8 +239,7 @@ videsc_elim vI vP vId vK vPair vSg vPi = loop
                                                          forall "D" (a .->. VIDesc vI) $ \d ->
                                                          (forall "x" a $ \x -> vP $$ (d $$ x)) .->.
                                                          (vP $$ VIDesc_Pi a d)) vPi
-                                          `tmApp` n)
-      loop x                   = error $ "internal: type error in the evaluator: videsc_elim"
+                                          `tmApp` reify (VIDesc vI) v)
 
 {------------------------------------------------------------------------------}
 -- FIXME: is this the right level? why not Set_1, or Set_0? Some kind
@@ -345,11 +347,8 @@ videsc_bind vA vB vc x vf = loop vc
       loop (VIDesc_Pair d1 d2) = VIDesc_Pair (loop d1) (loop d2)
       loop (VIDesc_Sg vB d)    = VIDesc_Sg vB (VLam "b" $ \v -> loop (d $$ v)) -- FIXME: get the binder name from 'd'
       loop (VIDesc_Pi vB d)    = VIDesc_Pi vB (VLam "b" $ \v -> loop (d $$ v))
-      loop (VNeutral tmc)      =
-          VNeutral (In <$> (IDesc_Bind <$> reifyType vA
-                                       <*> reifyType vB
-                                       <*> tmc
-                                       <*> pure x <*> tmBound (\tmx -> let v = reflect vA tmx in reify (VIDesc vB) (vf v))))
+      loop (VIDesc_Bind vI tm y vf) =
+          VIDesc_Bind vI tm y (\v -> loop (vf v))
 
 vliftI :: Value   -- ^ index type
        -> Value   -- ^ description
@@ -364,9 +363,9 @@ vliftI vI vD x vA i a vP vx = loop vD vx
       loop (VIDesc_Pair d1 d2) vx = loop d1 (vfst vx) .*. loop d2 (vsnd vx)
       loop (VIDesc_Sg vB d)    vx = loop (d $$ vfst vx) (vsnd vx)
       loop (VIDesc_Pi vB d)    vx = forall "b" vB $ \vb -> loop (d $$ vb) (vx $$ vb)
-      loop (VNeutral tmD)      vx =
+      loop v vx =
           VNeutral (In <$> (LiftI <$> reifyType vI
-                                  <*> tmD
+                                  <*> reify (VIDesc vI) v
                                   <*> pure x
                                   <*> tmBound (\tmx -> let v = reflect vI tmx in reifyType (vA v))
                                   <*> pure i
@@ -374,7 +373,7 @@ vliftI vI vD x vA i a vP vx = loop vD vx
                                   <*> tmBound (\tmi -> let vi = reflect vI tmi in
                                                        tmBound (\tma -> let va = reflect (vA vi) tma in
                                                                         reifyType (vP vi va)))
-                                  <*> reify (vsemI vI (VNeutral tmD) x vA) vx))
+                                  <*> reify (vsemI vI v x vA) vx))
 
 vallI :: Value
 vallI = VLam "I" $ \vI ->
@@ -434,6 +433,7 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
                               in VPair v1 v2
 reflect VUnit            tm = VUnitI
+reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "x" VIDesc_Id
 reflect _                tm = VNeutral tm
 
 
@@ -486,6 +486,9 @@ reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)
 reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
+reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
+     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure x <*> tmBound (\tmx -> let v = reflect vA tmx in reify (VIDesc tI) (vf v)))
+reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
 reify _                (VNeutral tm)       = tm
-reify ty               v                   = error $ "reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
+reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty

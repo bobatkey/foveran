@@ -54,8 +54,8 @@ fmap I D A B f =
 –    (k : (i : I) -> (a : A) -> P) ->
 –    (x : semI[D; i. A]) -> liftI[D; i. A; i a. P; x]
 
-– allI[“K” C;     i. A; i a. P] k c     = ()
 – allI[“IId” i;   i. A; i a. P] k a     = k i a
+– allI[“K” C;     i. A; i a. P] k c     = ()
 – allI[D₁ “×” D₂; i. A; i a. P] k «x,y» = «allI[D₁; i. A; i a. P] k x, allI[D₂; i. A; i a. P] k y»
 – allI[“Σ” C D;   i. A; i a. P] k «c,x» = allI[D c; i. A; i a. P] k x
 – allI[“Π” C D;   i. A; i a. P] k f     = λc. allI[D c; i. A; i a. P] k (f c)
@@ -67,6 +67,13 @@ fmap I D A B f =
 –   inductionI[D; i x. P] k i (construct x)
 – =
 –   k i x (allI[D; i. µI I D i; i x. P] (inductionI[D; i x. P] k)) : P i (construct x)
+
+– inductionOn x for i x. P with k.
+– infer what I, D and i are?
+
+–   inductionOn construct x for i x. P with k 
+– = 
+–   k i 
 
 – advantage of this is that we don't have to work out the set-level of
 – things when we generate the code for an eliminator. Disadvantage is

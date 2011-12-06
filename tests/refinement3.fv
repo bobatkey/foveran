@@ -10,6 +10,7 @@
 
 --------------------------------------------------------------------------------
 -- This ought to be built-in. semI[D; -] is a functor...
+-- fmap[D, i. A, i. B] : ((i : I) -> A -> B) -> semI[D, i.A] -> semI[D, i.B]
 mapI : (I : Set) ->
        (D : IDesc I) ->
        (X Y : I -> Set 2) ->
@@ -99,10 +100,12 @@ refinement I J D =
   ((j : J) -> X j -> semI[D (f j), i. (j : J) × f j ≡ i])
 
 {-
+just generate the appropriate type, and register a collection of projections:
+
 record refinement (I : Set) (J : Set) (D : I -> IDesc I) : Set 1 where
-  f : J -> I
-  X : J -> Set
-  h : (j : J) -> X j -> semI[D (f j), i. (j : J) × f j ≡ i]
+  #indexMap  : J -> I
+  #carrier   : J -> Set
+  #forgetMap : (j : J) -> X j -> semI[D (f j), i. (j : J) × f j ≡ i]
 -}
 
 realiseBody : (I J : Set) ->

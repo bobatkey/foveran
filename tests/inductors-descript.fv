@@ -162,6 +162,7 @@ semI' I J D X i = semI[D i, j. X j];
 – function is deliberately phrased to look like a monadic bind operator.
 – It would be nice in the future to build in the knowledge that IDesc
 – is a monad, and let the monad rules hold definitionally.
+{-
 compose : (A B : Set) → IDesc A → (A → IDesc B) → IDesc B;
 compose A B D f = elimID A (λD. IDesc B)
                          (λa. f a)
@@ -170,10 +171,12 @@ compose A B D f = elimID A (λD. IDesc B)
                          (λC D g. “Σ” C g)
                          (λC D g. “Π” C g)
                          D;
+-}
 
 – The semI function is actually a monad morphism. This function
 – witnesses this fact. Again, it would be nice if this held
 – definitionally.
+{-
 commute : (I J : Set) →
           (D₁ : IDesc I) →
           (D₂ : I → IDesc J) →
@@ -203,6 +206,7 @@ commute2 I J D₁ D₂ Φ =
          (λA D g p. «fst p, g (fst p) (snd p)»)
          (λA D g f. λa. g a (f a))
          D₁;
+-}
 
 – Every indexed description defines a functor. This function provides
 – the map functionality. Again, it would be nice if the functor laws
@@ -245,10 +249,7 @@ lift2 D A = elimD (λD. sem D A → IDesc A)
                   (λA' x. “K” Unit)
                   (λx. “IId” x)
                   (λD₁ D₂ f g x. f (fst x) “×” g (snd x))
- 		  (λD₁ D₂ f g x. case x for d. IDesc A with
-		                   { inl y. f y
-		 		   ; inr z. g z
-				   })
+ 		  (λD₁ D₂ f g x. case x with { inl y. f y; inr z. g z })
                   D;
 
 lift-to-lift2 : (D : Desc) →
@@ -262,11 +263,7 @@ lift-to-lift2 D A Φ =
         (λA x u. ⋄)
         (λx p. p)
         (λD₁ D₂ f₁ f₂ x p. « f₁ (fst x) (fst p), f₂ (snd x) (snd p) »)
-        (λD₁ D₂ f₁ f₂ x.
-            case x with
-              { inl y. λa. f₁ y a
-              ; inr z. λb. f₂ z b
-              })
+        (λD₁ D₂ f₁ f₂ x. case x with { inl y. λa. f₁ y a; inr z. λb. f₂ z b })
         D;
 
 lift2-to-lift : (D : Desc) →
@@ -309,14 +306,14 @@ lex-inductor : (A : Set) → inductor A →
                (B : Set) → inductor B →
                inductor (A × B);
 lex-inductor A AI B BI =
-  « λp.     compose A (A × B) (fst AI (fst p)) (bleh A B)
-        “×” compose B (A × B) (fst BI (snd p)) (bloo A B (fst p))
+  « λp.     (bind x <- fst AI (fst p) in bleh A B x)
+        “×” (bind x <- fst BI (snd p) in bloo A B (fst p) x)
   , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
                    (λa φa. snd BI (λb. Φ «a,b»)
-                                  (λb φb. k «a,b»
-                                            « commute A (A × B) (fst AI a) (bleh A B) Φ φa
+                                  (λb φb. k «a,b» «φa, φb»))
+{-                                            « commute A (A × B) (fst AI a) (bleh A B) Φ φa
                                             , commute B (A × B) (fst BI b) (bloo A B a) Φ φb
-                                            »))
+                                            »))-}
                    (fst p)
                    (snd p)
   »;
@@ -352,12 +349,12 @@ pair-inductor : (A : Set) → inductor A →
                 (B : Set) → inductor B →
                 inductor (A × B);
 pair-inductor A AI B BI =
-  « λp.     compose A (A × B) (fst AI (fst p)) (floo A B (snd p))
-        “×” compose B (A × B) (fst BI (snd p)) (bloo A B (fst p))
+  « λp.     (bind x <- fst AI (fst p) in floo A B (snd p) x)
+        “×” (bind x <- fst BI (snd p) in bloo A B (fst p) x)
   , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
                    (λa φa. snd BI (λb. Φ «a,b»)
-                                  (λb φb. k «a,b»
-                                            « commute A (A × B)
+                                  (λb φb. k «a,b» «map A (fst AI a) (λa. (b : B) -> Φ «a,b») (λa. Φ «a,b») (λa f. f b) φa, φb»))
+{-                                            « commute A (A × B)
                                                       (fst AI a)
                                                       (floo A B b)
                                                       Φ
@@ -367,7 +364,7 @@ pair-inductor A AI B BI =
                                                            (λa f. f b)
                                                            φa)
                                             , commute B (A × B) (fst BI b) (bloo A B a) Φ φb
-                                            »))
+                                            »))-}
                    (fst p)
                    (snd p)
   »;
@@ -427,18 +424,19 @@ with-bottom : (A : Set) → inductor A → inductor (maybe A);
 with-bottom A AI =
   « λx. case x with
           { inl u. “Π” A (λa. “IId” (inr a))
-          ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a))
+          ; inr a. bind a <- fst AI a in “IId” (inr a)
+– compose A (maybe A) (fst AI a) (λa. “IId” (inr a))
           }
   , λΦ k x. case x with
               { inl u.
                   k (inl u)
                     (snd AI (λa. Φ (inr a))
-                            (λa φ. k (inr a)
-                                     (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ)))
+                            (λa φ. k (inr a) φ))
+–                                     (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ)))
               ; inr a.
                   snd AI (λa. Φ (inr a))
-                         (λa φ. k (inr a)
-                                  (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ))
+                         (λa φ. k (inr a) φ)
+–                                  (commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ))
                          a
               }
   »;
@@ -451,13 +449,14 @@ with-top : (A : Set) → inductor A → inductor (maybe A);
 with-top A AI =
   « λx. case x with
           { inl u. “K” Unit
-          ; inr a. compose A (maybe A) (fst AI a) (λa. “IId” (inr a)) “×” “IId” (inl ⋄)
+          ; inr a. (bind a <- fst AI a in “IId” (inr a)) “×” “IId” (inl ())
+                 – compose A (maybe A) (fst AI a) (λa. “IId” (inr a)) “×” “IId” (inl ⋄)
           }
   , λΦ k x. case x with
               { inl u. k (inl u) ⋄
               ; inr a. snd AI (λa. Φ (inr a))
                         (λa φ. k (inr a)
-                                 « commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ
+                                 « φ – commute A (maybe A) (fst AI a) (λa. “IId” (inr a)) Φ φ
                                  , k (inl ⋄) ⋄
                                  »)
                         a
@@ -510,12 +509,12 @@ comonadic-inductor : (A  : Set) →
                            semI' A A (fst W) (semI' A A (fst AI) P) a) →
                      inductor A;
 comonadic-inductor A W AI d =
-  « λa. compose A A (fst AI a) (fst W)
+  « λa. bind a <- fst AI a in fst W a – compose A A (fst AI a) (fst W)
   , λΦ k a. counit A W Φ a (snd AI (semI' A A (fst W) Φ)
                                 (λa φ. map A (fst W a)
                                            (semI' A A (fst AI) (semI' A A (fst W) Φ))
                                            Φ
-				           (λa φ. k a (commute A A (fst AI a) (fst W) Φ φ))
+				           (λa φ. k a φ) – (commute A A (fst AI a) (fst W) Φ φ))
                                            (d (semI' A A (fst W) Φ)
                                                a
                                                (map A (fst AI a)
@@ -1070,14 +1069,14 @@ gcd n₁ n₂ =
           case compare (succ n₁) (succ n₂) with
             { inl e. succ n₁
             ; inr s. case s with
-               { inl lt. descend-gcd (λn. Nat) (fst lt) n₁ (succ n₂) (snd lt)
-                         (commute2 Nat (Nat × Nat)
-                                   (fst (complete-inductor NatDesc) (succ n₂))
-                                   (bloo Nat Nat (succ n₁)) (λn. Nat) (snd φ))
-               ; inr gt. descend-gcd (λn. Nat) (fst gt) n₂ (succ n₁) (snd gt)
-                         (commute2 Nat (Nat × Nat)
-                                   (fst (complete-inductor NatDesc) (succ n₁))
-                                   (floo Nat Nat (succ n₂)) (λn. Nat) (fst φ))
+               { inl lt. descend-gcd (λn. Nat) (fst lt) n₁ (succ n₂) (snd lt) (snd φ)
+–                         (commute2 Nat (Nat × Nat)
+–                                   (fst (complete-inductor NatDesc) (succ n₂))
+–                                   (bloo Nat Nat (succ n₁)) (λn. Nat) (snd φ))
+               ; inr gt. descend-gcd (λn. Nat) (fst gt) n₂ (succ n₁) (snd gt) (fst φ)
+–                         (commute2 Nat (Nat × Nat)
+–                                   (fst (complete-inductor NatDesc) (succ n₁))
+–                                   (floo Nat Nat (succ n₂)) (λn. Nat) (fst φ))
                }
             }))
     « n₁, n₂ »;
