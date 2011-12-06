@@ -79,7 +79,7 @@ pprint (ElimEq t (Just (a, e, t1)) t2) =
 pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("“K”" <+> down t)
 pprint Desc_Id             = "“Id”"
-pprint (Desc_Prod t1 t2)   = paren 08 (down t1 <+> "“×”" <+> t2)
+pprint (Desc_Prod t1 t2)   = paren 08 (sep [down t1, nest 2 "“×”", t2])
 pprint (Desc_Sum t1 t2)    = paren 09 (down t1 <+> "“+”" <+> t2)
 pprint Desc_Elim           = "elimD"
 pprint Sem                 = "sem"
@@ -91,8 +91,8 @@ pprint IDesc               = "IDesc"
 pprint (IDesc_Id t)        = paren 01 ("“IId”" <+> down t)
 pprint (IDesc_Sg t1 t2)    = paren 01 ("“Σ”" <+> (down t1 $$ down t2))
 pprint (IDesc_Pi t1 t2)    = paren 01 ("“Π”" <+> down t1 <+> down t2)
-pprint (IDesc_Bind t1 x t2) = paren 01 ("bind" <+> ppPattern x <+> "<-" <+> resetPrec t1 <+> "in"
-                                        $$ nest 2 (resetPrec t2))
+pprint (IDesc_Bind t1 x t2) = paren 09 (sep [ "bind" <+> ppPattern x <+> "<-" <+> resetPrec t1 <+> "in"
+                                            , nest 2 (resetPrec t2)])
 pprint IDesc_Elim          = "elimID"
 pprint (SemI tD i tA)      =
     resetPrec $ "semI" <> (cat [ "[" <+> tD
