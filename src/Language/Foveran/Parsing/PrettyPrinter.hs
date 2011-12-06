@@ -104,7 +104,7 @@ pprint (LiftI tD x tA i a tP tx) =
                                 , "," <+> ppPattern i <+> ppPattern a <> "." <+> tP
                                 , "," <+> tx
                                 , "]"])
-pprint (MuI t1 t2)         = paren 01 ("µI" <+> cat [down t1, down t2])
+pprint (MuI t1 t2)         = paren 01 ("µI" <+> sep [down t1, down t2])
 pprint InductionI          = "inductionI"
 
 pprint UserHole            = "?"
