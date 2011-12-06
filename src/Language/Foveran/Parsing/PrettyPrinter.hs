@@ -62,15 +62,19 @@ pprint (Case t tP y tL z tR) =
 pprint Unit                = "𝟙"
 pprint UnitI               = "()"
 pprint Empty               = "𝟘"
-pprint (ElimEmpty t1 Nothing)   = paren 01 ("absurdBy" <+> resetPrec t1)
-pprint (ElimEmpty t1 (Just t2)) = paren 01 ("absurdBy" <+> resetPrec t1 $$ nest 6 "for" <+> resetPrec t2)
+pprint (ElimEmpty t1 Nothing)   =
+    paren 01 ("absurdBy" <+> resetPrec t1)
+pprint (ElimEmpty t1 (Just t2)) =
+    paren 01 ("absurdBy" <+> resetPrec t1 $$ nest 6 "for" <+> resetPrec t2)
 
-pprint (Eq t1 t2)          = paren 07 (sep [down t1, nest 2 "≡", t2])
+pprint (Eq t1 t2)          = paren 07 (sep [down t1, nest 2 "==", t2])
 pprint Refl                = "refl"
-pprint (ElimEq t Nothing t2) = paren 01 ("rewriteBy" <+> resetPrec t <+> "then" $$ resetPrec t2)
-pprint (ElimEq t (Just (a, e, t1)) t2) = paren 01 ("rewriteBy" <+> resetPrec t
-                                                   $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
-                                                   $$ nest 2 "then" <+> resetPrec t2)
+pprint (ElimEq t Nothing t2) =
+    paren 01 ("rewriteBy" <+> resetPrec t <+> "then" $$ resetPrec t2)
+pprint (ElimEq t (Just (a, e, t1)) t2) =
+    paren 01 ("rewriteBy" <+> resetPrec t
+              $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
+              $$ nest 2 "then" <+> resetPrec t2)
 
 pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("“K”" <+> down t)
@@ -88,17 +92,21 @@ pprint (IDesc_Id t)        = paren 01 ("“IId”" <+> down t)
 pprint (IDesc_Sg t1 t2)    = paren 01 ("“Σ”" <+> (down t1 $$ down t2))
 pprint (IDesc_Pi t1 t2)    = paren 01 ("“Π”" <+> down t1 <+> down t2)
 pprint IDesc_Elim          = "elimID"
-pprint (SemI tD i tA)      = "semI[" <> resetPrec tD <> "," <+> ppPattern i <> "." <+> resetPrec tA <> "]"
+pprint (SemI tD i tA)      =
+    resetPrec $ "semI" <> (cat [ "[" <+> tD
+                               ,  "," <+> ppPattern i <> "." <+> tA
+                               ,  "]"])
 pprint (LiftI tD x tA i a tP tx) =
-    resetPrec ("liftI[" <> tD <+>
-                    "," <+> ppPattern x <> "." <+> tA <+>
-                    "," <+> ppPattern i <+> ppPattern a <> "." <+> tP <+>
-                    "," <+> tx <> "]")
-pprint (MuI t1 t2)         = paren 01 ("µI" <+> down t1 <+> down t2)
+    resetPrec $ "liftI" <> (cat [ "[" <+> tD
+                                , "," <+> ppPattern x <> "." <+> tA
+                                , "," <+> ppPattern i <+> ppPattern a <> "." <+> tP
+                                , "," <+> tx
+                                , "]"])
+pprint (MuI t1 t2)         = paren 01 ("µI" <+> cat [down t1, down t2])
 pprint InductionI          = "inductionI"
 
 pprint UserHole            = "?"
-pprint (Hole nm tms)       = "?" <> ppIdent nm <> "[" <> hcat (punctuate "," (map resetPrec (reverse tms))) <> "]"
+pprint (Hole nm tms)       = "?" <> ppIdent nm <> "{" <> hcat (punctuate "," (map resetPrec (reverse tms))) <> "}"
 
 ppAnnotTerm :: TermPos -> PP.Doc
 ppAnnotTerm t = foldAnnot pprint t `atPrecedenceLevel` 10
