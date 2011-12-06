@@ -131,3 +131,5 @@ runDeclCheck e = do
         putStrLn $ "Malformed definition at " ++ show p
     Left (p, IncompleteTyping) ->
         putStrLn $ "Incomplete typing at " ++ show p
+    Left (p, DataDeclError e) ->
+        putStrLn $ render $ "Data Declaration error at" <+> ppSpan p <> ":" <+> ppDataDeclError e
