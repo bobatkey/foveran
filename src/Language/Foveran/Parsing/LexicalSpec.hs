@@ -62,7 +62,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "elimID" :==>          emit IDesc_Elim
     , "µI" :==>              emit MuI
     , "inductionI" :==>      emit InductionI
-    , "≡" :==>               emit Eq
+    , "≡" .|. "==" :==>      emit Eq
     , "refl" :==>            emit Refl
     , "rewriteBy" :==>       emit RewriteBy
     , "elimEq" :==>          emit ElimEq
