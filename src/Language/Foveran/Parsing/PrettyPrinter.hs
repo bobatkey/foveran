@@ -59,9 +59,9 @@ pprint (Case t tP y tL z tR) =
             (";" <+> hang ("inr" <+> ppPattern z <> ".") 3 (resetPrec tR))
             $$
             "}")
-pprint Unit                = "𝟙"
+pprint Unit                = "Unit"
 pprint UnitI               = "()"
-pprint Empty               = "𝟘"
+pprint Empty               = "Empty"
 pprint (ElimEmpty t1 Nothing)   =
     paren 01 ("absurdBy" <+> resetPrec t1)
 pprint (ElimEmpty t1 (Just t2)) =
