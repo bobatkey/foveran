@@ -64,6 +64,7 @@ data TermCon tm
   | IDesc_Elim
   | SemI       tm Ident tm
   | LiftI      tm Ident tm Ident Ident tm tm
+  | MapI       tm Ident tm Ident tm tm tm
   | MuI        tm tm
   | InductionI
 
@@ -174,6 +175,12 @@ toLN (DS.IDesc_Bind t1 x t2) bv =
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
 toLN (DS.SemI tD x tA)    bv =
     Layer $ SemI (return $ tD bv) (identOfPattern x) (return $ tA (x:bv))
+toLN (DS.MapI tD i1 tA i2 tB tf tx) bv =
+    Layer $ MapI (return $ tD bv)
+                 (identOfPattern i1) (return $ tA (i1:bv))
+                 (identOfPattern i2) (return $ tB (i2:bv))
+                 (return $ tf bv)
+                 (return $ tx bv)
 toLN (DS.LiftI tD i tA i' a tP tx) bv =
     Layer $ LiftI (return $ tD bv)
                   (identOfPattern i) (return $ tA (i:bv))
@@ -246,6 +253,8 @@ close' fnm (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 close' fnm (IDesc_Bind t1 x t2) = IDesc_Bind <$> t1 <*> pure x <*> binder t2
 close' fnm IDesc_Elim       = pure IDesc_Elim
 close' fnm (SemI tD x tA)   = SemI <$> tD <*> pure x <*> binder tA
+close' fnm (MapI tD i1 tA i2 tB tf tx) =
+    MapI <$> tD <*> pure i1 <*> binder tA <*> pure i2 <*> binder tB <*> tf <*> tx
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm (LiftI tD i tA i' a tP tx) =
     LiftI <$> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx

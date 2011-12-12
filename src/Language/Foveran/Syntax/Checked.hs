@@ -77,6 +77,7 @@ data TermCon tm
     | IDesc_Elim
     | MuI        tm tm
     | SemI       tm tm Ident tm
+    | MapI       tm tm Ident tm Ident tm tm tm
     | LiftI      tm tm Ident tm Ident Ident tm tm
     | InductionI
 
@@ -140,6 +141,8 @@ traverseSyn (IDesc_Pi t1 t2) = IDesc_Pi <$> t1 <*> t2
 traverseSyn (IDesc_Bind tA tB t1 x t2) = IDesc_Bind <$> tA <*> tB <*> t1 <*> pure x <*> binder t2
 traverseSyn IDesc_Elim       = pure IDesc_Elim
 traverseSyn (SemI tI tD x tA)= SemI <$> tI <*> tD <*> pure x <*> binder tA
+traverseSyn (MapI tI tD i1 tA i2 tB tf tx) =
+    MapI <$> tI <*> tD <*> pure i1 <*> binder tA <*> pure i2 <*> binder tB <*> tf <*> tx
 traverseSyn (LiftI tI tD i tA i' a tP tx) =
     LiftI <$> tI <*> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
@@ -244,6 +247,10 @@ toDisplay (IDesc_Bind tA tB t1 x t2) =
     bindK x t2 $ \x t2 -> DS.IDesc_Bind <$> t1 <*> pure (DS.PatVar x) <*> pure t2
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
 toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure (DS.PatVar x) <*> pure tA
+toDisplay (MapI _ tD i1 tA i2 tB tf tx) =
+    bindK i1 tA $ \i1 tA ->
+    bindK i2 tB $ \i2 tB ->
+    DS.MapI <$> tD <*> pure (DS.PatVar i1) <*> pure tA <*> pure (DS.PatVar i2) <*> pure tB <*> tf <*> tx
 toDisplay (LiftI _ tD x tA i a tP tx) =
     do (x', tA') <- bind x tA
        (i', (a', tP')) <- bind i (bind a tP)
@@ -331,6 +338,8 @@ instance Eq Term where
       tA == tA' && tB == tB' && t1 == t1' && t2 == t2'
   In IDesc_Elim == In IDesc_Elim     = True
   In (SemI tI tD _ tA) == In (SemI tI' tD' _ tA') = tI == tI' && tD == tD' && tA == tA'
+  In (MapI tI tD _ tA _ tB tf tx) == In (MapI tI' tD' _ tA' _ tB' tf' tx') =
+    tI == tI' && tD == tD' && tA == tA' && tB == tB' && tf == tf' && tx == tx'
   In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
   In (LiftI tI tD i tA i2 a tP tx) == In (LiftI tI' tD' i' tA' i2' a' tP' tx') =
       tI == tI' && tD == tD' && tP == tP' && tx == tx'

@@ -72,6 +72,7 @@ data Token
     | Bind
     | IDesc_Elim
     | SemI
+    | MapI
     | LiftI
     | MuI
     | InductionI
@@ -142,6 +143,7 @@ instance SyntaxHighlight Token where
     lexicalClass Bind        = Keyword
     lexicalClass IDesc_Elim  = Keyword
     lexicalClass SemI        = Keyword
+    lexicalClass MapI        = Keyword
     lexicalClass LiftI       = Keyword
     lexicalClass MuI         = Type
     lexicalClass InductionI  = Keyword
@@ -217,6 +219,7 @@ instance Show Token where
   show IDesc_Elim  = "elimID"
   show Sem         = "sem"
   show SemI        = "semI"
+  show MapI        = "mapI"
   show LiftI       = "liftI"
   show MuI         = "µI"
   show InductionI  = "inductionI"

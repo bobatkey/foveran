@@ -609,6 +609,23 @@ synthesiseTypeFor (Annot p UnitI) = do
 synthesiseTypeFor (Annot p IDesc) = do
   return (VSet 0 .->. VSet 1, In $ CS.IDesc)
 
+synthesiseTypeFor (Annot p (MapI tD i1 tA i2 tB tf tx)) = do
+  (tyD, tmD) <- synthesiseTypeFor tD
+  case tyD of
+    VIDesc tyI -> do
+      let tmI = reifyType0 tyI
+      tmA <- bindVar i1 tyI tA $ \_ tA -> isType tA
+      tmB <- bindVar i2 tyI tB $ \_ tB -> isType tB
+      vA <- evalA tmA
+      vB <- evalA tmB
+      vD <- eval tmD
+      tmf <- tf `hasType` (forall i1 tyI $ \vi -> vA [vi] .->. vB [vi])
+      tmx <- tx `hasType` (vsemI tyI vD i1 (\v -> vA [v]))
+      return ( vsemI tyI vD i2 (\v -> vB [v])
+             , In $ CS.MapI tmI tmD i1 tmA i2 tmB tmf tmx )
+    v ->
+        raiseError p (ExpectingIDescForSemI v)
+
 synthesiseTypeFor (Annot p IDesc_Elim) = do
   return ( forall "I" (VSet 0) $ \i ->
            forall "P" (VIDesc i .->. VSet 10) $ \p ->

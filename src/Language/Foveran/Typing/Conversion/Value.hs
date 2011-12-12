@@ -22,6 +22,7 @@ module Language.Foveran.Typing.Conversion.Value
 
     , vsem
     , vsemI
+    , vmapI
 
     , vliftTy
     , vlift
@@ -120,6 +121,10 @@ vmuI :: Value -> Value -> Value
 vmuI a b = VLam "i" $ VMuI a b
 
 {------------------------------------------------------------------------------}
+bound :: Value -> (Value -> (Int -> Term)) -> Int -> Term
+bound ty f = tmBound (\tm -> f (reflect ty tm))
+
+{------------------------------------------------------------------------------}
 vcase :: Value ->
          Value ->
          Value ->
@@ -135,9 +140,9 @@ vcase (VNeutral n) vA vB x vP y vL z vR
                        <$> n
                        <*> reifyType vA
                        <*> reifyType vB
-                       <*> pure x <*> tmBound (\tmV -> reify (VSet 0) (vP (reflect (VSum vA vB) tmV)))
-                       <*> pure y <*> tmBound (\tmV -> let v = reflect vA tmV in reify (vP $ VInl v) (vL v))
-                       <*> pure z <*> tmBound (\tmV -> let v = reflect vB tmV in reify (vP $ VInr v) (vR v))))
+                       <*> pure x <*> bound (VSum vA vB) (\v -> reify (VSet 0) (vP v))
+                       <*> pure y <*> bound vA           (\v -> reify (vP $ VInl v) (vL v))
+                       <*> pure z <*> bound vB           (\v -> reify (vP $ VInr v) (vR v))))
 vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when eliminating case"
 
 {------------------------------------------------------------------------------}
@@ -183,6 +188,31 @@ vsemI vI vD x vA = loop vD
                             <*> tm
                             <*> pure y
                             <*> tmBound (\tmy -> let v = reflect vI tmy in reifyType (loop (vf v)))))
+
+vmapI :: Value ->
+         Value ->
+         Ident -> (Value -> Value) ->
+         Ident -> (Value -> Value) ->
+         Value ->
+         Value ->
+         Value
+vmapI vI vD i1 vA i2 vB vf vx = loop vD vx
+    where
+      loop (VIDesc_Id i)       a           = vf $$ i $$ a
+      loop (VIDesc_K _)        a           = a
+      loop (VIDesc_Pair d1 d2) (VPair x y) = VPair (loop d1 x) (loop d2 y)
+      loop (VIDesc_Sg c d)     (VPair x y) = VPair x (loop (d $$ x) y)
+      loop (VIDesc_Pi c d)     (VLam nm f) = VLam nm $ \v -> loop (d $$ v) (f v)
+      -- FIXME: might be able to proceed here?
+      loop vD                  a =
+          reflect (vsemI vI vD i2 vB)
+                  (In <$> (MapI
+                           <$> reifyType vI
+                           <*> reify (VIDesc vI) vD
+                           <*> pure i1 <*> bound vI (\v -> reifyType (vA v))
+                           <*> pure i2 <*> bound vI (\v -> reifyType (vB v))
+                           <*> reify (forall "i" vI $ \vi -> vA vi .->. vB vi) vf
+                           <*> reify (vsemI vI vD i1 vA) a))
 
 {------------------------------------------------------------------------------}
 vdesc_elim vP vK vI vPr vSu = loop

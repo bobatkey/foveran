@@ -266,6 +266,16 @@ term00 =
     (\p tD i tA p' -> Annot (makeSpan p p') (SemI tD i tA))
       <$> token Tok.SemI <* token Tok.LSqBracket <*> term10 <* token Tok.Comma <*> pattern <* token Tok.FullStop <*> term10 <*> token Tok.RSqBracket
     <|>
+    (\p tD i1 tA i2 tB tf tx p' -> Annot (makeSpan p p') (MapI tD i1 tA i2 tB tf tx))
+      <$> token Tok.MapI
+      <*  token Tok.LSqBracket
+      <*> term10                                   <* token Tok.Comma
+      <*> pattern <* token Tok.FullStop <*> term10 <* token Tok.Comma
+      <*> pattern <* token Tok.FullStop <*> term10 <* token Tok.Comma
+      <*> term10                                   <* token Tok.Comma
+      <*> term10
+      <*> token Tok.RSqBracket
+    <|>
     (\p tD x tA i a tP tx p' -> Annot (makeSpan p p') (LiftI tD x tA i a tP tx))
       <$> token Tok.LiftI
       <*  token Tok.LSqBracket

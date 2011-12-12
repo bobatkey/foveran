@@ -98,6 +98,13 @@ pprint (SemI tD i tA)      =
     resetPrec $ "semI" <> (cat [ "[" <+> tD
                                ,  "," <+> ppPattern i <> "." <+> tA
                                ,  "]"])
+pprint (MapI tD i1 tA i2 tB tf tx) =
+    resetPrec $ "mapI" <> (cat [ "[" <+> tD
+                               , "," <+> ppPattern i1 <> "." <+> tA
+                               , "," <+> ppPattern i2 <> "." <+> tB
+                               , tf
+                               , tx
+                               , "]"])
 pprint (LiftI tD x tA i a tP tx) =
     resetPrec $ "liftI" <> (cat [ "[" <+> tD
                                 , "," <+> ppPattern x <> "." <+> tA

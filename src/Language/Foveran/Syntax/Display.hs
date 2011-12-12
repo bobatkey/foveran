@@ -141,6 +141,7 @@ data TermCon tm
     | IDesc_Elim
     | IDesc_Bind tm Pattern tm
     | SemI       tm Pattern tm
+    | MapI       tm Pattern tm Pattern tm tm tm
     | LiftI      tm Pattern tm Pattern Pattern tm tm
     | MuI        tm tm
     | InductionI
