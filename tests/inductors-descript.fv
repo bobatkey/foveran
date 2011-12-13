@@ -211,6 +211,7 @@ commute2 I J D₁ D₂ Φ =
 – Every indexed description defines a functor. This function provides
 – the map functionality. Again, it would be nice if the functor laws
 – held definitionally.
+{-
 map : (A : Set) →
       (D : IDesc A) →
       (Φ Ψ : A → Set 1) →
@@ -225,7 +226,7 @@ map A D Φ Ψ f =
         (λA D map p. «fst p, map (fst p) (snd p)»)
         (λA D map f. λa. map a (f a))
         D;
-
+-}
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – The definition of inductors, as described above. We assume that
 – elimination into ‘Set 1’ is allowed, for flexibility.
@@ -353,7 +354,7 @@ pair-inductor A AI B BI =
         “×” (bind x <- fst BI (snd p) in bloo A B (fst p) x)
   , λΦ k p. snd AI (λa. (b : B) → Φ «a,b»)
                    (λa φa. snd BI (λb. Φ «a,b»)
-                                  (λb φb. k «a,b» «map A (fst AI a) (λa. (b : B) -> Φ «a,b») (λa. Φ «a,b») (λa f. f b) φa, φb»))
+                                  (λb φb. k «a,b» «mapI[fst AI a, a. (b : B) -> Φ «a,b», a. Φ «a,b», λa f. f b, φa], φb»))
 {-                                            « commute A (A × B)
                                                       (fst AI a)
                                                       (floo A B b)
@@ -511,17 +512,17 @@ comonadic-inductor : (A  : Set) →
 comonadic-inductor A W AI d =
   « λa. bind a <- fst AI a in fst W a – compose A A (fst AI a) (fst W)
   , λΦ k a. counit A W Φ a (snd AI (semI' A A (fst W) Φ)
-                                (λa φ. map A (fst W a)
-                                           (semI' A A (fst AI) (semI' A A (fst W) Φ))
-                                           Φ
-				           (λa φ. k a φ) – (commute A A (fst AI a) (fst W) Φ φ))
-                                           (d (semI' A A (fst W) Φ)
+                                (λa φ. mapI[fst W a
+                                           , a. semI' A A (fst AI) (semI' A A (fst W) Φ) a
+                                           , a. Φ a
+				           , λa φ. k a φ – (commute A A (fst AI a) (fst W) Φ φ))
+                                           , d (semI' A A (fst W) Φ)
                                                a
-                                               (map A (fst AI a)
-                                                    (semI' A A (fst W) Φ)
-                                                    (semI' A A (fst W) (semI' A A (fst W) Φ))
-                                                    (cojoin A W Φ)
-                                                    φ)))
+                                               (mapI[fst AI a
+                                                    , a. semI' A A (fst W) Φ a
+                                                    , a. semI' A A (fst W) (semI' A A (fst W) Φ) a
+                                                    , cojoin A W Φ
+                                                    , φ])])
                                 a)
   »;
 
@@ -542,8 +543,8 @@ primitive-inductor A AI Ψ k =
     « λΦ a p. « fst p, p », ⋄ »»»         – the cojoin
     AI
     (λΦ a φ.
-      « k a (map A (fst AI a) (λa. Ψ a × Φ a) (λa. Ψ a) (λa φ. fst φ) φ)
-      , map A (fst AI a) (λa. Ψ a × Φ a) (λa. Φ a) (λa φ. snd φ) φ
+      « k a (mapI[fst AI a, a. Ψ a × Φ a, a. Ψ a, λa φ. fst φ, φ])
+      , mapI[fst AI a, a. Ψ a × Φ a, a. Φ a, λa φ. snd φ, φ]
       »);
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -821,11 +822,11 @@ complete2-dist D P =
     (λx. semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x →
          semI' (µ D) (µ D) (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P) x)
     (λx dist y.
-      « map (µ D) (fst (desc-inductor D) (construct x))
-          (semI' (µ D) (µ D) (complete2-carrier D) P)
-          P
-          (complete2-counit D P)
-          y
+      « mapI[fst (desc-inductor D) (construct x)
+            , d. semI' (µ D) (µ D) (complete2-carrier D) P d
+            , d. P d
+            , complete2-counit D P
+            , y]
       , step D (complete2-carrier D) (semI' (µ D) (µ D) (fst (desc-inductor D)) P)
           x
           (apply D (µ D)
@@ -836,11 +837,11 @@ complete2-dist D P =
             (lift2-to-lift D (µ D)
               (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
               x
-              (map (µ D) (fst (desc-inductor D) (construct x))
-                (semI' (µ D) (µ D) (complete2-carrier D) P)
-                (semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P))
-                (complete2-snd2 D P)
-                y)))
+              (mapI[fst (desc-inductor D) (construct x)
+                   , x. semI' (µ D) (µ D) (complete2-carrier D) P x
+                   , x. semI' (µ D) (µ D) (fst (desc-inductor D)) (semI' (µ D) (µ D) (complete2-carrier D) P) x
+                   , complete2-snd2 D P
+                   , y])))
       »);
 
 – And now, after all that, a new induction principle for ‘µ D’:

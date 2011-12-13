@@ -1,5 +1,10 @@
 – This makes sure that we can do large eliminations:
 
+– notes:
+– 1. re-do this with the refinment0 version
+– 2. consider removing liftI, and replacing it with liftIDesc baked-in
+– 3. 
+
 – eliminateIDesc D for D. P with
 –   { “K” A.     ?
 –   ; “IId” i.   ?
@@ -7,23 +12,6 @@
 –   ; “Σ” A D.   λrecurse. ?
 –   ; “Π” A D.   λrecurse. ?
 –   }
-
---------------------------------------------------------------------------------
--- This ought to be built-in. semI[D; -] is a functor...
--- fmap[D, i. A, i. B] : ((i : I) -> A -> B) -> semI[D, i.A] -> semI[D, i.B]
-mapI : (I : Set) ->
-       (D : IDesc I) ->
-       (X Y : I -> Set 2) ->
-       (f : (i : I) -> X i -> Y i) ->
-       semI[D, i. X i] -> semI[D, i. Y i]
-mapI I D X Y f =
-  elimID I (λD. semI[D, i. X i] -> semI[D, i. Y i])
-    f
-    (λA a. a)
-    (λD₁ D₂ f₁ f₂ «x,y». «f₁ x, f₂ y»)
-    (λA D f «a,x». «a, f a x»)
-    (λA D f h. λa. f a (h a))
-    D
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 liftIDesc : (I : Set) ->
@@ -40,6 +28,34 @@ liftIDesc I D A =
     (λB D liftD f. “Π” B (λb. liftD b (f b)))
     D
 
+– so, liftIDesc commutes with mapI
+– floo : liftIDesc I D B (mapI I D A B f x) ≡ bind «i,a» <- liftIDesc I D A x in “IId” «i, f i a»
+
+– why is semI[liftIDesc I D B x, -] an applicative functor? Is it because we only have “positive” codes?
+– for all “positive” descriptions, we should be able to get an 'all', and an apply/product thing
+– we also get a “drop”
+
+– is there some way of getting all liftings to be represented as codes?
+– depends on the size of 'A'? Do we ever need 'A' to be bigger than Set?
+lift-to-liftIDesc : (I : Set) ->
+                    (D : IDesc I) ->
+                    (A : I -> Set) ->
+                    (P : (i : I) -> A i -> Set) ->
+                    (x : semI[D, i. A i]) ->
+                    liftI[D, i. A i, i a. P i a, x] ->
+                    semI[liftIDesc I D A x, «i,a». P i a]
+lift-to-liftIDesc I D A P =
+  elimID I (λD. (x : semI[D, i. A i]) ->
+                liftI[D, i. A i, i a. P i a, x] ->
+                semI[liftIDesc I D A x, «i,a». P i a])
+    (λi a p. p)
+    (λA a _. ())
+    (λD₁ D₂ f₁ f₂ «x₁,x₂» «y₁,y₂». «f₁ x₁ y₁, f₂ x₂ y₂»)
+    (λB D f «b,x» y. f b x y)
+    (λB D f h g b. f b (h b) (g b))
+    D
+
+– what is the relationship between this and liftIDesc?
 relIDesc : (I : Set) ->
            (D : IDesc I) ->
            (A B : I -> Set) ->
@@ -48,11 +64,14 @@ relIDesc : (I : Set) ->
            IDesc ((i : I) × A i × B i)
 relIDesc I D A B =
   elimID I (λD. semI[D, i. A i] -> semI[D, i. B i] -> IDesc ((i : I) × A i × B i))
-    (λi a b. “IId” «i,a,b»)
+    (λi a b.   “IId” «i,a,b»)
     (λC c₁ c₂. “K” Unit)
-    (λD₁ D₂ lift₁ lift₂ «x₁,y₁» «x₂,y₂». lift₁ x₁ x₂ “×” lift₂ y₁ y₂)
-    (λC D lift «c₁,x» «c₂,y». “Σ” (c₂ ≡ c₁) (λeq. lift c₁ x (rewriteBy eq then y)))
-    (λC D lift f₁ f₂. “Π” C (λc. lift c (f₁ c) (f₂ c)))
+    (λD₁ D₂ lift₁ lift₂ «x₁,y₁» «x₂,y₂».
+      lift₁ x₁ x₂ “×” lift₂ y₁ y₂)
+    (λC D lift «c₁,x» «c₂,y».
+      “Σ” (c₂ ≡ c₁) (λeq. lift c₁ x (rewriteBy eq then y)))
+    (λC D lift f₁ f₂.
+      “Π” C (λc. lift c (f₁ c) (f₂ c)))
     D
 
 --------------------------------------------------------------------------------
@@ -111,10 +130,9 @@ record refinement (I : Set) (J : Set) (D : I -> IDesc I) : Set 1 where
 realiseBody : (I J : Set) ->
               (f : J -> I) ->
               (D : IDesc I) ->
-              (j : J) ->
               (x : semI[D, i. (j : J) × f j ≡ i]) ->
               IDesc J
-realiseBody I J f D j x =
+realiseBody I J f D x =
   bind «i,j,_» <- liftIDesc I D (λi. (j : J) × f j ≡ i) x in
     “IId” j
 
@@ -123,7 +141,7 @@ refinement:code : (I J : Set) ->
                   refinement I J D ->
                   J -> IDesc J
 refinement:code I J D «f, X, h» =
-  λj. “Σ” (X j) (λx. realiseBody I J f (D (f j)) j (h j x))
+  λj. “Σ” (X j) (λx. realiseBody I J f (D (f j)) (h j x))
 
 refinementSet : (I J : Set) ->
                 (D : I -> IDesc I) ->
@@ -164,7 +182,7 @@ realiseRefinementExt : (I J : Set) ->
 realiseRefinementExt I J D «f,h» =
   λj. (x : µI I D (f j)) × goodElem I J D «f,h» «j,x»
 
-– basically, this stores the refinement data separately from the original data. This makes the forgetful functor trivial
+– basically, this stores the refinement data separately from the original data. This makes the forgetful function trivial
 
 – this is a relation between elements of the underlying datatype and
 – the indicies of the new one.
@@ -177,11 +195,21 @@ realiseRefinementExt I J D «f,h» =
 Now, any refinement should give an isomorphism:
   µI J (refinement:code I J D R) j =~ (x : µI I D (f j)) × goodElem I J D R j x
 
-this will likely be a nightmare to prove...
+this will likely be a nightmare to prove... 
 -}
 
-{- presumably by recursion on the realised refinement. Might be
-relatively easy.  -}
+{-
+iso1 : (I J : Set) ->
+       (D : I -> IDesc I) ->
+       (R : refinement I J D) ->
+       (j : J) ->
+       refinementSet I J D R j ->
+       (x : µI I D (fst R j)) × goodElem I J D R «j, x»
+iso1 I J D R =
+  inductionI J (refinement:code I J D R)
+    (λj _. (x : µI I D (fst R j)) × goodElem I J D R «j,x»)
+    (λj «a,x» φ. ?)
+-}
 
 assume iso2 : (I J : Set) ->
               (D : I -> IDesc I) ->
@@ -190,9 +218,8 @@ assume iso2 : (I J : Set) ->
               ((x : µI I D (fst R j)) × goodElem I J D R «j,x») ->
               refinementSet I J D R j
 
-{- by recursion on the underlying data... -}
-
-– and prove that the two are mutual inverse (if possible)
+– and prove that the two are mutual inverse (if possible). This is
+– probably not possible, due to the Π construct.
 
 --------------------------------------------------------------------------------
 -- from natural numbers to lists
@@ -226,32 +253,88 @@ l : list A
 l = cons A a (cons A b (nil A))
 
 --------------------------------------------------------------------------------
-– catamorphisms on indexed data; need to get the universe levels sorted out
+data Term : Set where
+  var : Nat -> Term
+  lam : Term -> Term
+  app : Term -> Term -> Term
+
+var : Nat -> Term
+var k = construct «inl (), k, refl»
+
+lam : Term -> Term
+lam tm = construct «inr (inl ()), tm, refl»
+
+app : Term -> Term -> Term
+app tm1 tm2 = construct «inr (inr ()), tm1, tm2, refl»
+
+assume lt : Nat -> Nat -> Set
+
+{-
+data WSTerm : Nat -> Set ornaments Term where
+  var : (n k : Nat) -> lt k n             -> WSTerm n [forget (var n k _)   = var k]
+  lam : (n : Nat) -> WSTerm (succ n)      -> WSTerm n [forget (lam n t)     = lam (forget t)]
+  app : (n : Nat) -> WSTerm n -> WSTerm n -> WSTerm n [forget (app n t1 t2) = app (forget t1) (forget t2)]
+
+– the algebraic ornament is well-scoped terms indexed by their underlying term
+– normal/neutral terms?
+-}
+
+wellscoped:refinement : refinement Unit Nat Term:code
+wellscoped:refinement =
+  « λn. ()
+  , λn. ((k : Nat) × lt k n) + Unit + Unit
+  , λn cons. case cons with
+               { inl «k, _». «inl (), k, refl»
+               ; inr cons.
+                 case cons with
+                   { inl _. «inr (inl ()), «succ n, refl», refl»
+                   ; inr _. «inr (inr ()), «n, refl», «n, refl», refl»
+                   }
+               }
+  »
+
+WSTerm : Nat -> Set
+WSTerm = refinementSet Unit Nat Term:code wellscoped:refinement
+
+varWS : (n k : Nat) -> lt k n -> WSTerm n
+varWS n k k_lt_n = construct «inl «k, k_lt_n», ()»
+
+lamWS : (n : Nat) -> WSTerm (succ n) -> WSTerm n
+lamWS n tm = construct «inr (inl ()), tm, ()»
+
+appWS : (n : Nat) -> WSTerm n -> WSTerm n -> WSTerm n
+appWS n tm1 tm2 = construct «inr (inr ()), tm1, tm2, ()»
+
+– renaming for free? substitution for free? what is special about the succ operation?
+– morphisms in the renaming category are functions Fin n -> Fin m
+– or vector (Fin m) n for an extensional version
+
+--------------------------------------------------------------------------------
+– catamorphisms on indexed data
 algebra : (I : Set) -> (D : I -> IDesc I) -> Set 1
 algebra I D =
   (A : I -> Set) ×
   (i : I) -> semI[D i, i. A i] -> A i
 
-– This is basically the same as zip0, below
+– This is basically the same as dropIDesc below
 drop : (I : Set) ->
-       (D : I -> IDesc I) ->
-       (A : I -> Set) ->
-       (i : I) ->
-       (x : semI[D i, i. µI I D i]) ->
-       liftI[D i, i. µI I D i, i x. A i, x] ->
-       semI[D i, i. A i]
-drop I D A i =
+       (D : IDesc I) ->
+       (A B : I -> Set) ->
+       (x : semI[D, i. A i]) ->
+       liftI[D, i. A i, i x. B i, x] ->
+       semI[D, i. B i]
+drop I D A B =
   elimID I
-    (λD'. (x : semI[D', i. µI I D i]) ->
-          liftI[D', i. µI I D i, i x. A i, x] ->
-          semI[D', i. A i])
+    (λD'. (x : semI[D', i. A i]) ->
+          liftI[D', i. A i, i x. B i, x] ->
+          semI[D', i. B i])
     (λi x a. a)
     (λX x u. x)
     (λD₁ D₂ drop₁ drop₂ x a.
       «drop₁ (fst x) (fst a), drop₂ (snd x) (snd a)»)
     (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
     (λX D drop f a. λx. drop x (f x) (a x))
-    (D i)
+    D
 
 cata : (I : Set) ->
        (D : I -> IDesc I) ->
@@ -260,60 +343,62 @@ cata : (I : Set) ->
 cata I D A =
   inductionI I D
     (λi x. fst A i)
-    (λi x φ. snd A i (drop I D (fst A) i x φ))
+    (λi x φ. snd A i (drop I (D i) (µI I D) (fst A) x φ))
 
 --------------------------------------------------------------------------------
 -- Generic forgetful functions
-zip0 :
+
+-- this is the descriptions version of “drop”. It has exactly the same code...
+dropIDesc :
   (I : Set) ->
-  (J : I -> Set) ->
-  (B : I -> Set) ->
-  (D : I -> IDesc I) ->
-  (i : I) ->
-  (j : J i) ->
-  (x : semI[D i, i. J i]) ->
-  semI[liftIDesc I (D i) J x,  i. B (fst i)] ->
-  semI[D i, i. B i]
-zip0 I J B D i j =
-  elimID I (λD. (x : semI[D, i. J i]) ->
-                semI[liftIDesc I D J x, i. B (fst i)] ->
+  (A B : I -> Set) ->
+  (D : IDesc I) ->
+  (x : semI[D, i. A i]) ->
+  semI[liftIDesc I D A x,  i. B (fst i)] -> – this is equivalent to semI[bind «i,_» <- liftIDesc I D J x in “IId” i, i. B i]
+  semI[D, i. B i]
+dropIDesc I A B D =
+  elimID I (λD. (x : semI[D, i. A i]) ->
+                semI[liftIDesc I D A x, i. B (fst i)] ->
                 semI[D, i. B i])
     (λi j b. b)
     (λA a _. a)
     (λD₁ D₂ f₁ f₂ «x₁,x₂» «y₁,y₂». «f₁ x₁ y₁, f₂ x₂ y₂»)
     (λA D h «a,x» y. «a, h a x y»)
     (λA D h f g a. h a (f a) (g a))
-    (D i);
+    D
 
--- this should be split into an application of zip0, then something that deals with the mapIDesc.
-zip :
+-- every refinement yields a natural transformation:
+-- if we weren't worried about f : J -> I, then this would just be an application of 'dropIDesc'
+-- presumably, this is a cartesian morphism. Is this exploitable?
+forgetTransformation :
   (I J : Set) ->
-  (f : J -> I) ->
-  (B : I -> Set) ->
-  (D : IDesc I) ->
+  (D : I -> IDesc I) ->
+  (R : refinement I J D) ->
+  (X : I -> Set) ->
   (j : J) ->
-  (x : semI[D, i. (j : J) × f j ≡ i]) ->
-  semI[realiseBody I J f D j x, j. B (f j)] ->
-  semI[D, i. B i]
-zip I J f B D j =
-  elimID I (λD. (x : semI[D, i. (j : J) × f j ≡ i]) ->
-                semI[realiseBody I J f D j x, j. B (f j)] ->
-                semI[D, i. B i])
-    (λi «j, eq» b. rewriteBy eq then b)
-    (λA a _. a)
-    (λD₁ D₂ f₁ f₂ «x₁,x₂» «y₁,y₂». «f₁ x₁ y₁, f₂ x₂ y₂»)
-    (λA D h «a,x» y. «a, h a x y»)
-    (λA D h f g a. h a (f a) (g a))
-    D;
+  semI[refinement:code I J D R j, j. X (fst R j)] ->
+  semI[D (fst R j), i. X i]
+forgetTransformation I J D R X j «a,x» =
+  dropIDesc
+    I (λi. (j : J) × fst R j ≡ i) X
+    (D (fst R j))
+    (snd (snd R) j a)
+    (mapI[liftIDesc I (D (fst R j)) (λi. (j : J) × fst R j ≡ i) (snd (snd R) j a) – functor
+         , x. X (fst R (fst (snd x))) – source
+         , x. X (fst x) – target
+         , λ«i,j,eq» x. rewriteBy eq then x
+         , x])
 
-forgetAlg : (I J : Set) ->
-            (D : I -> IDesc I) ->
-            (R : refinement I J D) ->
-            (j : J) ->
-            semI[refinement:code I J D R j, j. µI I D (fst R j)] ->
-            µI I D (fst R j)
-forgetAlg I J D R j «a,x» =
-  construct (zip I J (fst R) (µI I D) (D (fst R j)) j (snd (snd R) j a) x)
+– now what if you compose:
+–    f . forgetTransformation? 
+
+forgetAlgebra : (I J : Set) ->
+                (D : I -> IDesc I) ->
+                (R : refinement I J D) ->
+                algebra J (refinement:code I J D R)
+forgetAlgebra I J D R =
+  « λj. µI I D (fst R j)
+  , λj x. construct (forgetTransformation I J D R (µI I D) j x)»
 
 forget : (I J : Set) ->
          (D : I -> IDesc I) ->
@@ -322,7 +407,7 @@ forget : (I J : Set) ->
          µI J (refinement:code I J D R) j ->
          µI I D (fst R j)
 forget I J D R =
-  cata J (refinement:code I J D R) «λj. µI I D (fst R j), forgetAlg I J D R»
+  cata J (refinement:code I J D R) (forgetAlgebra I J D R)
 
 two : Nat
 two = succ (succ zero)
@@ -332,15 +417,6 @@ test = refl
 
 --------------------------------------------------------------------------------
 -- algebraic ornaments
-forgetAlgebra : (I J : Set) ->
-                (D : I -> IDesc I) ->
-                (R : refinement I J D) ->
-                algebra J (refinement:code I J D R)
-forgetAlgebra I J D R =
-  « λj. µI I D (fst R j)
-  , forgetAlg I J D R
-  »
-
 algRefinement :
   (I : Set) ->
   (D : I -> IDesc I) ->
@@ -350,9 +426,12 @@ algRefinement I D A =
   « λ«i, a». i
   , λ«i, a». (x : semI[D i, i. fst A i]) × snd A i x ≡ a
   , λ«i, a» «x, _».
-      mapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
-        (λi a. ««i, a», refl»)
-        x
+      mapI[D i, i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i,
+        λi a. ««i, a», refl»,
+        x]
+–      fmapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+–        (λi a. ««i, a», refl»)
+–        x
   »
 
 vectorRefinement : (A : Set) -> refinement Unit ((u : Unit) × Nat) (list:code A)
@@ -373,6 +452,8 @@ vnil A = construct «««inl (), ()», refl», ()»
 vcons : (A : Set) -> (n : Nat) -> A -> vector A n -> vector A (succ n)
 vcons A n a v = construct «««inr a, n, ()», refl», «v, ()»»
 
+– induction principle for algebraic refinements?
+
 v : vector A two
 v = vcons A (succ zero) a (vcons A zero b (vnil A))
 
@@ -383,46 +464,373 @@ length A = forget Unit Unit Nat:code (listRefinement A) ()
 toList : (A : Set) -> (n : Nat) -> vector A n -> list A
 toList A n = forget Unit ((u : Unit) × Nat) (list:code A) (vectorRefinement A) «(), n»
 
+--------------------------------------------------------------------------------
+-- The "by hand" ornamentation of lists to get vectors
+vectorRefinement2 : (A : Set) -> refinement Unit Nat (list:code A)
+vectorRefinement2 A =
+  « λn. ()
+  , λn. (zero ≡ n) + ((n' : Nat) × A × (succ n' ≡ n))
+  , λn c. case c with
+            { inl _.          «inl (), ()»
+            ; inr «n', a, _». «inr a, «n', refl», ()»
+            }
+  »
+
+vector2 : (A : Set) -> Nat -> Set
+vector2 A = refinementSet Unit Nat (list:code A) (vectorRefinement2 A)
+
+vnil2 : (A : Set) -> vector2 A zero
+vnil2 A = construct «inl refl, ()»
+
+vcons2 : (A : Set) -> (n : Nat) -> A -> vector2 A n -> vector2 A (succ n)
+vcons2 A n a v = construct «inr «n, a, refl», v, ()»
+
+vector2:elim :
+  (A : Set) ->
+  (P : (n : Nat) -> vector2 A n -> Set) ->
+  P zero (vnil2 A) ->
+  ((n : Nat) -> (a : A) -> (v : vector2 A n) -> P n v -> P (succ n) (vcons2 A n a v)) ->
+  (n : Nat) ->
+  (v : vector2 A n) ->
+  P n v
+vector2:elim A P pnil pcons =
+  inductionI Nat (refinement:code Unit Nat (list:code A) (vectorRefinement2 A))
+    (λn v. P n v)
+    (λn «c, x».
+       case c for c. (x : semI[realiseBody Unit Nat (λn. ()) (list:code A ()) (snd (snd (vectorRefinement2 A)) n c), n. vector2 A n]) ->
+                     liftI[ realiseBody Unit Nat (λn. ()) (list:code A ()) (snd (snd (vectorRefinement2 A)) n c)
+                           , n. vector2 A n
+                           , n v. P n v
+                           , x] ->
+                     P n (construct «c,x») with
+         { inl eq. λ_ _. rewriteBy eq then pnil
+         ; inr «n', a, eq». λ«v, _» «ih, _». rewriteBy eq then pcons n' a v ih
+         } x)
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+algRefinementSet : (I : Set) ->
+                   (D : I -> IDesc I) ->
+                   (A : algebra I D) ->
+                   ((i : I) × fst A i) -> Set
+algRefinementSet I D A =
+  µI ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A))
+
+forgetAlg : (I : Set) ->
+            (D : I -> IDesc I) ->
+            (A : algebra I D) ->
+            (i : I) ->
+            (a : fst A i) ->
+            algRefinementSet I D A «i,a» ->
+            µI I D i
+forgetAlg I D A i a x =
+  forget I ((i : I) × fst A i) D (algRefinement I D A) «i,a» x
+
+{-
+recompute : (I : Set) ->
+            (D : I -> IDesc I) ->
+            (A : algebra I D) ->
+            (i : I) ->
+            (a : fst A i) ->
+            (x : algRefinementSet I D A «i,a») ->
+            cata I D A i (forgetAlg I D A i a x) ≡ a
+recompute I D A i a x =
+  inductionI ((i : I) × fst A i)
+    (refinement:code I ((i : I) × fst A i) D (algRefinement I D A))
+    (λ«i,a» x. cata I D A i (forgetAlg I D A i a x) ≡ a)
+    (λ«i,a» «x, rest» φ.
+      rewriteBy snd x then
+      elimID I
+        (λD'. (x : semI[D', i. fst A i]) ->
+              (rest : semI[ liftIDesc I D' (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+                              (mapI I D' (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i) (λi a. ««i,a», refl») x)
+                          , i. algRefinementSet I D A (fst (snd i)) ]) ->
+              liftI[ realiseBody I ((i : I) × fst A i) (λx. fst x) D'
+                       (mapI I D' (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i) (λi a. ««i,a», refl») x)
+                   , i. algRefinementSet I D A i
+                   , i x. cata I D A (fst i) (forgetAlg I D A (fst i) (snd i) x) ≡ snd i
+                   , rest ] ->
+              ?) – snd A i (mapI' ) == snd A i x)
+        ?
+        ?
+        ?
+        ?
+        ?
+        (D i)
+        (fst x)
+        rest
+        φ)
+    «i,a» x
+-}
+
+– the relevant code is actually  liftIDesc I (D i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+–                                   (mapI I (D i) (fst A) (λi. (j : (i : I) × fst A i) × fst j ≡ i) (λi a. ««i,a», refl») x
+
+– abstract over (D i), and attempt to prove the lemma...
+– tricky bit is going to be working out what the cata . forget thing looks like...
+– should just be cata I D A i (mapI' (forgetAlg ...) «x, rest»)
+
+– rest : semI[ code
+–            , x. µI ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) x]
+
+– φ : liftI[ code
+–          , «i,a». µI ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) «i,a»
+–          , «i,a» x. cata I D A i (forget I ((i : I) × fst A i) D (algRefinement I D A) «i,a» x) ≡ a
+–          , rest ]
+
+–      cata I D A i (forget I ((i : I) × fst A i) D (algRefinement I D A) «i,a» (construct «x, rest»)) ≡ fst x
+
 -- to prove:
 –  (A : Set) -> (n : Nat) -> (v : vector A n) -> length A (toList A n v) ≡ n
 
--- more generally:
 {-
-assume prop :
-  (I J : Set) ->
-  (D   : I -> IDesc I) ->
-  (alg : algebra I D) ->
-  icata I D (fst alg) (snd alg)
-
-forget I ((i : I) × fst alg i) D (algRefinement I D alg)
-  : (j : (i : I) × fst algebra i) ->
-    µI ((i : I) × fst alg i) (refinement:code I ((i : I) × fst algebra i) D (algRefinement I D alg)) j ->
-    µI I D (fst j)
--}
-
-iso1 : (I J : Set) ->
-       (D : I -> IDesc I) ->
-       (R : refinement I J D) ->
-       (j : J) ->
-       refinementSet I J D R j ->
-       (x : µI I D (fst R j)) × goodElem I J D R «j, x»
-iso1 I J D R =
-  inductionI J (refinement:code I J D R)
-    (λj _. (x : µI I D (fst R j)) × goodElem I J D R «j,x»)
-    (λj «a,x» φ. ?)
 –      « construct (zip I J (fst R) (µI I D) (D (fst R j)) j (snd (snd R) j a) x)
 –      , ? »)
+-}
+
+-- FIXME: this should be built-in
+-- Also, it is (possibly) the 'pure' of the (relative) applicative functor that is liftI
+-- We can also define 'apply', and get the desired equalities to hold definitionally...
+-- Along with the interaction with the semI-level things.
+allI : (I  : Set) ->
+       (D  : IDesc I) ->
+       (A  : I -> Set) ->
+       (P  : (i : I) -> A i -> Set 2) ->
+       (p  : (i : I) -> (x : A i) -> P i x) ->
+       (xs : semI[D, i. A i]) ->
+       liftI[D, i. A i, i x. P i x, xs]
+allI I D A P p = elimID I (λD. (xs : semI[D, i. A i]) -> liftI[D, i. A i, i x. P i x, xs])
+                        (λx xs. p x xs)
+                        (λA xs. ⋄)
+                        (λD₁ D₂ all₁ all₂ x. «all₁ (fst x), all₂ (snd x)»)
+                        (λB D all x. all (fst x) (snd x))
+                        (λB D all x. λb. all b (x b))
+                        D;
+
+unitIDesc : (I : Set) ->
+            (D : IDesc I) ->
+            (A : I -> Set) ->
+            (x : semI[D, i. A i]) ->
+            semI[liftIDesc I D A x, _. Unit]
+unitIDesc I D A =
+  elimID I (λD. (x : semI[D, i. A i]) -> semI[liftIDesc I D A x, _. Unit])
+    (λi a. ())
+    (λB b. ())
+    (λD₁ D₂ all₁ all₂ «x₁,x₂». «all₁ x₁, all₂ x₂»)
+    (λB D all «b,x». all b x)
+    (λB D all f b. all b (f b))
+    D
+
+– dropIDesc I D A (λ_. Unit) x (unitIDesc I D A x) ≡ x
+
+allIDesc : (I : Set) ->
+           (D : IDesc I) ->
+           (A : I -> Set) ->
+           (P : (i : I) -> A i -> Set) ->
+           (p : (i : I) -> (a : A i) -> P i a) ->
+           (x : semI[D, i. A i]) ->
+           semI[liftIDesc I D A x, «i,a». P i a]
+allIDesc I D A P p =
+  elimID I (λD. (x : semI[D, i. A i]) -> semI[liftIDesc I D A x, «i,a». P i a])
+    (λi a. p i a)
+    (λB b. ())
+    (λD₁ D₂ all₁ all₂ «x₁,x₂». «all₁ x₁, all₂ x₂»)
+    (λB D all «b,x». all b x)
+    (λB D all f b. all b (f b))
+    D
+
+mapI' : (I : Set) ->
+        (D : IDesc I) ->
+        (A B : I -> Set) ->
+        (f : (i : I) -> A i -> B i) ->
+        semI[D, i. A i] -> semI[D, i.B i]
+mapI' I D A B f x =
+  drop I D A B x (allI I D (λi. A i) (λi _. B i) f x)
+
+– we could attempt to make this hold definitionally...
+{-
+drop-all : (I : Set) ->
+           (D : IDesc I) ->
+           (A B : I -> Set) ->
+           (f : (i : I) -> A i -> B i) ->
+           (x : semI[D, i. A i]) ->
+           drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI I D (λi. A i) (λi. B i) f x
+drop-all I D A B f =
+  elimID I
+    (λD. (x : semI[D, i. A i]) ->
+         drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI I D (λi. A i) (λi. B i) f x)
+    (λi a. refl)
+    (λA a. refl)
+    (λD₁ D₂ ih₁ ih₂ «x₁,x₂».
+      rewriteBy ih₁ x₁ then
+      rewriteBy ih₂ x₂ then
+      refl)
+    (λA D ih «a,x».
+      rewriteBy ih a x then
+      refl)
+    (λA D ih f. ?) – stuck: due to lack of extensionality...
+    D
+-}
+helper : (I : Set) ->
+         (D : I -> IDesc I) ->
+         (A : algebra I D) ->
+         (i : I) ->
+         (x : semI[D i, i. µI I D i]) ->
+         liftI[ D i, i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+         liftI[ D i
+              , i. (j : (i : I) × fst A i) × fst j ≡ i
+              , i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) (fst x)
+              , mapI[D i, i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i
+                    , λi a. ««i, a», refl»
+                    , drop I (D i) (µI I D) (fst A) x (allI I (D i) (λi. µI I D i) (λi _. fst A i) (cata I D A) x) ]
+              ]
+– vs (fusing the mapI with the lift, and converting drop . all to mapI
+{-         liftI[ D i
+              , i. fst A i
+              , i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i,x»
+              , mapI I (D i) (λi. µI I D i) (λi _. fst A i) (cata I D A) x
+              ]-}
+– then (fusing in the new mapI)
+{-         liftI[ D i
+              , i. µI I D i
+              , i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A x»
+              , x
+              ]-}
+– which is as required
+helper I D A i =
+  elimID I
+    (λD'. (x : semI[D', i. µI I D i]) ->
+          liftI[D', i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+          liftI[ D'
+               , i. (j : (i : I) × fst A i) × fst j ≡ i
+               , i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) (fst x)
+               , mapI[D'
+                     , i. fst A i
+                     , i. (j : (i : I) × fst A i) × fst j ≡ i
+                     , λi a. ««i, a», refl»
+                     , drop I D' (µI I D) (fst A) x (allI I D' (λi. µI I D i) (λi _. fst A i) (cata I D A) x)]
+               ])
+    (λi x y. y)
+    (λA a _. ())
+    (λD₁ D₂ f₁ f₂ «x₁,x₂» «y₁,y₂». «f₁ x₁ y₁, f₂ x₂ y₂»)
+    (λB D f «b,x» y. f b x y)
+    (λB D f h g b. f b (h b) (g b))
+    (D i) – exactly the same code as for lift-to-liftIDesc
 
 {-
+extract :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (A : algebra I D) ->
+  (i : I) ->
+  (x : semI[D i, i. µI I D i]) ->
+  liftI[D i, i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+  semI[D i, i. fst A i]
+extract I D A i =
+  elimID I (λD'. (x : semI[D', i. µI I D i]) ->
+                 liftI[D', i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+                 semI[D', i. fst A i])
+    (λi x y. snd A i (fst (fst (deconstruct ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) «i, cata I D A i x» y))))
+    (λX x _. x)
+    ?
+    ?
+    ?
+    (D i)
+-}
+
+– could replace cata with something else?
+helper2 : (I : Set) ->
+          (D : I -> IDesc I) ->
+          (A : algebra I D) ->
+          (i : I) ->
+          (x : semI[D i, i. µI I D i]) ->
+          liftI[ D i, i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+          semI[ realiseBody I ((i : I) × fst A i) (λ«i,_». i) (D i)
+                  (mapI[D i, i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i
+                       , λi a. ««i, a», refl»
+                       , drop I (D i) (µI I D) (fst A) x (allI I (D i) (λi. µI I D i) (λi _. fst A i) (cata I D A) x)])
+              , x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) x]
+helper2 I D A i =
+  elimID I
+    (λD'. (x : semI[D', i. µI I D i]) ->
+          liftI[ D', i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+          semI[ realiseBody I ((i : I) × fst A i) (λ«i,_». i) D'
+                  (mapI[D', i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i
+                       , λi a. ««i, a», refl»
+                       , mapI' I D' (µI I D) (fst A) (cata I D A) x])
+              , x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) x])
+    (λi x y. y)
+    (λA a _. ())
+    (λD₁ D₂ f₁ f₂ «x₁,x₂» «y₁,y₂». «f₁ x₁ y₁, f₂ x₂ y₂»)
+    (λB D f «b,x» y. f b x y)
+    (λB D f h g b. f b (h b) (g b))
+    (D i) – exactly the same code as for lift-to-liftIDesc
+
+– defined equality for semI? Then just assume that everything preserves it?
+
+– this should follow for some nice general reason...
+{-
+helper3 : (I : Set) ->
+          (D : I -> IDesc I) ->
+          (A : algebra I D) ->
+          (i : I) ->
+          (x : semI[D i, i. µI I D i]) ->
+          liftI[ D i, i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+          semI[ refinement:code I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i (construct x)»
+              , x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) x]
+helper3 I D A i x xs =
+  elimID I
+    (λD'. (f : (semI[D', i. fst A i] -> fst A i)) ->
+          (x : semI[D', i. µI I D i]) ->
+          liftI[D', i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
+          (a : (x' : semI[D', i. fst A i]) × (f x' ≡ f (mapI' I D' (µI I D) (fst A) (cata I D A) x))) ×
+          semI[ realiseBody I ((i : I) × fst A i) (λ«i,_». i) D'
+                  (mapI I D' (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i) (λi a. ««i, a», refl») (fst a))
+              , x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) x])
+    (λi f x xs. ««cata I D A i x, refl», xs») – FIXME: extract it from the underlying thing
+    (λA d x xs. ««x, refl», ()»)
+    (λD₁ D₂ ih₁ ih₂ f x xs. ?)
+    ?
+    ?
+    (D i)
+    (snd A i)
+    x
+    xs
+-}
+
 decorate :
   (I : Set) ->
   (D : I -> IDesc I) ->
   (A : algebra I D) ->
   (i : I) ->
   (x : µI I D i) ->
-  µI ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) «i, cata I D A i x»
-decorate I D A = ?
--}
+  refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x»
+decorate I D A =
+  inductionI I D
+    (λi x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x»)
+    (λi x φ. construct « « mapI' I (D i) (µI I D) (fst A) (cata I D A) x
+                         – mapI I (D i) (λi. µI I D i) (λi. fst A i) (cata I D A) x  -- to do this, we would need to know that drop . all = mapI
+                         – this completely recomputes the underlying value! We ought to be able to extract it from φ
+                         , refl»
+                       , helper2 I D A i x φ
+               {- lift-to-liftIDesc I (D i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+                     (λi x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) (fst x))
+                     (mapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
+                       (λi a. ««i, a», refl»)
+                       (drop I D (fst A) i x (allI I (D i) (λi. µI I D i) (λi _. fst A i) (cata I D A) x)))
+                     (helper I D A i x φ) -}
+                       »)
+
+toVector : (A : Set) ->
+           (l : list A) ->
+           vector A (length A l)
+toVector A = decorate Unit (list:code A) (forgetAlgebra Unit Unit Nat:code (listRefinement A)) ()
+
+– test2 : toList A (length A l) (toVector A l) ≡ l
+– test2 = refl
+
+– normalise toList A two (decorate Unit (list:code A) (forgetAlgebra Unit Unit Nat:code (listRefinement A)) () l)
+
+
 – such that decorate and forget are mutually inverse
 
 – icata alg (forget I J D (algRefinement I D alg) j x) ≡ j

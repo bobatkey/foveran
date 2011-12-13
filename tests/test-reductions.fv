@@ -1,0 +1,39 @@
+IId : (I : Set) -> I -> IDesc I
+IId I i = “IId” i
+
+– FIXME: need type ascription syntax
+{-
+semIIId : (I : Set) ->
+          (i : I) ->
+          (A : I -> Set) ->
+          (semI[IId I i, i. A] : Set) ≡ A i
+semIIId I i A = refl
+-}
+
+assume I : Set
+assume D : IDesc I
+assume D' : I -> IDesc I
+
+exD : IDesc I
+exD = bind x <- D in D' x
+
+assume A : I -> Set
+assume B : I -> Set
+assume C : I -> Set
+
+ex : Set
+ex = semI[exD, i. A i]
+
+normalise ex
+
+assume x : semI[exD, i. A i]
+
+normalise x
+
+assume f : (i : I) -> A i -> B i
+assume g : (i : I) -> B i -> C i
+assume y : semI[D, i. A i]
+
+normalise mapI[D, i. B i, i. C i, g, mapI[D, i. A i, i. B i, f, y]]
+
+;

@@ -102,8 +102,8 @@ pprint (MapI tD i1 tA i2 tB tf tx) =
     resetPrec $ "mapI" <> (cat [ "[" <+> tD
                                , "," <+> ppPattern i1 <> "." <+> tA
                                , "," <+> ppPattern i2 <> "." <+> tB
-                               , tf
-                               , tx
+                               , "," <+> tf
+                               , "," <+> tx
                                , "]"])
 pprint (LiftI tD x tA i a tP tx) =
     resetPrec $ "liftI" <> (cat [ "[" <+> tD
