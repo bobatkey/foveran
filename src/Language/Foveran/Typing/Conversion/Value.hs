@@ -454,7 +454,7 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
                               in VPair v1 v2
 reflect VUnit            tm = VUnitI
-reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "x" VIDesc_Id
+reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
 reflect _                tm = VNeutral tm
 
