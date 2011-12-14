@@ -28,21 +28,6 @@ algebra I D =
   (A : I -> Set) ×
   (i : I) -> semI[D i, i. A i] -> A i
 
-– ought drop be built-in?
-– then dropI[D, i. A, i. B, x, allI[D, i. A, i _. B, f, x]] = mapI[D, i. A, i. B, f, x]
-–   unitI[D, i. A, x] : liftI[D, i. a, _ _. Unit, x] – can it be definitionally established that this is the unique value of this type?
-–   mapLift[D, i. A, i x. P, i x. Q, x, f] : liftI[D,i.A,i x.P,x] -> liftI[D,i.A,i x. Q,x]
-–   so canonical elements of liftI are mapLiftI[..., f] XXX, where XXX is neutral or unitI
-
-– apply[D, i. A, i a. P, i a. Q, x] : 
-–      liftI[D, i. A, i a. P -> Q, x] -> liftI[D, i. A, i a. P, x] -> liftI[D, i. A, i a. Q, x]
-
-– pureI[D, i. A, i a. P, x] :
-–     ((i : A) -> (a : A i) -> P i a) -> liftI[D, i. A, i a. P, x]
-
-– Then we can treat liftI[D, i. A, x, -] as an applicative functor!
-– Why is this an applicative functor? Why is this the right thing to bulid in?
-– if drop is built-in, then we can also get the above to hold automatically
 drop : (I : Set) ->
        (D : IDesc I) ->
        (A B : I -> Set) ->
@@ -86,8 +71,6 @@ map P I D X Y f =
                                 , x])
      »
 
-
-
 --------------------------------------------------------------------------------
 – shouldn't expect the map laws to hold, due to functional extensionality problems.
 – need a way of defining a sub-universe of descriptions that doesn't have “Π”
@@ -102,8 +85,6 @@ assume ext : (A : Set) ->
              ((a : A) -> f a ≡ g a) ->
              f ≡ g
 
-– is-id : (λi x. x) ≡ (λi. case x with { inl _. λx. x; inr _. λx. x })
-
 internal-id : (P I : Set) ->
               (D : IDescP P I) ->
               (X : P -> Set) ->
@@ -115,7 +96,7 @@ internal-id : (P I : Set) ->
                       , x. semI[IDescP:fork P I X x, i. Y i]
                       , λx. case x with { inl p. λx. x; inr i. λx. x }
                       , x]
-internal-id P I D X Y i = ?
+internal-id P I D X Y i =
 {-  elimID (P + I)
     (λD'. (x : semI[D', x. semI[IDescP:fork P I X x, i. Y i]]) ->
           x ≡ mapI[D'
