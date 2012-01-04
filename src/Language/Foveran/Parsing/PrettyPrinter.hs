@@ -95,22 +95,24 @@ pprint (IDesc_Bind t1 x t2) = paren 09 (sep [ "bind" <+> ppPattern x <+> "<-" <+
                                             , nest 2 (resetPrec t2)])
 pprint IDesc_Elim          = "elimID"
 pprint (SemI tD i tA)      =
-    resetPrec $ "semI" <> (cat [ "[" <+> tD
-                               ,  "," <+> ppPattern i <> "." <+> tA
-                               ,  "]"])
+    resetPrec $ "semI" <> hcat [ "["
+                               , sep $ punctuate "," [ tD, ppPattern i <> "." <+> tA ]
+                               ,  "]" ]
 pprint (MapI tD i1 tA i2 tB tf tx) =
-    resetPrec $ "mapI" <> (cat [ "[" <+> tD
-                               , "," <+> ppPattern i1 <> "." <+> tA
-                               , "," <+> ppPattern i2 <> "." <+> tB
-                               , "," <+> tf
-                               , "," <+> tx
-                               , "]"])
+    resetPrec $ "mapI" <> hcat [ "["
+                               , sep $ punctuate "," [ tD
+                                                     , ppPattern i1 <> "." <+> tA
+                                                     , ppPattern i2 <> "." <+> tB
+                                                     , tf
+                                                     , tx ]
+                               , "]" ]
 pprint (LiftI tD x tA i a tP tx) =
-    resetPrec $ "liftI" <> (cat [ "[" <+> tD
-                                , "," <+> ppPattern x <> "." <+> tA
-                                , "," <+> ppPattern i <+> ppPattern a <> "." <+> tP
-                                , "," <+> tx
-                                , "]"])
+    resetPrec $ "liftI" <> hcat [ "["
+                                , sep $ punctuate "," [ tD
+                                                      , ppPattern x <> "." <+> tA
+                                                      , ppPattern i <+> ppPattern a <> "." <+> tP
+                                                      , tx ]
+                                , "]" ]
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> sep [down t1, down t2])
 pprint InductionI          = "inductionI"
 
