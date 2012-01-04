@@ -162,7 +162,7 @@ velimeq tA ta tb (VNeutral n) a e tP tp =
                      <*> reify tA tb
                      <*> n
                      <*> pure a <*> pure e
-                     <*> tmBound (\tma -> tmBound (\tme -> reifyType (tP (reflect tA tma) (reflect (VEq tA tA ta (reflect tA tma)) tme))))
+                     <*> bound tA (\va -> bound (VEq tA tA ta va) (\ve -> reifyType (tP va ve)))
                      <*> reify (tP ta VRefl) tp))
 
 {------------------------------------------------------------------------------}
@@ -388,12 +388,10 @@ vliftI vI vD x vA i a vP vx = loop vD vx
           VNeutral (In <$> (LiftI <$> reifyType vI
                                   <*> reify (VIDesc vI) v
                                   <*> pure x
-                                  <*> tmBound (\tmx -> let v = reflect vI tmx in reifyType (vA v))
+                                  <*> bound vI (\v -> reifyType (vA v))
                                   <*> pure i
                                   <*> pure a
-                                  <*> tmBound (\tmi -> let vi = reflect vI tmi in
-                                                       tmBound (\tma -> let va = reflect (vA vi) tma in
-                                                                        reifyType (vP vi va)))
+                                  <*> bound vI (\vi -> bound (vA vi) (\va -> reifyType (vP vi va)))
                                   <*> reify (vsemI vI v x vA) vx))
 
 vallI :: Value
@@ -511,7 +509,7 @@ reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDes
 reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
-     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure x <*> tmBound (\tmx -> let v = reflect vA tmx in reify (VIDesc tI) (vf v)))
+     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure x <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
     In <$> (MapI <$> reifyType vI <*> tmD
