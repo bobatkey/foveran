@@ -14,6 +14,8 @@ module Language.Foveran.Syntax.Checked
     , bindFree
     , generalise
     , toDisplaySyntax
+
+    , cmp
     )
     where
 
@@ -288,62 +290,113 @@ tmFree :: Ident -> Int -> Term
 tmFree nm = \i -> In $ Free nm
 
 {------------------------------------------------------------------------------}
--- FIXME: some of these things are irrelevant: so they needn't be
--- checked for equality
+cmp :: (Int -> Int -> Bool)
+    -> Term
+    -> Term
+    -> Bool
+cmp compareLevel (In (Free nm1))         (In (Free nm2))         = nm1 == nm2
+cmp compareLevel (In (Bound i))          (In (Bound j))          = i == j
+cmp compareLevel (In (Lam _ t))          (In (Lam _ t'))         = cmp compareLevel t t'
+cmp compareLevel (In (App t1 t2))        (In (App t1' t2'))      = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (Pi _ t1 t2))       (In (Pi _ t1' t2'))     = cmp (flip compareLevel) t1 t1' && cmp compareLevel t2 t2'
 
--- FIXME: Should reimplement this with (optional) set-level
--- cummulativity checking
+cmp compareLevel (In (Set i))            (In (Set j))            = compareLevel i j
+
+cmp compareLevel (In (Sigma _ t1 t2))    (In (Sigma _ t1' t2'))  = cmp (==) t1 t1' && cmp compareLevel t2 t2' -- FIXME: is this right?
+cmp compareLevel (In (Pair t1 t2))       (In (Pair t1' t2'))     = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (Proj1 t))          (In (Proj1 t'))         = cmp compareLevel t t'
+cmp compareLevel (In (Proj2 t))          (In (Proj2 t'))         = cmp compareLevel t t'
+
+cmp compareLevel (In (Sum t1 t2))        (In (Sum t1' t2'))      = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (Inl t))            (In (Inl t'))           = cmp compareLevel t t'
+cmp compareLevel (In (Inr t))            (In (Inr t'))           = cmp compareLevel t t'
+cmp compareLevel (In (Case t1  tA  tB  _ t2  _ t3  _ t4))
+                 (In (Case t1' tA' tB' _ t2' _ t3' _ t4'))
+    = cmp compareLevel t1 t1' &&
+      cmp compareLevel tA tA' &&
+      cmp compareLevel tB tB' &&
+      cmp compareLevel t2 t2' &&
+      cmp compareLevel t3 t3' &&
+      cmp compareLevel t4 t4'
+
+cmp compareLevel (In Unit)              (In Unit)                = True
+cmp compareLevel (In UnitI)             (In UnitI)               = True
+cmp compareLevel (In Empty)             (In Empty)               = True
+cmp compareLevel (In (ElimEmpty t1 t2)) (In (ElimEmpty t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t1 t2'
+
+cmp compareLevel (In (Eq tA tB ta tb))
+                 (In (Eq tA' tB' ta' tb'))
+    = cmp compareLevel ta ta' &&
+      cmp compareLevel tb tb' &&
+      cmp compareLevel tA tA' &&
+      cmp compareLevel tB tB'
+cmp compareLevel (In Refl)              (In Refl)                = True
+cmp compareLevel (In (ElimEq tA  ta  tb  t  _ _ tP  tp))
+                 (In (ElimEq tA' ta' tb' t' _ _ tP' tp'))
+    = cmp compareLevel tA tA' &&
+      cmp compareLevel ta ta' &&
+      cmp compareLevel tb tb' &&
+      cmp compareLevel t t'   &&
+      cmp compareLevel tP tP' &&
+      cmp compareLevel tp tp'
+
+cmp compareLevel (In Desc)              (In Desc)                = True
+cmp compareLevel (In (Desc_K t))        (In (Desc_K t'))         = cmp compareLevel t t'
+cmp compareLevel (In Desc_Id)           (In Desc_Id)             = True
+cmp compareLevel (In (Desc_Prod t1 t2)) (In (Desc_Prod t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (Desc_Sum t1 t2))  (In (Desc_Sum t1' t2'))  = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In Desc_Elim)         (In Desc_Elim)           = True
+cmp compareLevel (In Sem)               (In Sem)                 = True
+cmp compareLevel (In (Mu t))            (In (Mu t'))             = cmp compareLevel t t'
+cmp compareLevel (In (Construct t))     (In (Construct t'))      = cmp compareLevel t t'
+cmp compareLevel (In Induction)         (In Induction)           = True
+
+cmp compareLevel (In IDesc)             (In IDesc)               = True
+cmp compareLevel (In (IDesc_K t))       (In (IDesc_K t'))        = cmp compareLevel t t'
+cmp compareLevel (In (IDesc_Id t))      (In (IDesc_Id t'))       = cmp compareLevel t t'
+cmp compareLevel (In (IDesc_Pair t1 t2)) (In (IDesc_Pair t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (IDesc_Sg t1 t2))  (In (IDesc_Sg t1' t2'))  = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (IDesc_Pi t1 t2))  (In (IDesc_Pi t1' t2'))  = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (IDesc_Bind tA  tB  t1  _ t2))
+                 (In (IDesc_Bind tA' tB' t1' _ t2'))
+    = cmp compareLevel tA tA' &&
+      cmp compareLevel tB tB' &&
+      cmp compareLevel t1 t1' &&
+      cmp compareLevel t2 t2'
+cmp compareLevel (In IDesc_Elim)        (In IDesc_Elim)          = True
+cmp compareLevel (In (SemI tI  tD  _ tA))
+                 (In (SemI tI' tD' _ tA'))
+    = cmp compareLevel tI tI' &&
+      cmp compareLevel tD tD' &&
+      cmp compareLevel tA tA'
+cmp compareLevel (In (MapI tI  tD  _ tA  _ tB  tf  tx))
+                 (In (MapI tI' tD' _ tA' _ tB' tf' tx'))
+    = cmp compareLevel tI tI' &&
+      cmp compareLevel tD tD' &&
+      cmp compareLevel tA tA' &&
+      cmp compareLevel tB tB' &&
+      cmp compareLevel tf tf' &&
+      cmp compareLevel tx tx'
+cmp compareLevel (In (MuI t1 t2))      (In (MuI t1' t2'))       = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
+                 (In (LiftI tI' tD' _ tA' _ _ tP' tx'))
+    = cmp compareLevel tI tI' &&
+      cmp compareLevel tD tD' &&
+      cmp compareLevel tA tA' &&
+      cmp compareLevel tP tP' &&
+      cmp compareLevel tx tx'
+cmp compareLevel (In InductionI)       (In InductionI)
+    = True
+cmp compareLevel (In (Hole nm tms))    (In (Hole nm' tms'))
+    = nm == nm' && length tms == length tms' && all (uncurry (cmp compareLevel)) (zip tms tms') -- FIXME: write a proper comparison
+
+cmp compareLevel _ _ = False
+
+
+-- FIXME: We don't compare the elimination types for Case, ElimEmpty
+-- because we are assuming that the two terms are already the same
+-- type. This might be a mistake.
+
+
 instance Eq Term where
-  In (Free nm1) == In (Free nm2)     = nm1 == nm2
-  In (Bound i)  == In (Bound j)      = i == j
-  In (Lam _ t)  == In (Lam _ t')     = t == t'
-  In (App t ts) == In (App t' ts')   = t == t' && ts == ts'
-  In (Set i)    == In (Set j)        = i == j
-  In (Pi _ t1 t2)    == In (Pi _ t1' t2')    = t1 == t1' && t2 == t2'
-  In (Sigma _ t1 t2) == In (Sigma _ t1' t2') = t1 == t1' && t2 == t2'
-  In (Sum t1 t2)     == In (Sum t1' t2')     = t1 == t1' && t2 == t2'
-  In (Pair t1 t2)    == In (Pair t1' t2')    = t1 == t1' && t2 == t2'
-  In (Proj1 t)  == In (Proj1 t')     = t == t'
-  In (Proj2 t)  == In (Proj2 t')     = t == t'
-  In (Inl t)    == In (Inl t')       = t == t'
-  In (Inr t)    == In (Inr t')       = t == t'
-  In (Case t1 _ _ _ t2 _ t3  _ t4) == In (Case t1' _ _ _ t2' _ t3' _ t4') = t1 == t1' && t2 == t2' && t3 == t3' && t4 == t4'
-  In Unit       == In Unit           = True
-  In UnitI      == In UnitI          = True
-  In Empty      == In Empty          = True
-  In (ElimEmpty t1 t2) == In (ElimEmpty t1' t2') = t1 == t1'
-
-  In (Eq _ _ ta tb) == In (Eq _ _ ta' tb') = ta == ta' && tb == tb'
-  In Refl           == In Refl             = True
-  In (ElimEq _ _ _ t _ _ tP tp) == In (ElimEq _ _ _ t' _ _ tP' tp') = t == t' && tP == tP' && tp == tp'
-
-  In Desc       == In Desc           = True
-  In (Desc_K t) == In (Desc_K t')    = t == t'
-  In Desc_Id    == In Desc_Id        = True
-  In (Desc_Prod t1 t2) == In (Desc_Prod t1' t2') = t1 == t1' && t2 == t2'
-  In (Desc_Sum t1 t2)  == In (Desc_Sum t1' t2')  = t1 == t1' && t2 == t2'
-  In Desc_Elim  == In Desc_Elim      = True
-  In Sem        == In Sem            = True
-  In (Mu t)     == In (Mu t')        = t == t'
-  In (Construct t) == In (Construct t') = t == t'
-  In Induction  == In Induction      = True
-  
-  In IDesc      == In IDesc          = True
-  In (IDesc_K t)   == In (IDesc_K t')              = t == t'
-  In (IDesc_Id t)  == In (IDesc_Id t')             = t == t'
-  In (IDesc_Pair t1 t2) == In (IDesc_Pair t1' t2') = t1 == t1' && t2 == t2'
-  In (IDesc_Sg t1 t2)   == In (IDesc_Sg t1' t2')   = t1 == t1' && t2 == t2'
-  In (IDesc_Pi t1 t2)   == In (IDesc_Pi t1' t2')   = t1 == t1' && t2 == t2'
-  In (IDesc_Bind tA tB t1 x t2) == In (IDesc_Bind tA' tB' t1' x' t2') =
-      tA == tA' && tB == tB' && t1 == t1' && t2 == t2'
-  In IDesc_Elim == In IDesc_Elim     = True
-  In (SemI tI tD _ tA) == In (SemI tI' tD' _ tA') = tI == tI' && tD == tD' && tA == tA'
-  In (MapI tI tD _ tA _ tB tf tx) == In (MapI tI' tD' _ tA' _ tB' tf' tx') =
-    tI == tI' && tD == tD' && tA == tA' && tB == tB' && tf == tf' && tx == tx'
-  In (MuI t1 t2) == In (MuI t1' t2') = t1 == t1' && t2 == t2'
-  In (LiftI tI tD i tA i2 a tP tx) == In (LiftI tI' tD' i' tA' i2' a' tP' tx') =
-      tI == tI' && tD == tD' && tP == tP' && tx == tx'
-  In InductionI  == In InductionI    = True
-  In (Hole nm tms)   == In (Hole nm' tms')    = nm == nm' && tms == tms'
-  
-  _             == _                 = False
+    (==) = cmp (==)

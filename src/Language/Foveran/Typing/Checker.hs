@@ -114,14 +114,10 @@ runTypingMonad c context holeContext localContext =
 
 {------------------------------------------------------------------------------}
 compareTypes :: Span -> Value -> Value -> TypingMonad ctxt ()
-compareTypes p (VSet i) (VSet j) =
-    do unless (j <= i) $ do
-         raiseError p (LevelProblem j i)
-compareTypes p v1       v2 =
+compareTypes p v1 v2 =
     do let tm1 = reifyType0 v1
            tm2 = reifyType0 v2
-       unless (tm1 == tm2) $ do
-         raiseError p (TypesNotEqual v1 v2)
+       unless (CS.cmp (<=) tm2 tm1) $ do raiseError p (TypesNotEqual v1 v2)
 
 -- should probably extend the cummulativity checking to include Pi and
 -- Sigma types (i.e. with cummulativity in the codomain of Pi). See

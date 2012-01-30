@@ -9,5 +9,4 @@ available from [https://github.com/bobatkey/Forvie](https://github.com/bobatkey/
 
 ## Known Bugs
 
-* The universe cummulativity checker is broken (doesn't extend the
-    subtyping to Pis and Sigmas)
+* Level checking of equalities is slightly broken, in some cases

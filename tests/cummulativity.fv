@@ -1,0 +1,30 @@
+sum_elim : (A B : Set) ->
+           (P : A + B -> Set 2) ->
+           ((a : A) -> P (inl a)) ->
+           ((b : B) -> P (inr b)) ->
+           (x : A + B) ->
+           P x
+sum_elim A B P Pinl Pinr x =
+  case x for x. P x with
+    { inl a. Pinl a; inr b. Pinr b }
+
+– this should succeed
+test : (A B : Set) ->
+       (P : A + B -> Set) ->
+       ((a : A) -> P (inl a)) ->
+       ((b : B) -> P (inr b)) ->
+       (x : A + B) ->
+       P x
+test A B P Pinl Pinr x =
+  sum_elim A B P Pinl Pinr x
+
+– this tests sub-typing in the domain of Pi-types
+test2 : (A B : Set) ->
+        (P : A + B -> Set) ->
+        ((a : A) -> P (inl a)) ->
+        ((b : B) -> P (inr b)) ->
+        (x : A + B) ->
+        P x
+test2 = sum_elim
+
+;
