@@ -149,10 +149,21 @@ vcase (VNeutral n) vA vB x vP y vL z vR
 vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when eliminating case"
 
 {------------------------------------------------------------------------------}
-velimEmpty :: Value -> Value -> Value
+velimEmpty :: Value -- ^ a purported element of the empty type
+           -> Value -- ^ result type
+           -> Value -- ^ an element of the result type
 velimEmpty (VNeutral n) a = reflect a (In <$> (ElimEmpty <$> n <*> reifyType a))
 
 {------------------------------------------------------------------------------}
+velimeq :: Value -- ^ The type of the equality 'A'
+        -> Value -- ^ Element 'a' of 'A'
+        -> Value -- ^ Element 'b' of 'A'
+        -> Value -- ^ A proof 'e' that 'a' equals 'b'
+        -> Ident -- ^ Identifier for the element of 'A'
+        -> Ident -- ^ Identifier for the proof of equality
+        -> (Value -> Value -> Value) -- ^ The elimination type 'P'
+        -> Value -- ^ Value of type 'P a refl'
+        -> Value -- ^ Value of type 'P b e'
 velimeq tA ta tb VRefl a e tP tp = tp
 velimeq tA ta tb (VNeutral n) a e tP tp =
     reflect (tP tb (VNeutral n))
@@ -428,6 +439,13 @@ vallI = VLam "I" $ \vI ->
            VLam "b" $ \b -> all $$ b $$ (x $$ b))
           vD $$ xs
 
+vinductionI :: Value -- ^ The index type (@I : Set@)
+            -> Value -- ^ The description (@D : IDesc I@)
+            -> Value -- ^ The predicate (@P : (i : I) -> MuI D i -> Set@)
+            -> Value -- ^ The body (@k : (i : I) -> semI[D i, i. MuI D i] -> liftI[D i, i. MuI D i, i x. P i x] -> P i (construct x)@)
+            -> Value -- ^ The index (@i : I@)
+            -> Value -- ^ The target (@x : MuI D i@)
+            -> Value -- ^ The result (@P i x@)
 vinductionI vI vD vP vk = loop
     where
       loop vi (VConstruct x) =
