@@ -42,6 +42,7 @@ data TypeError
     | ElimEqCanOnlyHandleHomogenousEq Value Value
     | ExpectingEqualityType       Value
     | ExpectingIDescForSemI       Value
+    | OtherError                  String -- FIXME: try to get rid of this
 
 ppType :: UsesIdentifiers ctxt =>
           ctxt
@@ -133,6 +134,8 @@ ppTypeError ctxt (ExpectingEqualityType ty)
 ppTypeError ctxt (ExpectingIDescForSemI ty)
     = "Expecting term to have indexed description type, but type is"
       $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (OtherError msg)
+    = text msg
 
 {------------------------------------------------------------------------------}
 data DataDeclError
