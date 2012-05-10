@@ -24,7 +24,6 @@ import           Data.Traversable (traverse)
 import           Text.Position (Span)
 
 import           Text.PrettyPrint (render, (<+>), ($$), nest, (<>), vcat, text)
-import           Text.PrettyPrint.IsString ()
 import           Language.Foveran.Util.PrettyPrinting (ppSpan)
 import           Language.Foveran.Parsing.PrettyPrinter (ppIdent, ppPlain)
 

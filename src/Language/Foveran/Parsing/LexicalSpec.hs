@@ -84,7 +84,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , oneOrMore (tok digit) :==>
                              emit Number
     , "\n" :==>              Emit Newline
-    , oneOrMore (tok " \t") :==>
+    , oneOrMore (tok (singleton ' ' .|. singleton '\t')) :==>
                              Ignore Whitespace
     , ("--" .|. "–") .>>. star (tok (complement (singleton '\n'))) :==>
                              Ignore Comment

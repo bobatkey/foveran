@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TypeSynonymInstances, OverloadedStrings, TupleSections #-}
+{-# LANGUAGE DeriveFunctor, TypeSynonymInstances, OverloadedStrings, TupleSections, FlexibleInstances #-}
 
 module Language.Foveran.Syntax.LocallyNameless
     ( TermPos

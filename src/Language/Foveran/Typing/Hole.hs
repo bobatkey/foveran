@@ -16,7 +16,6 @@ module Language.Foveran.Typing.Hole
     where
 
 import           Text.PrettyPrint
-import           Text.PrettyPrint.IsString
 
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), runNameGenerationWith)
 import           Language.Foveran.Syntax.Checked (Term, bindFree, toDisplaySyntax)

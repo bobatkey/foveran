@@ -7,7 +7,6 @@ module Language.Foveran.Typing.Normalise
 
 import Control.Monad.IO.Class (liftIO)
 import Text.PrettyPrint
-import Text.PrettyPrint.IsString ()
 import Data.Rec (AnnotRec (Annot))
 import qualified Language.Foveran.Syntax.Display as DS
 import qualified Language.Foveran.Syntax.Checked as CS

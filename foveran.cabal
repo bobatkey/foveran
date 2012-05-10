@@ -18,7 +18,8 @@ Executable foveran
                  transformers >= 0.2.2.0,
                  mtl >= 2.0.1.0,
                  forvie >= 0.1,
-                 blaze-html >= 0.3.2.0
+                 blaze-html >= 0.3.2.0,
+                 blaze-markup >= 0.5.1.0
   Main-Is:       Language/Foveran/Main.hs
 
   Hs-Source-Dirs:src

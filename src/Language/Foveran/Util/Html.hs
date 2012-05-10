@@ -13,7 +13,7 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 
 import qualified Data.ByteString.Lazy as BL
-import           Text.Blaze.Renderer.Utf8
+import           Text.Blaze.Html.Renderer.Utf8
 
 import           Language.Forvie.SyntaxHighlight.Html (generateHtml)
 

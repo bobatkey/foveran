@@ -11,7 +11,6 @@ module Language.Foveran.Typing.Errors
     where
 
 import           Text.PrettyPrint
-import           Text.PrettyPrint.IsString
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers, runNameGeneration)
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
 import           Language.Foveran.Syntax.Checked (toDisplaySyntax)

@@ -18,7 +18,6 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import           Data.MonadicStream
 import           Text.PrettyPrint
-import           Text.PrettyPrint.IsString
 import           Text.Position
 
 import           Text.ParserCombinators
