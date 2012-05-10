@@ -83,6 +83,12 @@ data TermCon tm
     | LiftI      tm tm Ident tm Ident Ident tm tm
     | InductionI
 
+    {- Group stuff -}
+    | Group      Ident
+    | GroupUnit
+    | GroupMul   tm tm
+    | GroupInv   tm
+
     | Hole       Ident [tm]
     deriving (Show, Functor)
 
@@ -149,6 +155,11 @@ traverseSyn (LiftI tI tD i tA i' a tP tx) =
     LiftI <$> tI <*> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
+
+traverseSyn (Group nm)       = pure (Group nm)
+traverseSyn GroupUnit        = pure GroupUnit
+traverseSyn (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
+traverseSyn (GroupInv t)     = GroupInv <$> t
 
 traverseSyn (Hole nm tms)    = Hole nm <$> sequenceA tms
 
@@ -259,6 +270,12 @@ toDisplay (LiftI _ tD x tA i a tP tx) =
        DS.LiftI <$> tD <*> pure (DS.PatVar x') <*> pure tA' <*> pure (DS.PatVar i') <*> pure (DS.PatVar a') <*> pure tP' <*> tx
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
+
+toDisplay (Group nm)              = pure (DS.Group nm)
+toDisplay GroupUnit               = pure DS.GroupUnit
+toDisplay (GroupMul t1 t2)        = DS.GroupMul <$> t1 <*> t2
+toDisplay (GroupInv t)            = DS.GroupInv <$> t
+
 toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
 
 toDisplaySyntax :: Term -> NameGeneration DS.Term
@@ -387,6 +404,16 @@ cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
       cmp compareLevel tx tx'
 cmp compareLevel (In InductionI)       (In InductionI)
     = True
+
+cmp compareLevel (In (Group nm))       (In (Group nm'))
+    = nm == nm'
+cmp compareLevel (In GroupUnit)        (In GroupUnit)
+    = True
+cmp compareLevel (In (GroupMul t1 t2)) (In (GroupMul t1' t2'))
+    = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (GroupInv t))     (In (GroupInv t'))
+    = cmp compareLevel t t'
+
 cmp compareLevel (In (Hole nm tms))    (In (Hole nm' tms'))
     = nm == nm' && length tms == length tms' && all (uncurry (cmp compareLevel)) (zip tms tms') -- FIXME: write a proper comparison
 

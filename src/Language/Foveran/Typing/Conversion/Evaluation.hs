@@ -143,6 +143,11 @@ eval InductionI         = pure (VLam "I" $ \vI ->
                                 VLam "x" $ \vx ->
                                 vinductionI vI vD vP vk vi vx)
 
+eval (Group nm)         = pure (VGroup nm)
+eval GroupUnit          = pure vgroupUnit
+eval (GroupMul t1 t2)   = vgroupMul <$> t1 <*> t2
+eval (GroupInv t)       = vgroupInv <$> t
+
 eval (Hole nm tms)      = doHole nm <*> sequenceA tms
 
 {------------------------------------------------------------------------------}

@@ -31,6 +31,10 @@ module Language.Foveran.Typing.Conversion.Value
     , vmuI
     , vinductionI
 
+    , vgroupUnit
+    , vgroupMul
+    , vgroupInv
+
     , reflect
     , reifyType0
     , reify
@@ -88,6 +92,9 @@ data Value
 
     | VMapI       (Value -> Value) Value (Int -> Term)
     | VSemI       Value (Int -> Term) Ident (Value -> Value)
+
+    | VGroup      Ident
+    | VGroupTerm  [(Bool, Int -> Term)]
 
     | VNeutral   (Int -> Term)
     deriving Show
@@ -464,6 +471,18 @@ vinductionI vI vD vP vk = loop
                    `tmApp` n)
 
 {------------------------------------------------------------------------------}
+vgroupUnit :: Value
+vgroupUnit = VGroupTerm []
+
+vgroupMul :: Value -> Value -> Value
+vgroupMul (VGroupTerm tms1) (VGroupTerm tms2) = VGroupTerm (tms1 ++ tms2)
+vgroupMul _                 _                 = error "internal: type error discovered in vgroupMul"
+
+vgroupInv :: Value -> Value
+vgroupInv (VGroupTerm tms) = VGroupTerm $ reverse $ map (\(inverted,tm) -> (not inverted,tm)) tms
+vgroupInv _                = error "internal: type error discovered in vgroupInv"
+
+{------------------------------------------------------------------------------}
 reflect :: Value -> (Int -> Term) -> Value
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
@@ -472,6 +491,7 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
 reflect VUnit            tm = VUnitI
 reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
+reflect (VGroup nm)      tm = VGroupTerm [(False, tm)]
 reflect _                tm = VNeutral tm
 
 
@@ -490,6 +510,7 @@ reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VID
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure i <*> bound vI (\v -> reifyType (vA v)))
+reifyType (VGroup nm)     = \i -> In $ Group nm
 reifyType (VNeutral t)    = \i -> t i
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
@@ -537,5 +558,27 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
+reify (VGroup nm)      (VGroupTerm tms)    = reifyGroupTerm tms
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
+
+reifyGroupTerm :: [(Bool, Int -> Term)] -> Int -> Term
+reifyGroupTerm l i =
+    foldr smartMul (In GroupUnit) $ map doInverses $ collapse [] $ map toTerm l
+    where
+      toTerm (inverted, tm) = (inverted, tm i)
+
+      doInverses (True, tm)  = In $ GroupInv tm
+      doInverses (False, tm) = tm
+
+      collapse []             []             = []
+      collapse l1             []             = reverse l1
+      collapse []             ((inv, v):l2)  = collapse [(inv,v)] l2
+      collapse ((inv1,v1):l1) ((inv2,v2):l2) =
+          if inv1 == not inv2 && v1 == v2 then
+              collapse l1 l2
+          else
+              collapse ((inv2,v2):(inv1,v1):l1) l2
+
+      smartMul x (In GroupUnit) = x
+      smartMul x y              = In $ GroupMul x y

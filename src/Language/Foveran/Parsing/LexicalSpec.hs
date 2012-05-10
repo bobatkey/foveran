@@ -78,6 +78,10 @@ lexicalSpec = $([|compileLexicalSpecification
     , "<-" :==>              emit LeftArrow
     , "[" :==>               emit LSqBracket
     , "]" :==>               emit RSqBracket
+    , "Group" :==>           emit Group
+    , "unit" :==>            emit GroupUnit
+    , "#" :==>               emit GroupMul
+    , "inv" :==>             emit GroupInv
     , "?" :==>               emit Hole
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                              emit Ident

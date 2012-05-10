@@ -1,0 +1,23 @@
+GA : Set
+GA = Group[GA]
+
+tm : GA -> GA -> GA
+tm g1 g2 = inv g1 # inv g2 # g2
+
+test : (g1 g2 : GA) -> tm g1 g2 == inv g1
+test g1 g2 = refl
+
+normalise tm  -- should be equal to \g1 g2. inv g1
+
+tm2 : GA -> GA -> GA
+tm2 g1 g2 = g1 # inv g2 # g2 # inv g1
+
+normalise tm2 -- should be equal to \g1 g2. unit
+
+tm3 : GA -> GA -> GA
+tm3 g1 g2 = inv (g1 # g2)
+
+test3 : (g1 g2 : GA) -> tm3 g1 g2 == (inv g2 # inv g1)
+test3 g1 g2 = refl
+
+;

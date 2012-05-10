@@ -77,6 +77,11 @@ data Token
     | MuI
     | InductionI
 
+    | Group
+    | GroupUnit
+    | GroupInv
+    | GroupMul
+
     | Underscore
     | LSqBracket
     | RSqBracket
@@ -157,6 +162,10 @@ instance SyntaxHighlight Token where
     lexicalClass Then        = Keyword
     lexicalClass AbsurdBy    = Keyword
     lexicalClass Hole        = Keyword
+    lexicalClass Group       = Keyword
+    lexicalClass GroupUnit   = Operator
+    lexicalClass GroupMul    = Operator
+    lexicalClass GroupInv    = Operator
 
 instance Layout Token where
     lbrace = LBrace
@@ -234,3 +243,7 @@ instance Show Token where
   show Then        = "then"
   show AbsurdBy    = "absurdBy"
   show Hole        = "?"
+  show Group       = "Group"
+  show GroupUnit   = "unit"
+  show GroupMul    = "#"
+  show GroupInv    = "inv"

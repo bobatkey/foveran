@@ -146,6 +146,12 @@ data TermCon tm
     | MuI        tm tm
     | InductionI
 
+    {- Group stuff -}
+    | Group      Ident
+    | GroupUnit
+    | GroupMul   tm tm
+    | GroupInv   tm
+
     | UserHole
     | Hole       Ident [tm]
     deriving (Show, Functor)

@@ -188,7 +188,9 @@ term08 =
     -- right associative
     optBinary <$> term07 <*> (optional $ (Prod,) <$ token Tok.Times <*> term08  
                                          <|>
-                                         (Desc_Prod,) <$ token Tok.QuoteTimes <*> term08)
+                                         (Desc_Prod,) <$ token Tok.QuoteTimes <*> term08
+                                         <|>
+                                         (GroupMul,) <$ token Tok.GroupMul <*> term08)
 
 term07 :: Parser Tok.Token TermPos
 term07 =
@@ -215,6 +217,10 @@ term01 =
     binaryPrefix IDesc_Sg <$> token Tok.Quote_Sg <*> term00 <*> term00
     <|>
     binaryPrefix IDesc_Pi <$> token Tok.Quote_Pi <*> term00 <*> term00
+    <|>
+    unary GroupInv <$> token Tok.GroupInv <*> term00
+    <|>
+    (\p i p'-> Annot (makeSpan p p') (Group i)) <$> token Tok.Group <* token Tok.LSqBracket <*> identifier <*> token Tok.RSqBracket
     <|>
     (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
       <$> (token Tok.ElimEmpty <|> token Tok.AbsurdBy)
@@ -317,6 +323,8 @@ term00 =
     keyword Empty <$> token Tok.EmptyType
     <|>
     keyword Unit <$> token Tok.UnitType
+    <|>
+    keyword GroupUnit <$> token Tok.GroupUnit
     <|>
     keyword Desc_Id <$> token Tok.QuoteId
     <|>
