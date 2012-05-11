@@ -768,11 +768,11 @@ apply D A Φ Ψ =
 
 – One direction of truth preservation gives the unit. This isn't
 – actually used below, but is here for completeness.
-unit : (A : Set) →
-       (D : Desc) →
-       (x : sem D A) →
-       lift' D A (λx. Unit) x;
-unit A = elimD
+preserveunit : (A : Set) →
+               (D : Desc) →
+               (x : sem D A) →
+               lift' D A (λx. Unit) x;
+preserveunit A = elimD
   (λD. (x : sem D A) → lift' D A (λx. Unit) x)
   (λA x. ⋄)
   (λa. ⋄)
