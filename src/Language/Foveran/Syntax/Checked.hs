@@ -2,6 +2,9 @@
 
 module Language.Foveran.Syntax.Checked
     ( Ident
+
+    , Irrelevant (..)
+
     , Term
     , TermCon (..)
     , tmApp
@@ -26,6 +29,15 @@ import           Data.Traversable
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
 
+newtype Irrelevant a = Irrelevant { fromIrrelevant :: a }
+    deriving (Show)
+
+instance Eq (Irrelevant a) where
+    _ == _ = True
+
+instance Ord (Irrelevant a) where
+    compare _ _ = EQ
+
 -- The only difference between this and InternalSyntax is the
 -- appearance of explicit types in the “Case” expression, and explicit
 -- types on the “Eq” type former. This is needed for correct
@@ -36,18 +48,18 @@ type Term = Rec TermCon
 data TermCon tm
     = Free  Ident
     | Bound Int
-    | Lam   Ident tm
+    | Lam   (Irrelevant Ident) tm
     | App   tm tm
     | Set   Int
-    | Pi    (Maybe Ident) tm tm
-    | Sigma (Maybe Ident) tm tm
+    | Pi    (Irrelevant (Maybe Ident)) tm tm
+    | Sigma (Irrelevant (Maybe Ident)) tm tm
     | Pair  tm tm
     | Proj1 tm
     | Proj2 tm
     | Sum   tm tm
     | Inl   tm
     | Inr   tm
-    | Case  tm tm tm Ident tm Ident tm Ident tm
+    | Case  tm tm tm (Irrelevant Ident) tm (Irrelevant Ident) tm (Irrelevant Ident) tm
     | Unit
     | UnitI
     | Empty
@@ -55,7 +67,7 @@ data TermCon tm
 
     | Eq     tm tm tm tm
     | Refl
-    | ElimEq tm tm tm tm Ident Ident tm tm
+    | ElimEq tm tm tm tm (Irrelevant Ident) (Irrelevant Ident) tm tm
 
     | Desc
     | Desc_K    tm
@@ -75,12 +87,12 @@ data TermCon tm
     | IDesc_Pair tm tm
     | IDesc_Sg   tm tm
     | IDesc_Pi   tm tm
-    | IDesc_Bind tm tm tm Ident tm
+    | IDesc_Bind tm tm tm (Irrelevant Ident) tm
     | IDesc_Elim
     | MuI        tm tm
-    | SemI       tm tm Ident tm
-    | MapI       tm tm Ident tm Ident tm tm tm
-    | LiftI      tm tm Ident tm Ident Ident tm tm
+    | SemI       tm tm (Irrelevant Ident) tm
+    | MapI       tm tm (Irrelevant Ident) tm (Irrelevant Ident) tm tm tm
+    | LiftI      tm tm (Irrelevant Ident) tm (Irrelevant Ident) (Irrelevant Ident) tm tm
     | InductionI
 
     {- Group stuff -}
@@ -90,7 +102,7 @@ data TermCon tm
     | GroupInv   tm
 
     | Hole       Ident [tm]
-    deriving (Show, Functor)
+    deriving (Show, Functor, Eq, Ord)
 
 --------------------------------------------------------------------------------
 class Applicative f => Binding f where
@@ -208,26 +220,34 @@ gatheringTuple t1 t2                  = DS.Tuple [t1,t2]
 toDisplay :: TermCon (NameGeneration DS.Term) -> NameGeneration (DS.TermCon DS.Term)
 toDisplay (Free nm)               = pure $ DS.Var nm
 toDisplay (Bound i)               = DS.Var <$> getBound i
-toDisplay (Lam nm body)           = bindK nm body $ \nm body -> pure (gatheringLam nm body)
+toDisplay (Lam inm body)          = bindK nm body $ \nm body -> pure (gatheringLam nm body)
+    where nm = fromIrrelevant inm
 toDisplay (App t t')              = gatheringApp <$> t <*> t'
 toDisplay (Set i)                 = pure $ DS.Set i
-toDisplay (Pi Nothing t1 t2)      = gatheringPi [] <$> t1 <*> bindDummy t2
-toDisplay (Pi (Just nm) t1 t2)    = bindK nm t2 $ \nm t2 -> gatheringPi [DS.PatVar nm] <$> t1 <*> pure t2
-toDisplay (Sigma Nothing t1 t2)   = DS.Prod <$> t1 <*> bindDummy t2
-toDisplay (Sigma (Just nm) t1 t2) = bindK nm t2 $ \nm t2 -> DS.Sigma [DS.PatVar nm] <$> t1 <*> pure t2
+toDisplay (Pi (Irrelevant Nothing) t1 t2)
+    = gatheringPi [] <$> t1 <*> bindDummy t2
+toDisplay (Pi (Irrelevant (Just nm)) t1 t2)
+    = bindK nm t2 $ \nm t2 -> gatheringPi [DS.PatVar nm] <$> t1 <*> pure t2
+toDisplay (Sigma (Irrelevant Nothing) t1 t2)
+    = DS.Prod <$> t1 <*> bindDummy t2
+toDisplay (Sigma (Irrelevant (Just nm)) t1 t2)
+    = bindK nm t2 $ \nm t2 -> DS.Sigma [DS.PatVar nm] <$> t1 <*> pure t2
 toDisplay (Pair t1 t2)            = gatheringTuple <$> t1 <*> t2
 toDisplay (Proj1 t)               = DS.Proj1 <$> t
 toDisplay (Proj2 t)               = DS.Proj2 <$> t
 toDisplay (Sum t1 t2)             = DS.Sum <$> t1 <*> t2
 toDisplay (Inl t)                 = DS.Inl <$> t
 toDisplay (Inr t)                 = DS.Inr <$> t
-toDisplay (Case t1 _ _ x t2 y t3 z t4)
+toDisplay (Case t1 _ _ ix t2 iy t3 iz t4)
     = bindK x t2 $ \x t2 ->
       bindK y t3 $ \y t3 ->
       bindK z t4 $ \z t4 -> DS.Case <$> t1
                                     <*> (Just <$> ((,) <$> pure x <*> pure t2))
                                     <*> pure (DS.PatVar y) <*> pure t3
                                     <*> pure (DS.PatVar z) <*> pure t4
+    where x = fromIrrelevant ix
+          y = fromIrrelevant iy
+          z = fromIrrelevant iz
 toDisplay Unit                    = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty
@@ -235,9 +255,11 @@ toDisplay (ElimEmpty t1 t2)       = DS.ElimEmpty <$> t1 <*> (Just <$> t2)
 
 toDisplay (Eq _ _ t1 t2)          = DS.Eq <$> t1 <*> t2
 toDisplay Refl                    = pure DS.Refl
-toDisplay (ElimEq _ _ _ t a e t1 t2) =
+toDisplay (ElimEq _ _ _ t ia ie t1 t2) =
     do (a', (e', t1')) <- bind a (bind e t1)
        DS.ElimEq <$> t <*> ((\x y t -> Just (x,y,t)) <$> pure a' <*> pure e' <*> pure t1') <*> t2
+    where a = fromIrrelevant ia
+          e = fromIrrelevant ie
 
 toDisplay Desc                    = pure DS.Desc
 toDisplay (Desc_K t)              = DS.Desc_K <$> t
@@ -256,18 +278,25 @@ toDisplay (IDesc_K t)             = DS.Desc_K <$> t
 toDisplay (IDesc_Pair t1 t2)      = DS.Desc_Prod <$> t1 <*> t2
 toDisplay (IDesc_Sg t1 t2)        = DS.IDesc_Sg <$> t1 <*> t2
 toDisplay (IDesc_Pi t1 t2)        = DS.IDesc_Pi <$> t1 <*> t2
-toDisplay (IDesc_Bind tA tB t1 x t2) =
+toDisplay (IDesc_Bind tA tB t1 ix t2) =
     bindK x t2 $ \x t2 -> DS.IDesc_Bind <$> t1 <*> pure (DS.PatVar x) <*> pure t2
+    where x = fromIrrelevant ix
 toDisplay IDesc_Elim              = pure DS.IDesc_Elim
-toDisplay (SemI _ tD x tA)        = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure (DS.PatVar x) <*> pure tA
-toDisplay (MapI _ tD i1 tA i2 tB tf tx) =
+toDisplay (SemI _ tD ix tA)       = bindK x tA $ \x tA -> DS.SemI <$> tD <*> pure (DS.PatVar x) <*> pure tA
+    where x = fromIrrelevant ix
+toDisplay (MapI _ tD ii1 tA ii2 tB tf tx) =
     bindK i1 tA $ \i1 tA ->
     bindK i2 tB $ \i2 tB ->
     DS.MapI <$> tD <*> pure (DS.PatVar i1) <*> pure tA <*> pure (DS.PatVar i2) <*> pure tB <*> tf <*> tx
-toDisplay (LiftI _ tD x tA i a tP tx) =
+    where i1 = fromIrrelevant ii1
+          i2 = fromIrrelevant ii2
+toDisplay (LiftI _ tD ix tA ii ia tP tx) =
     do (x', tA') <- bind x tA
        (i', (a', tP')) <- bind i (bind a tP)
        DS.LiftI <$> tD <*> pure (DS.PatVar x') <*> pure tA' <*> pure (DS.PatVar i') <*> pure (DS.PatVar a') <*> pure tP' <*> tx
+    where x = fromIrrelevant ix
+          i = fromIrrelevant ii
+          a = fromIrrelevant ia
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
 
@@ -426,4 +455,7 @@ cmp compareLevel _ _ = False
 
 
 instance Eq Term where
-    (==) = cmp (==)
+    In tm == In tm' = tm == tm'
+
+instance Ord Term where
+    compare (In tm) (In tm') = compare tm tm'

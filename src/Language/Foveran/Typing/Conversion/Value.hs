@@ -150,9 +150,9 @@ vcase (VNeutral n) vA vB x vP y vL z vR
                        <$> n
                        <*> reifyType vA
                        <*> reifyType vB
-                       <*> pure x <*> bound (VSum vA vB) (\v -> reify (VSet 0) (vP v))
-                       <*> pure y <*> bound vA           (\v -> reify (vP $ VInl v) (vL v))
-                       <*> pure z <*> bound vB           (\v -> reify (vP $ VInr v) (vR v))))
+                       <*> pure (Irrelevant x) <*> bound (VSum vA vB) (\v -> reify (VSet 0) (vP v))
+                       <*> pure (Irrelevant y) <*> bound vA           (\v -> reify (vP $ VInl v) (vL v))
+                       <*> pure (Irrelevant z) <*> bound vB           (\v -> reify (vP $ VInr v) (vR v))))
 vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when eliminating case"
 
 {------------------------------------------------------------------------------}
@@ -179,7 +179,7 @@ velimeq tA ta tb (VNeutral n) a e tP tp =
                      <*> reify tA ta
                      <*> reify tA tb
                      <*> n
-                     <*> pure a <*> pure e
+                     <*> pure (Irrelevant a) <*> pure (Irrelevant e)
                      <*> bound tA (\va -> bound (VEq tA tA ta va) (\ve -> reifyType (tP va ve)))
                      <*> reify (tP ta VRefl) tp))
 
@@ -405,10 +405,10 @@ vliftI vI vD x vA i a vP vx = loop vD vx
       loop v vx =
           VNeutral (In <$> (LiftI <$> reifyType vI
                                   <*> reify (VIDesc vI) v
-                                  <*> pure x
+                                  <*> pure (Irrelevant x)
                                   <*> bound vI (\v -> reifyType (vA v))
-                                  <*> pure i
-                                  <*> pure a
+                                  <*> pure (Irrelevant i)
+                                  <*> pure (Irrelevant a)
                                   <*> bound vI (\vi -> bound (vA vi) (\va -> reifyType (vP vi va)))
                                   <*> reify (vsemI vI v x vA) vx))
 
@@ -497,8 +497,8 @@ reflect _                tm = VNeutral tm
 
 {------------------------------------------------------------------------------}
 reifyType :: Value -> (Int -> Term)
-reifyType (VPi x v f)     = \i -> In $ Pi x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSigma x v f)  = \i -> In $ Sigma x (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
+reifyType (VPi x v f)     = \i -> In $ Pi (Irrelevant x) (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
+reifyType (VSigma x v f)  = \i -> In $ Sigma (Irrelevant x) (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
 reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
 reifyType (VSet l)        = \i -> In $ Set l
 reifyType VUnit           = \i -> In $ Unit
@@ -509,7 +509,7 @@ reifyType (VMu v)         = \i -> In $ Mu (reify VDesc v i)
 reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VIDesc v1) v2 i)) `tmApp` reify v1 v3
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
-    In <$> (SemI <$> reifyType vI <*> tmD <*> pure i <*> bound vI (\v -> reifyType (vA v)))
+    In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
 reifyType (VGroup nm)     = \i -> In $ Group nm
 reifyType (VNeutral t)    = \i -> t i
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
@@ -523,7 +523,7 @@ reify :: Value -> Value -> (Int -> Term)
 reify (VSet _) a = reifyType a
 
 reify (VPi _ tA tB)    (VLam nm f) = \i -> let d = reflect tA (vbound i)
-                                           in In $ Lam nm $ reify (tB d) (f d) (i + 1)
+                                           in In $ Lam (Irrelevant nm) $ reify (tB d) (f d) (i + 1)
 reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-blah should only be VLam"
 
 reify (VSigma _ tA tB) e = let v1 = vfst e
@@ -548,12 +548,12 @@ reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDes
 reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
 reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
-     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure x <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
+     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure (Irrelevant x) <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
     In <$> (MapI <$> reifyType vI <*> tmD
-                 <*> pure i <*> bound vI (\i -> reifyType (vB i))
-                 <*> pure i <*> bound vI (\i -> reifyType (vA i))
+                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vB i))
+                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vA i))
                  <*> reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v

@@ -134,12 +134,12 @@ isType (Annot p (Pi ident tA tB)) = do
   tmA  <- isType tA
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
-  return (In $ CS.Pi ident tmA tmB)
+  return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 isType (Annot p (Sigma ident tA tB)) = do
   tmA  <- isType tA
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
-  return (In $ CS.Sigma ident tmA tmB)
+  return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 isType (Annot p (Sum t1 t2)) = do
   tm1 <- isType t1
   tm2 <- isType t2
@@ -162,7 +162,7 @@ isType (Annot p (SemI tD x tA)) = do
     VIDesc tyI -> do
       tmA <- bindVar x tyI tA $ \x tA -> isType tA
       let tmI = reifyType0 tyI
-      return (In $ CS.SemI tmI tmD x tmA)
+      return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
     v ->
       raiseError p (ExpectingIDescForSemI v)
 isType (Annot p (LiftI tD x tA i a tP tx)) = do
@@ -177,7 +177,7 @@ isType (Annot p (LiftI tD x tA i a tP tx)) = do
       vD <- eval tmD
       tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
       let tmI = reifyType0 vI
-      return (In $ CS.LiftI tmI tmD x tmA i a tmP tmx)
+      return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
     v ->
         raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
 isType (Annot p (Group nm)) = do
@@ -205,13 +205,13 @@ hasType (Annot p (Pi ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
-  return (In $ CS.Pi ident tmA tmB)
+  return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 
 hasType (Annot p (Sigma ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
-  return (In $ CS.Sigma ident tmA tmB)
+  return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 
 hasType (Annot p (Sum t1 t2)) (VSet l) = do
   tm1 <- t1 `hasType` VSet l
@@ -242,7 +242,7 @@ hasType (Annot p (SemI tD x tA)) (VSet l) = do
     VIDesc tyI -> do
       tmA <- bindVar x tyI tA $ \x tA -> tA `hasType` (VSet l)
       let tmI = reifyType0 tyI
-      return (In $ CS.SemI tmI tmD x tmA)
+      return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
     v ->
       raiseError p (ExpectingIDescForSemI v)
 
@@ -258,7 +258,7 @@ hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
       vD <- eval tmD
       tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
       let tmI = reifyType0 vI
-      return (In $ CS.LiftI tmI tmD x tmA i a tmP tmx)
+      return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
     v ->
         raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
 
@@ -270,7 +270,7 @@ hasType (Annot p (Group nm)) (VSet l) = do
 {------------------------------}
 hasType (Annot p (Lam x tm)) (VPi _ tA tB) = do
   tm' <- bindVar x tA tm $ \x tm -> tm `hasType` (tB x)
-  return (In $ CS.Lam x tm')
+  return (In $ CS.Lam (CS.Irrelevant x) tm')
 
 hasType (Annot p (Lam x t)) v = do
   raiseError p (ExpectingPiTypeForLambda v)
@@ -394,7 +394,7 @@ hasType (Annot p (IDesc_Bind t1 x t2)) (VIDesc tyB) = do
       tm2 <- bindVar x tyA t2 $ \x t2 -> t2 `hasType` (VIDesc tyB)
       let tmA = reifyType0 tyA
           tmB = reifyType0 tyB
-      return (In $ CS.IDesc_Bind tmA tmB tm1 x tm2)
+      return (In $ CS.IDesc_Bind tmA tmB tm1 (CS.Irrelevant x) tm2)
     v ->
         raiseError p (ExpectingDescTypeForDesc v) -- FIXME: better error message, and position
 
@@ -437,7 +437,7 @@ hasType (Annot p (ElimEq t Nothing tp)) tP =
                     tmPg = CS.generalise [eq,tb] tmP
                 vP'  <- tmPg `evalWith` [VRefl, va]
                 tm_p <- tp `hasType` vP'
-                return (In $ CS.ElimEq tA ta tb tm "a" "eq" tmPg tm_p)
+                return (In $ CS.ElimEq tA ta tb tm (CS.Irrelevant "a") (CS.Irrelevant "eq") tmPg tm_p)
          ty ->
              raiseError p (ExpectingEqualityType ty)
 
@@ -461,7 +461,7 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
                     tR `hasType` vP
            let tmA = reifyType0 tA
                tmB = reifyType0 tB
-           return (In $ CS.Case tmS tmA tmB "x" tmP y tmL z tmR)
+           return (In $ CS.Case tmS tmA tmB (CS.Irrelevant "x") tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
     v ->
         do raiseError p (CaseOnNonSum v)
 
@@ -529,7 +529,7 @@ synthesiseTypeFor (Annot p (Case t (Just (x, tP)) y tL z tR)) = do
            v   <- tmP `evalWith` [vS]
            let tmA = reifyType0 tA
                tmB = reifyType0 tB
-           return (v, In $ CS.Case tmS tmA tmB x tmP y tmL z tmR)
+           return (v, In $ CS.Case tmS tmA tmB (CS.Irrelevant x) tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
     v ->
         do raiseError p (CaseOnNonSum v)
 
@@ -560,7 +560,7 @@ synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
            -- create the term
            let ta = reify vA va 0
                tb = reify vB vb 0
-           return (vtmP', In $ CS.ElimEq tA ta tb tm a e tmP tm_p)
+           return (vtmP', In $ CS.ElimEq tA ta tb tm (CS.Irrelevant a) (CS.Irrelevant e) tmP tm_p)
     ty ->
         do raiseError p (ExpectingEqualityType ty)
 
@@ -637,7 +637,7 @@ synthesiseTypeFor (Annot p (MapI tD i1 tA i2 tB tf tx)) = do
       tmf <- tf `hasType` (forall i1 tyI $ \vi -> vA [vi] .->. vB [vi])
       tmx <- tx `hasType` (vsemI tyI vD i1 (\v -> vA [v]))
       return ( vsemI tyI vD i2 (\v -> vB [v])
-             , In $ CS.MapI tmI tmD i1 tmA i2 tmB tmf tmx )
+             , In $ CS.MapI tmI tmD (CS.Irrelevant i1) tmA (CS.Irrelevant i2) tmB tmf tmx )
     v ->
         raiseError p (ExpectingIDescForSemI v)
 
