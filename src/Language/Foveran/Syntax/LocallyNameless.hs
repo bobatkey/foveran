@@ -81,7 +81,7 @@ instance Show (TermPos' p) where
 
 identOfPattern (DS.PatVar nm)  = nm
 identOfPattern (DS.PatTuple _) = "p" -- FIXME: concatenate all the names, or something
-identOfPattern DS.PatNull      = "x"
+identOfPattern DS.PatNull      = "__x"
 
 lookupVarInPattern :: Ident -> DS.Pattern -> Int -> Maybe (FM TermCon a)
 lookupVarInPattern nm (DS.PatVar nm') k | nm == nm' = Just (Layer $ Bound k)

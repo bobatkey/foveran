@@ -133,12 +133,12 @@ isType (Annot p (Set l)) = do
 isType (Annot p (Pi ident tA tB)) = do
   tmA  <- isType tA
   vtmA <- eval tmA
-  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
+  tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> isType tB
   return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 isType (Annot p (Sigma ident tA tB)) = do
   tmA  <- isType tA
   vtmA <- eval tmA
-  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> isType tB
+  tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> isType tB
   return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 isType (Annot p (Sum t1 t2)) = do
   tm1 <- isType t1
@@ -204,13 +204,17 @@ hasType (Annot p (Set l1)) (VSet l2) = do
 hasType (Annot p (Pi ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
-  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
+  -- FIXME: do something cleverer here: should make sure that the name
+  -- chosen for the variable cannot be used elsewhere there is a
+  -- similar problem in the sigma case below. And in the cases in
+  -- 'hasType' above.
+  tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 
 hasType (Annot p (Sigma ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
-  tmB  <- bindVar (fromMaybe "x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
+  tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 
 hasType (Annot p (Sum t1 t2)) (VSet l) = do

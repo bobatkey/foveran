@@ -1,0 +1,15 @@
+assume
+  A : Set
+
+assume
+  B : A -> Set
+
+-- neither of these should type check
+
+test : (_ : A) -> B __x -> B __x
+test a b = b
+
+test2 : A -> B __x -> B __x
+test2 a b = b
+
+;
