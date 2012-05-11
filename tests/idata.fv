@@ -131,7 +131,7 @@ data Bool : Set where
   true  : Bool
   false : Bool
 
-– normalise Bool
+normalise Bool
 
 one : Nat
 one = succ zero
@@ -196,16 +196,6 @@ vnil A = construct «inl (), refl»
 vcons : (A : Set) -> (n : Nat) -> A -> Vector A n -> Vector A (succ n)
 vcons A n a xs = construct «inr (), n, a, xs, refl»
 
-{-
-Maybe:
-
-local
-  assume A : Set
-
-  data List : Set where
-    nil  : List
-    cons : A -> List -> List
--}
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 Vector:body : Set -> Nat -> Unit + Unit -> IDesc Nat;
 Vector:body A n b =
@@ -226,12 +216,9 @@ Vector:elim A Φ φnil φcons =
   inductionI Nat (Vector:code A) Φ
     (λn «constructor, arguments».
       case constructor for b. elimtype Nat (Unit + Unit) (Vector:body A) Φ n b with
-        { inl _. λz               _.      rewriteBy z {-for n p. Φ n (construct «inl (), p»)-} then φnil
-        ; inr _. λ«n', a, xs, eq» «φ, _». rewriteBy eq {-for n p. Φ n (construct «inr (), n', a, xs, p»)-} then φcons n' a xs φ
+        { inl _. λz               _.      rewriteBy z then φnil
+        ; inr _. λ«n', a, xs, eq» «φ, _». rewriteBy eq then φcons n' a xs φ
         } arguments)
-
-       –; inr _. λ«n', a, xs, eq» «φ, _». rewriteBy eq then (φcons n' a xs φ)
-       –; inr «n', a, xs, eq». λ«φ, _». rewriteBy eq then (φcons n' a xs φ)
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Emp : Set where
@@ -250,7 +237,6 @@ data regexp (A : Set) : Set where
   seq  : regexp A -> regexp A -> regexp A
   star : regexp A -> regexp A
   tok  : A -> regexp A
-;
 
 data Fin : Nat -> Set where
   fz : (n : Nat) -> Fin (succ n)
@@ -294,22 +280,9 @@ assume acc2ty :
   Φ a (acc2 A lt a f);                            – result
 -}
 
-{-
-normalise acc2;
-
-data Emp : Nat () -> Set where
-  { };
--}
-
 data Eq (A : Set) (a : A) : A -> Set where
   reflexivity : Eq A a a
 
-normalise Eq;
- 
-assume A : Set
-assume a : A
-
-normalise inductionI A (Eq:code A a);
-
+normalise Eq
 
 ;
