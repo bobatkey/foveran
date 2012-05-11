@@ -647,17 +647,16 @@ mapI' I D A B f x =
   drop I D A B x (allI I D (λi. A i) (λi _. B i) f x)
 
 – we could attempt to make this hold definitionally...
-{-
 drop-all : (I : Set) ->
            (D : IDesc I) ->
            (A B : I -> Set) ->
            (f : (i : I) -> A i -> B i) ->
            (x : semI[D, i. A i]) ->
-           drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI I D (λi. A i) (λi. B i) f x
+           drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI[D, i. A i, i. B i, f, x]
 drop-all I D A B f =
   elimID I
     (λD. (x : semI[D, i. A i]) ->
-         drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI I D (λi. A i) (λi. B i) f x)
+         drop I D A B x (allI I D (λi. A i) (λi _. B i) f x) ≡ mapI[D, i. A i, i. B i, f, x])
     (λi a. refl)
     (λA a. refl)
     (λD₁ D₂ ih₁ ih₂ «x₁,x₂».
@@ -669,7 +668,7 @@ drop-all I D A B f =
       refl)
     (λA D ih f. ?) – stuck: due to lack of extensionality...
     D
--}
+
 helper : (I : Set) ->
          (D : I -> IDesc I) ->
          (A : algebra I D) ->
@@ -715,27 +714,6 @@ helper I D A i =
     (λB D f «b,x» y. f b x y)
     (λB D f h g b. f b (h b) (g b))
     (D i) – exactly the same code as for lift-to-liftIDesc
-
-{-
-extract :
-  (I : Set) ->
-  (D : I -> IDesc I) ->
-  (A : algebra I D) ->
-  (i : I) ->
-  (x : semI[D i, i. µI I D i]) ->
-  liftI[D i, i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
-  semI[D i, i. fst A i]
-extract I D A i =
-  elimID I (λD'. (x : semI[D', i. µI I D i]) ->
-                 liftI[D', i. µI I D i, i x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x», x] ->
-                 semI[D', i. fst A i])
-    (λi x y. snd A i (fst (fst (deconstruct ((i : I) × fst A i) (refinement:code I ((i : I) × fst A i) D (algRefinement I D A)) «i, cata I D A i x» y))))
-    (λX x _. x)
-    ?
-    ?
-    ?
-    (D i)
--}
 
 – could replace cata with something else?
 helper2 : (I : Set) ->
@@ -825,8 +803,8 @@ toVector : (A : Set) ->
            vector A (length A l)
 toVector A = decorate Unit (list:code A) (forgetAlgebra Unit Unit Nat:code (listRefinement A)) ()
 
-– test2 : toList A (length A l) (toVector A l) ≡ l
-– test2 = refl
+test2 : toList A (length A l) (toVector A l) ≡ l
+test2 = refl
 
 – normalise toList A two (decorate Unit (list:code A) (forgetAlgebra Unit Unit Nat:code (listRefinement A)) () l)
 
