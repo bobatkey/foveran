@@ -28,10 +28,7 @@ or-equal F p = p;
 -}
 
 and : bool → bool → bool;
-and b₁ = case b₁ for b₁. bool → bool with
-           { inl u. λb₂. b₂
-           ; inr u. λb₂. false
-           };
+and b₁ = case b₁ with { inl u. λb₂. b₂; inr u. λb₂. false };
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 alphabet : Set;
