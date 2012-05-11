@@ -47,7 +47,7 @@ bind :: Ident -> NameGeneration a -> NameGeneration (Ident, a)
 bind nm (NG f)   = NG $ \(used, bound) -> let (used',nm') = freshen used nm in (nm', f (used', nm':bound))
 
 bindDummy :: NameGeneration a -> NameGeneration a
-bindDummy (NG f) = NG $ \(used, bound) -> f (used, undefined:bound) -- FIXME: wicked hack: change this to use Maybes
+bindDummy x = snd <$> bind "dummy" x
 
 bindK :: Ident -> NameGeneration a -> (Ident -> a -> NameGeneration b) -> NameGeneration b
 bindK nm x k = do (nm',x') <- bind nm x
