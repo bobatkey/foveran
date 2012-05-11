@@ -1,0 +1,10 @@
+-- This test case used to fail due to a mistake in Syntax.Checked.cmp
+data Emp : Set where
+
+Emp:elim : (P : Emp -> Set) -> (e : Emp) -> P e
+Emp:elim P =
+  inductionI Unit Emp:code (λi e. P e)
+    (λ_ «constructor, arguments». absurdBy constructor)
+    ()
+    
+;
