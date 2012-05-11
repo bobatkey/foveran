@@ -236,7 +236,11 @@ Vector:elim A Φ φnil φcons =
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Emp : Set where
 
-normalise Emp
+Emp:elim : (P : Emp -> Set) -> (e : Emp) -> P e
+Emp:elim P =
+  inductionI Unit Emp:code (λi e. P e)
+    (λ_ «constructor, arguments». absurdBy constructor)
+    ()
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data regexp (A : Set) : Set where

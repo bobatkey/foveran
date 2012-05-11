@@ -368,7 +368,7 @@ cmp compareLevel (In (Case t1  tA  tB  _ t2  _ t3  _ t4))
 cmp compareLevel (In Unit)              (In Unit)                = True
 cmp compareLevel (In UnitI)             (In UnitI)               = True
 cmp compareLevel (In Empty)             (In Empty)               = True
-cmp compareLevel (In (ElimEmpty t1 t2)) (In (ElimEmpty t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t1 t2'
+cmp compareLevel (In (ElimEmpty t1 t2)) (In (ElimEmpty t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
 
 cmp compareLevel (In (Eq tA tB ta tb))
                  (In (Eq tA' tB' ta' tb'))
