@@ -1,0 +1,89 @@
+– Some investigations in the structure of the liftI thing
+
+– The main point is that it is an applicative functor, of sorts
+– This is a fact that could be built in to the definitional equality
+
+--------------------------------------------------------------------------------
+– the “pure” part
+pureI :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P : (i : I) -> A i -> Set) ->
+  (x : semI[D, i. A i]) ->
+  ((i : I) -> (x : A i) -> P i x) ->
+  liftI[D, i. A i, i x. P i x, x]
+pureI I D A P x p =
+  elimID I (λD. (x : semI[D, i. A i]) -> liftI[D, i. A i, i x. P i x, x])
+    (λi x. p i x)
+    (λB b. ())
+    (λD₁ D₂ all₁ all₂ x. «all₁ (fst x), all₂ (snd x)»)
+    (λB D all x. all (fst x) (snd x))
+    (λB D all x. λb. all b (x b))
+    D x
+
+– the “ap” part
+apI :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P Q : (i : I) -> A i -> Set) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i a. P i a -> Q i a, x] ->
+  liftI[D, i. A i, i a. P i a, x] ->
+  liftI[D, i. A i, i a. Q i a, x]
+apI I D A P Q =
+  elimID I
+    (λD. (x : semI[D, i. A i]) ->
+         liftI[D, i. A i, i a. P i a -> Q i a, x] ->
+         liftI[D, i. A i, i a. P i a, x] ->
+         liftI[D, i. A i, i a. Q i a, x])
+    (λi x f p. f p)
+    (λA a _ _. ())
+    (λD₁ D₂ ih₁ ih₂ «x₁,x₂» «f₁,f₂» «a₁, a₂».
+      «ih₁ x₁ f₁ a₁, ih₂ x₂ f₂ a₂»)
+    (λB D ih «b, x» f p. ih b x f p)
+    (λB D ih h f p. λb. ih b (h b) (f b) (p b))
+    D
+
+--------------------------------------------------------------------------------
+map :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P Q : (i : I) -> A i -> Set) ->
+  (x : semI[D, i. A i]) ->
+  ((i : I) -> (a : A i) -> P i a -> Q i a) ->
+  liftI[D, i. A i, i a. P i a, x] ->
+  liftI[D, i. A i, i a. Q i a, x]
+map I D A P Q x f =
+  apI I D A P Q x (pureI I D A (λi a. P i a -> Q i a) x f)  
+
+--------------------------------------------------------------------------------
+– And also:
+drop : (I : Set) ->
+       (D : IDesc I) ->
+       (A B : I -> Set) ->
+       (x : semI[D, i. A i]) ->
+       liftI[D, i. A i, i x. B i, x] ->
+       semI[D, i. B i]
+drop I D A B =
+  elimID I
+    (λD'. (x : semI[D', i. A i]) ->
+          liftI[D', i. A i, i x. B i, x] ->
+          semI[D', i. B i])
+    (λi x a. a)
+    (λX x u. x)
+    (λD₁ D₂ drop₁ drop₂ x a.
+      «drop₁ (fst x) (fst a), drop₂ (snd x) (snd a)»)
+    (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
+    (λX D drop f a. λx. drop x (f x) (a x))
+    D
+
+– laws:
+–  - applicative functor laws for pureI and apI
+–  - drop I D A B x (pureI I D A (λi _. B) x f) = mapI I D A B f x
+–  - liftI[D, i. B i, i b. P i b, mapI I D A B f x] = liftI[D, i. A i, i a. P i (f i a), x]
+–  - 
+
+;
