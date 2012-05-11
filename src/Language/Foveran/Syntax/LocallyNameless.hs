@@ -91,7 +91,7 @@ lookupVarInPattern nm (DS.PatTuple l) k = do
   (t, isLast) <- lookupVarInTuplePattern l
   return $ if isLast then t else (Layer $ Proj1 t)
     where lookupVarInTuplePattern []     = Nothing
-          lookupVarInTuplePattern [p]    = do t <- lookupVarInPattern nm p k; return (t,True)
+          lookupVarInTuplePattern [p]    = do t <- lookupVarInPattern nm p k; return (t, True)
           lookupVarInTuplePattern (p:ps) = do t <- lookupVarInPattern nm p k; return (t, False)
                                            <|>
                                            do (t,isLast) <- lookupVarInTuplePattern ps; return (Layer $ Proj2 t, isLast)
