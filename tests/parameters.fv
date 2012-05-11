@@ -96,7 +96,7 @@ internal-id : (P I : Set) ->
                       , x. semI[IDescP:fork P I X x, i. Y i]
                       , λx. case x with { inl p. λx. x; inr i. λx. x }
                       , x]
-internal-id P I D X Y i =
+internal-id P I D X Y i = ?
 {-  elimID (P + I)
     (λD'. (x : semI[D', x. semI[IDescP:fork P I X x, i. Y i]]) ->
           x ≡ mapI[D'
