@@ -9,7 +9,6 @@ module Language.Foveran.Syntax.LocallyNameless
     )
     where
 
-import           Data.List (elemIndex)
 import           Data.Traversable (sequenceA, traverse)
 import           Control.Applicative
 import           Data.Rec
