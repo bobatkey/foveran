@@ -119,10 +119,6 @@ compareTypes p v1 v2 =
            tm2 = reifyType0 v2
        unless (CS.cmp (<=) tm2 tm1) $ do raiseError p (TypesNotEqual v1 v2)
 
--- should probably extend the cummulativity checking to include Pi and
--- Sigma types (i.e. with cummulativity in the codomain of Pi). See
--- e.g. “The View from the Left” or Norell's thesis.
-
 {------------------------------------------------------------------------------}
 -- | Check that something is a type
 isType :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
