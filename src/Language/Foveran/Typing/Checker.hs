@@ -14,7 +14,7 @@ import           Control.Monad.Trans (lift)
 import           Control.Monad.Reader (ReaderT, runReaderT, ask, local)
 import           Control.Monad.State (StateT, runStateT, get, modify)
 import           Data.Maybe (fromMaybe)
-import           Data.Rec (AnnotRec (Annot), Rec (In))
+import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
 import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close)
@@ -160,7 +160,7 @@ isType (Annot p (SemI tD x tA)) = do
       let tmI = reifyType0 tyI
       return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
     v ->
-      raiseError p (ExpectingIDescForSemI v)
+      raiseError (annot tD) (ExpectingIDescForSemI v)
 isType (Annot p (LiftI tD x tA i a tP tx)) = do
   (tyD, tmD) <- synthesiseTypeFor tD
   case tyD of
@@ -174,8 +174,8 @@ isType (Annot p (LiftI tD x tA i a tP tx)) = do
       tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
       let tmI = reifyType0 vI
       return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-    v ->
-        raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
+    v -> do
+      raiseError (annot tD) (ExpectingIDescForSemI v) -- FIXME: more specific error message
 isType (Annot p (Group nm)) = do
   return (In $ CS.Group nm)
 isType (Annot p UserHole) = do
@@ -194,8 +194,11 @@ hasType :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
         -> TypingMonad ctxt CS.Term
 
 hasType (Annot p (Set l1)) (VSet l2) = do
-  unless (l1 < l2) $ raiseError p ExpectingSet -- FIXME: expecting a set of a certain level
+  unless (l1 < l2) $ raiseError p (SetLevelMismatch l1 l2)
   return (In $ CS.Set l1)
+
+hasType (Annot p (Set l1)) v = do
+  raiseError p (TermIsASet v)
 
 hasType (Annot p (Pi ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
@@ -207,22 +210,37 @@ hasType (Annot p (Pi ident tA tB)) (VSet l) = do
   tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 
+hasType (Annot p (Pi ident tA tB)) v = do
+  raiseError p (TermIsASet v)
+
 hasType (Annot p (Sigma ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 
+hasType (Annot p (Sigma ident tA tB)) v = do
+  raiseError p (TermIsASet v)
+
 hasType (Annot p (Sum t1 t2)) (VSet l) = do
   tm1 <- t1 `hasType` VSet l
   tm2 <- t2 `hasType` VSet l
   return (In $ CS.Sum tm1 tm2)
 
+hasType (Annot p (Sum t1 t2)) v = do
+  raiseError p (TermIsASet v)
+
 hasType (Annot p Unit) (VSet l) = do
   return (In $ CS.Unit)
 
+hasType (Annot p Unit) v = do
+  raiseError p (TermIsASet v)
+
 hasType (Annot p Empty) (VSet l) = do
   return (In $ CS.Empty)
+
+hasType (Annot p Empty) v = do
+  raiseError p (TermIsASet v)
 
 hasType (Annot p (Eq tA tB)) (VSet l) = do
   (tyA, tmA) <- synthesiseTypeFor tA
@@ -236,6 +254,9 @@ hasType (Annot p (Eq tA tB)) (VSet l) = do
   -- types for terms that aren't of synthesisable type.
   return (In $ CS.Eq tyA' tyB' tmA tmB)
 
+hasType (Annot p (Eq tA tB)) v = do
+  raiseError p (TermIsASet v)
+
 hasType (Annot p (SemI tD x tA)) (VSet l) = do
   (tyD, tmD) <- synthesiseTypeFor tD
   case tyD of
@@ -244,7 +265,10 @@ hasType (Annot p (SemI tD x tA)) (VSet l) = do
       let tmI = reifyType0 tyI
       return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
     v ->
-      raiseError p (ExpectingIDescForSemI v)
+      raiseError (annot tD) (ExpectingIDescForSemI v)
+
+hasType (Annot p (SemI tD x tA)) v = do
+  raiseError p (TermIsASet v)
 
 hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
   (tyD, tmD) <- synthesiseTypeFor tD
@@ -259,13 +283,17 @@ hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
       tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
       let tmI = reifyType0 vI
       return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-    v ->
-        raiseError p (ExpectingIDescForSemI v) -- FIXME: more specific error message
+    v -> do
+      raiseError (annot tD) (ExpectingIDescForSemI v) -- FIXME: more specific error message
+
+hasType (Annot p (LiftI tD x tA i a tP tx)) v = do
+  raiseError p (TermIsASet v)
 
 hasType (Annot p (Group nm)) (VSet l) = do
   return (In $ CS.Group nm)
 
--- FIXME: all the error cases for Set too.
+hasType (Annot p (Group nm)) v =  do
+  raiseError p (TermIsASet v)
 
 {------------------------------}
 hasType (Annot p (Lam x tm)) (VPi _ tA tB) = do
@@ -395,8 +423,8 @@ hasType (Annot p (IDesc_Bind t1 x t2)) (VIDesc tyB) = do
       let tmA = reifyType0 tyA
           tmB = reifyType0 tyB
       return (In $ CS.IDesc_Bind tmA tmB tm1 (CS.Irrelevant x) tm2)
-    v ->
-        raiseError p (ExpectingDescTypeForDesc v) -- FIXME: better error message, and position
+    v -> do
+      raiseError (annot t1) (ExpectingDescTypeForDesc v) -- FIXME: better error message
 
 hasType (Annot p (IDesc_Bind t1 x t2)) v = do
   raiseError p (ExpectingDescTypeForDesc v)
@@ -415,6 +443,7 @@ hasType (Annot p Refl) (VEq vA vB va vb) = do
 
 hasType (Annot p Refl) v = do
   raiseError p (ReflExpectingEqualityType v)
+
 
 hasType (Annot p UserHole) v = do
   generateHole p Nothing (Just v)
@@ -439,8 +468,7 @@ hasType (Annot p (ElimEq t Nothing tp)) tP =
                 tm_p <- tp `hasType` vP'
                 return (In $ CS.ElimEq tA ta tb tm (CS.Irrelevant "a") (CS.Irrelevant "eq") tmPg tm_p)
          ty ->
-             raiseError p (ExpectingEqualityType ty)
-
+             raiseError (annot t) (ExpectingEqualityType ty)
 
 hasType (Annot p (ElimEmpty t1 Nothing)) v =
     do tm1     <- hasType t1 VEmpty
@@ -463,22 +491,31 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
                tmB = reifyType0 tB
            return (In $ CS.Case tmS tmA tmB (CS.Irrelevant "x") tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
     v ->
-        do raiseError p (CaseOnNonSum v)
+        do raiseError (annot t) (CaseOnNonSum v)
 
+{------------------------------}
+{- Built-in group operations -}
 
 hasType (Annot p GroupUnit) (VGroup nm) = do
   return (In $ CS.GroupUnit)
+
+hasType (Annot p GroupUnit) v = do
+  raiseError p (TermIsAGroupExpression v)
 
 hasType (Annot p (GroupMul t1 t2)) (VGroup nm) = do
   tm1 <- hasType t1 (VGroup nm)
   tm2 <- hasType t2 (VGroup nm)
   return (In $ CS.GroupMul tm1 tm2)
 
+hasType (Annot p (GroupMul t1 t2)) v = do
+  raiseError p (TermIsAGroupExpression v)
+
 hasType (Annot p (GroupInv t)) (VGroup nm) = do
   tm <- hasType t (VGroup nm)
   return (In $ CS.GroupInv tm)
 
--- FIXME: proper error messages
+hasType (Annot p (GroupInv t)) v = do
+  raiseError p (TermIsAGroupExpression v)
 
 {------------------------------}
 {- Fall through case -}
@@ -530,8 +567,8 @@ synthesiseTypeFor (Annot p (Case t (Just (x, tP)) y tL z tR)) = do
            let tmA = reifyType0 tA
                tmB = reifyType0 tB
            return (v, In $ CS.Case tmS tmA tmB (CS.Irrelevant x) tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
-    v ->
-        do raiseError p (CaseOnNonSum v)
+    v -> do
+      raiseError (annot t) (CaseOnNonSum v)
 
 synthesiseTypeFor (Annot p (ElimEmpty t1 (Just t2))) = do
   tm1  <- t1 `hasType` VEmpty
@@ -562,7 +599,7 @@ synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
                tb = reify vB vb 0
            return (vtmP', In $ CS.ElimEq tA ta tb tm (CS.Irrelevant a) (CS.Irrelevant e) tmP tm_p)
     ty ->
-        do raiseError p (ExpectingEqualityType ty)
+        do raiseError (annot t) (ExpectingEqualityType ty)
 
 synthesiseTypeFor (Annot p Desc) = do
   return (VSet 1, In $ CS.Desc)
@@ -639,7 +676,7 @@ synthesiseTypeFor (Annot p (MapI tD i1 tA i2 tB tf tx)) = do
       return ( vsemI tyI vD i2 (\v -> vB [v])
              , In $ CS.MapI tmI tmD (CS.Irrelevant i1) tmA (CS.Irrelevant i2) tmB tmf tmx )
     v ->
-        raiseError p (ExpectingIDescForSemI v)
+        raiseError (annot tD) (ExpectingIDescForSemI v)
 
 synthesiseTypeFor (Annot p IDesc_Elim) = do
   return ( forall "I" (VSet 0) $ \i ->
@@ -689,9 +726,9 @@ synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
               else
                   raiseError p (OtherError "Groups not equal")
           _ ->
-              raiseError p (OtherError "Right operand not a group element")
+              raiseError (annot t2) (OtherError "Right operand not a group element")
     _ ->
-        raiseError p (OtherError "Left operand not a group element")
+        raiseError (annot t1) (OtherError "Left operand not a group element")
 
 synthesiseTypeFor (Annot p (GroupInv t)) = do
   (ty, tm) <- synthesiseTypeFor t
@@ -699,7 +736,7 @@ synthesiseTypeFor (Annot p (GroupInv t)) = do
     VGroup nm ->
         return (VGroup nm, In $ CS.GroupInv tm)
     _ ->
-        raiseError p (OtherError "Operand is not a group element")
+        raiseError (annot t) (OtherError "Operand is not a group element")
 
 synthesiseTypeFor (Annot p t) = do
   raiseError p (UnableToSynthesise (Annot p t))

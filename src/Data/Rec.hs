@@ -3,6 +3,7 @@
 module Data.Rec
     ( Rec (..)
     , AnnotRec (..)
+    , annot
     , translate
     , translateStar
     , translateRec
@@ -33,6 +34,9 @@ translateRec :: (Functor m, Functor f) =>
 translateRec f (In x) = In <$> f (translateRec f <$> x)
 
 data AnnotRec a f = Annot a (f (AnnotRec a f))
+
+annot :: AnnotRec a f -> a
+annot (Annot a _) = a
 
 instance Regioned a => Regioned (AnnotRec a f) where
     regionLeft (Annot a _) = regionLeft a

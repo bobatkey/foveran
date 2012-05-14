@@ -31,10 +31,12 @@ data TypeError
     | ApplicationOfNonFunction    Value
     | CaseOnNonSum                Value
     | ExpectingSet
+    | SetLevelMismatch            Int Int
+    | TermIsASet                  Value
+    | TermIsAGroupExpression      Value
     | UnableToSynthesise          LN.TermPos
     | Proj1FromNonSigma           Value
     | Proj2FromNonSigma           Value
-    | LevelProblem                Int Int
     | TypesNotEqual               Value Value
     | ReflCanOnlyProduceHomogenousEquality Value Value
     | ReflCanOnlyProduceEquality  Value Value Value
@@ -80,7 +82,7 @@ ppTypeError ctxt (ExpectingSumTypeForInr ty)
 ppTypeError ctxt (ExpectingUnitTypeForUnit ty)
     = "Expecting term to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term has type 𝟙"
+      $$ "but this term has type Unit"
 ppTypeError ctxt (ExpectingDescTypeForDesc ty)
     = "Expecting Desc type for description"
 ppTypeError ctxt (ExpectingMuTypeForConstruct ty)
@@ -90,19 +92,29 @@ ppTypeError ctxt (ExpectingMuTypeForConstruct ty)
 ppTypeError ctxt (UnknownIdentifier nm)
     = "Unknown identifier" <+> "“" <> ppIdent nm <> "”"
 ppTypeError ctxt (ApplicationOfNonFunction ty)
-    = "Application of non function"
+    = "Application of non function. Term has type"
+      $$ nest 4 (ppType ctxt ty)
 ppTypeError ctxt (CaseOnNonSum ty)
-    = "Case on value of non-sum type"
+    = "Case on value of non-sum type. Term has type"
+      $$ nest 4 (ppType ctxt ty)
 ppTypeError ctxt (ExpectingSet)
     = "Expecting a term of sort Set"
+ppTypeError ctxt (SetLevelMismatch l1 l2)
+    = "Set level problem: 'Set" <+> int l1 <> "' does not have type 'Set" <+> int l2 <> "'"
+ppTypeError ctxt (TermIsASet v)
+    = "This term is a set, but the context was expecting a term of type"
+      $$ nest 4 (ppType ctxt v)
+ppTypeError ctxt (TermIsAGroupExpression v)
+    = "This term is a group expression, but the context was expecting a term of type" 
+      $$ nest 4 (ppType ctxt v)
 ppTypeError ctxt (UnableToSynthesise t)
     = "Unable to synthesise type for this term: " <> text (show t)
 ppTypeError ctxt (Proj1FromNonSigma ty)
-    = "First projection from non Sigma-type"
+    = "First projection from non Sigma-type. Actual type is"
+      $$ nest 4 (ppType ctxt ty)
 ppTypeError ctxt (Proj2FromNonSigma ty)
-    = "Second projection from non Sigma-type"
-ppTypeError ctxt (LevelProblem i j)
-    = "Level problem:" <+> int i <+> "not <=" <+> int j
+    = "Second projection from non Sigma-type. Actual type is"
+      $$ nest 4 (ppType ctxt ty)
 ppTypeError ctxt (TypesNotEqual ty1 ty2)
     = "Expecting term to have type "
       $$ nest 4 (ppType ctxt ty1)
