@@ -220,9 +220,19 @@ term01 =
     <|>
     unary GroupInv <$> token Tok.GroupInv <*> term00
     <|>
-    (\p i p'-> Annot (makeSpan p p') (Group i NotAbelian)) <$> token Tok.Group <* token Tok.LSqBracket <*> identifier <*> token Tok.RSqBracket
+    (\p i paramTy p'-> Annot (makeSpan p p') (Group i NotAbelian paramTy))
+      <$> token Tok.Group
+      <*  token Tok.LSqBracket
+      <*> identifier
+      <*> optional (token Tok.Comma *> term10)
+      <*> token Tok.RSqBracket
     <|>
-    (\p i p'-> Annot (makeSpan p p') (Group i IsAbelian)) <$> token Tok.AbGroup <* token Tok.LSqBracket <*> identifier <*> token Tok.RSqBracket
+    (\p i paramTy p'-> Annot (makeSpan p p') (Group i IsAbelian paramTy))
+      <$> token Tok.AbGroup
+      <*  token Tok.LSqBracket
+      <*> identifier
+      <*> optional (token Tok.Comma *> term10)
+      <*> token Tok.RSqBracket
     <|>
     (\p t1 t2 -> Annot (makeSpan p t2) (ElimEmpty t1 (Just t2)))
       <$> (token Tok.ElimEmpty <|> token Tok.AbsurdBy)

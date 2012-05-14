@@ -116,8 +116,8 @@ pprint (LiftI tD x tA i a tP tx) =
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> sep [down t1, down t2])
 pprint InductionI          = "inductionI"
 
-pprint (Group nm NotAbelian) = "Group[" <> ppIdent nm <> "]"
-pprint (Group nm IsAbelian)  = "AbGroup[" <> ppIdent nm <> "]"
+pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
+pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint GroupUnit           = "unit"
 pprint (GroupMul t1 t2)    = paren 08 (t1 <+> "#" <+> down t2)
 pprint (GroupInv t)        = paren 07 ("inv" <+> down t)

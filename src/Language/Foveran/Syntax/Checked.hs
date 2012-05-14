@@ -94,7 +94,7 @@ data TermCon tm
     | InductionI
 
     {- Group stuff -}
-    | Group      Ident Abelian
+    | Group      Ident Abelian (Maybe tm)
     | GroupUnit
     | GroupMul   tm tm
     | GroupInv   tm
@@ -166,7 +166,7 @@ traverseSyn (LiftI tI tD i tA i' a tP tx) =
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
-traverseSyn (Group nm ab)    = pure (Group nm ab)
+traverseSyn (Group nm ab ty) = Group nm ab <$> sequenceA ty
 traverseSyn GroupUnit        = pure GroupUnit
 traverseSyn (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 traverseSyn (GroupInv t)     = GroupInv <$> t
@@ -298,7 +298,7 @@ toDisplay (LiftI _ tD ix tA ii ia tP tx) =
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
 
-toDisplay (Group nm ab)           = pure (DS.Group nm ab)
+toDisplay (Group nm ab paramTy)   = DS.Group nm ab <$> sequenceA paramTy
 toDisplay GroupUnit               = pure DS.GroupUnit
 toDisplay (GroupMul t1 t2)        = DS.GroupMul <$> t1 <*> t2
 toDisplay (GroupInv t)            = DS.GroupInv <$> t
@@ -432,8 +432,10 @@ cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
 cmp compareLevel (In InductionI)       (In InductionI)
     = True
 
-cmp compareLevel (In (Group nm ab))    (In (Group nm' ab'))
+cmp compareLevel (In (Group nm ab Nothing)) (In (Group nm' ab' Nothing))
     = nm == nm' && ab == ab'
+cmp compareLevel (In (Group nm ab (Just t))) (In (Group nm' ab' (Just t')))
+    = nm == nm' && ab == ab' && cmp (==) t t' -- FIXME: I think this is right, wrt to the levels
 cmp compareLevel (In GroupUnit)        (In GroupUnit)
     = True
 cmp compareLevel (In (GroupMul t1 t2)) (In (GroupMul t1' t2'))

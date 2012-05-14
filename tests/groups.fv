@@ -1,3 +1,5 @@
+--------------------------------------------------------------------------------
+-- Non abelian groups
 GA : Set
 GA = Group[GA]
 
@@ -36,5 +38,25 @@ normalise tm4
 test5 : (g1 g2 : UOM) ->
         (g1 # g2 # g1 # g2) == (g1 # g1 # g2 # g2)
 test5 g1 g2 = refl
+
+--------------------------------------------------------------------------------
+-- Groups with parameters
+assume A : Set
+
+G : A -> Set
+G = AbGroup[G,A]
+
+{-
+– this ought to fail, due to the types not matching
+
+test6 : (a b : A) ->
+        G a -> G b -> G a
+test6 a b g1 g2 = g1 # g2 
+-}
+
+test7 : (a : A) ->
+        (g1 g2 : G a) ->
+        (g1 # g2) == (g2 # g1)
+test7 a g1 g2 = refl
 
 ;

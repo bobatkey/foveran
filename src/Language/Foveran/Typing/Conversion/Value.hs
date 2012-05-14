@@ -31,6 +31,7 @@ module Language.Foveran.Typing.Conversion.Value
     , vmuI
     , vinductionI
 
+    , vgroup
     , vgroupUnit
     , vgroupMul
     , vgroupInv
@@ -95,7 +96,7 @@ data Value
     | VMapI       (Value -> Value) Value (Int -> Term)
     | VSemI       Value (Int -> Term) Ident (Value -> Value)
 
-    | VGroup      Ident Abelian
+    | VGroup      Ident Abelian (Maybe (Value, Value))
     | VGroupTerm  [(Bool, Int -> Term)]
 
     | VNeutral   (Int -> Term)
@@ -473,6 +474,10 @@ vinductionI vI vD vP vk = loop
                    `tmApp` n)
 
 {------------------------------------------------------------------------------}
+vgroup :: Ident -> Abelian -> Maybe Value -> Value
+vgroup nm ab Nothing   = VGroup nm ab Nothing
+vgroup nm ab (Just ty) = VLam "x" $ \x -> VGroup nm ab (Just (ty, x))
+
 vgroupUnit :: Value
 vgroupUnit = VGroupTerm []
 
@@ -493,7 +498,7 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
 reflect VUnit            tm = VUnitI
 reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
-reflect (VGroup nm ab)   tm = VGroupTerm [(False, tm)]
+reflect (VGroup nm ab _) tm = VGroupTerm [(False, tm)]
 reflect _                tm = VNeutral tm
 
 
@@ -512,7 +517,8 @@ reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VID
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
-reifyType (VGroup nm ab)  = \i -> In $ Group nm ab
+reifyType (VGroup nm ab Nothing)  = \i -> In $ Group nm ab Nothing
+reifyType (VGroup nm ab (Just (t1, t2))) = (In <$> (Group nm ab <$> (Just <$> reifyType t1))) `tmApp` reify t1 t2
 reifyType (VNeutral t)    = \i -> t i
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
@@ -560,7 +566,7 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
-reify (VGroup nm ab)   (VGroupTerm tms)    = reifyGroupTerm tms ab
+reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
 

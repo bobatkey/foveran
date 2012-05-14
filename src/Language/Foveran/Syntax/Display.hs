@@ -150,7 +150,7 @@ data TermCon tm
     | InductionI
 
     {- Group stuff -}
-    | Group      Ident Abelian
+    | Group      Ident Abelian (Maybe tm)
     | GroupUnit
     | GroupMul   tm tm
     | GroupInv   tm
