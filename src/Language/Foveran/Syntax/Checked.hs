@@ -38,11 +38,6 @@ instance Eq (Irrelevant a) where
 instance Ord (Irrelevant a) where
     compare _ _ = EQ
 
--- The only difference between this and InternalSyntax is the
--- appearance of explicit types in the “Case” expression, and explicit
--- types on the “Eq” type former. This is needed for correct
--- reflection of the variables during NBE.
-
 type Term = Rec TermCon
 
 data TermCon tm
@@ -447,11 +442,6 @@ cmp compareLevel (In (Hole nm tms))    (In (Hole nm' tms'))
     = nm == nm' && length tms == length tms' && all (uncurry (cmp compareLevel)) (zip tms tms') -- FIXME: write a proper comparison
 
 cmp compareLevel _ _ = False
-
-
--- FIXME: We don't compare the elimination types for Case, ElimEmpty
--- because we are assuming that the two terms are already the same
--- type. This might be a mistake.
 
 
 instance Eq Term where
