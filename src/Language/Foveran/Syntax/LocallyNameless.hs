@@ -3,6 +3,7 @@
 module Language.Foveran.Syntax.LocallyNameless
     ( TermPos
     , TermCon (..)
+    , Abelian (..)
     , toLocallyNamelessClosed
     , toLocallyNameless
     , close
@@ -16,6 +17,7 @@ import           Text.Position (Span)
 import           Data.FreeMonad
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier (Ident)
+import           Language.Foveran.Syntax.Common (Abelian)
 
 type TermPos = AnnotRec Span TermCon
 type TermPos' p = AnnotRec p TermCon
@@ -67,7 +69,7 @@ data TermCon tm
   | MuI        tm tm
   | InductionI
 
-  | Group      Ident
+  | Group      Ident Abelian
   | GroupUnit
   | GroupMul   tm tm
   | GroupInv   tm
@@ -193,7 +195,7 @@ toLN (DS.LiftI tD i tA i' a tP tx) bv =
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
-toLN (DS.Group nm)        bv = Layer $ Group nm
+toLN (DS.Group nm ab)     bv = Layer $ Group nm ab
 toLN DS.GroupUnit         bv = Layer $ GroupUnit
 toLN (DS.GroupMul t1 t2)  bv = Layer $ GroupMul (return $ t1 bv) (return $ t2 bv)
 toLN (DS.GroupInv t)      bv = Layer $ GroupInv (return $ t bv)
@@ -271,7 +273,7 @@ close' fnm InductionI       = pure InductionI
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms
 
-close' fnm (Group nm)       = pure (Group nm)
+close' fnm (Group nm ab)    = pure (Group nm ab)
 close' fnm GroupUnit        = pure GroupUnit
 close' fnm (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 close' fnm (GroupInv t)     = GroupInv <$> t

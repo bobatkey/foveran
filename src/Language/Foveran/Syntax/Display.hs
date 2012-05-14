@@ -21,10 +21,13 @@ module Language.Foveran.Syntax.Display
     , Term
     , TermPos
     , TermCon (..)
+
+    , Abelian (..)
     )
     where
 
 import Language.Foveran.Syntax.Identifier (Ident)
+import Language.Foveran.Syntax.Common (Abelian (..))
 import Text.Position (Span)
 import Data.Rec
 
@@ -147,7 +150,7 @@ data TermCon tm
     | InductionI
 
     {- Group stuff -}
-    | Group      Ident
+    | Group      Ident Abelian
     | GroupUnit
     | GroupMul   tm tm
     | GroupInv   tm

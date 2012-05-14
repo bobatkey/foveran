@@ -176,8 +176,8 @@ isType (Annot p (LiftI tD x tA i a tP tx)) = do
       return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
     v -> do
       raiseError (annot tD) (ExpectingIDescForSemI v) -- FIXME: more specific error message
-isType (Annot p (Group nm)) = do
-  return (In $ CS.Group nm)
+isType (Annot p (Group nm ab)) = do
+  return (In $ CS.Group nm ab)
 isType (Annot p UserHole) = do
   generateHole p Nothing Nothing
 isType term@(Annot p _) = do
@@ -289,10 +289,10 @@ hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
 hasType (Annot p (LiftI tD x tA i a tP tx)) v = do
   raiseError p (TermIsASet v)
 
-hasType (Annot p (Group nm)) (VSet l) = do
-  return (In $ CS.Group nm)
+hasType (Annot p (Group nm ab)) (VSet l) = do
+  return (In $ CS.Group nm ab)
 
-hasType (Annot p (Group nm)) v =  do
+hasType (Annot p (Group nm ab)) v =  do
   raiseError p (TermIsASet v)
 
 {------------------------------}
@@ -496,22 +496,22 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
 {------------------------------}
 {- Built-in group operations -}
 
-hasType (Annot p GroupUnit) (VGroup nm) = do
+hasType (Annot p GroupUnit) (VGroup nm ab) = do
   return (In $ CS.GroupUnit)
 
 hasType (Annot p GroupUnit) v = do
   raiseError p (TermIsAGroupExpression v)
 
-hasType (Annot p (GroupMul t1 t2)) (VGroup nm) = do
-  tm1 <- hasType t1 (VGroup nm)
-  tm2 <- hasType t2 (VGroup nm)
+hasType (Annot p (GroupMul t1 t2)) (VGroup nm ab) = do
+  tm1 <- hasType t1 (VGroup nm ab)
+  tm2 <- hasType t2 (VGroup nm ab)
   return (In $ CS.GroupMul tm1 tm2)
 
 hasType (Annot p (GroupMul t1 t2)) v = do
   raiseError p (TermIsAGroupExpression v)
 
-hasType (Annot p (GroupInv t)) (VGroup nm) = do
-  tm <- hasType t (VGroup nm)
+hasType (Annot p (GroupInv t)) (VGroup nm ab) = do
+  tm <- hasType t (VGroup nm ab)
   return (In $ CS.GroupInv tm)
 
 hasType (Annot p (GroupInv t)) v = do
@@ -718,11 +718,11 @@ synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
   (ty1, tm1) <- synthesiseTypeFor t1
   (ty2, tm2) <- synthesiseTypeFor t2
   case ty1 of
-    VGroup nm1 ->
+    VGroup nm1 ab1 ->
         case ty2 of
-          VGroup nm2 ->
-              if nm1 == nm2 then
-                  return (VGroup nm1, In $ CS.GroupMul tm1 tm2)
+          VGroup nm2 ab2 ->
+              if nm1 == nm2 && ab1 == ab2 then
+                  return (VGroup nm1 ab1, In $ CS.GroupMul tm1 tm2)
               else
                   raiseError p (OtherError "Groups not equal")
           _ ->
@@ -733,8 +733,8 @@ synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
 synthesiseTypeFor (Annot p (GroupInv t)) = do
   (ty, tm) <- synthesiseTypeFor t
   case ty of
-    VGroup nm ->
-        return (VGroup nm, In $ CS.GroupInv tm)
+    VGroup nm ab ->
+        return (VGroup nm ab, In $ CS.GroupInv tm)
     _ ->
         raiseError (annot t) (OtherError "Operand is not a group element")
 

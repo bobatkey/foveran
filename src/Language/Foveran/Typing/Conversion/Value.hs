@@ -48,6 +48,8 @@ import Control.Applicative
 import Data.Maybe (fromMaybe)
 import Data.Rec
 
+import qualified Data.Map as M -- for normalising abelian group expressions
+
 import Language.Foveran.Syntax.Identifier (Ident)
 import Language.Foveran.Syntax.Checked
 
@@ -93,7 +95,7 @@ data Value
     | VMapI       (Value -> Value) Value (Int -> Term)
     | VSemI       Value (Int -> Term) Ident (Value -> Value)
 
-    | VGroup      Ident
+    | VGroup      Ident Abelian
     | VGroupTerm  [(Bool, Int -> Term)]
 
     | VNeutral   (Int -> Term)
@@ -491,7 +493,7 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
 reflect VUnit            tm = VUnitI
 reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
-reflect (VGroup nm)      tm = VGroupTerm [(False, tm)]
+reflect (VGroup nm ab)   tm = VGroupTerm [(False, tm)]
 reflect _                tm = VNeutral tm
 
 
@@ -510,7 +512,7 @@ reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VID
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
-reifyType (VGroup nm)     = \i -> In $ Group nm
+reifyType (VGroup nm ab)  = \i -> In $ Group nm ab
 reifyType (VNeutral t)    = \i -> t i
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
@@ -558,18 +560,22 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
-reify (VGroup nm)      (VGroupTerm tms)    = reifyGroupTerm tms
+reify (VGroup nm ab)   (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
 
-reifyGroupTerm :: [(Bool, Int -> Term)] -> Int -> Term
-reifyGroupTerm l i =
-    foldr smartMul (In GroupUnit) $ map doInverses $ collapse [] $ map toTerm l
+reifyGroupTerm :: [(Bool, Int -> Term)] -> Abelian -> Int -> Term
+reifyGroupTerm l ab i =
+    foldr smartMul (In GroupUnit) $ map doInverses $ normaliser $ map toTerm l
     where
       toTerm (inverted, tm) = (inverted, tm i)
 
       doInverses (True, tm)  = In $ GroupInv tm
       doInverses (False, tm) = tm
+
+      normaliser = case ab of
+                     IsAbelian  -> collapseAb M.empty
+                     NotAbelian -> collapse []
 
       collapse []             []             = []
       collapse l1             []             = reverse l1
@@ -579,6 +585,22 @@ reifyGroupTerm l i =
               collapse l1 l2
           else
               collapse ((inv2,v2):(inv1,v1):l1) l2
+
+      toNum True  = -1
+      toNum False = 1
+
+      collapseAb m [] = map toTermAb (M.assocs m)
+          where
+            toTermAb (tm, n) =
+                let t = foldr smartMul (In GroupUnit) (replicate (abs n) tm) in
+                if n < 0 then (True, t) else (False, t)
+      collapseAb m ((inv, tm):l) =
+          case M.lookup tm m of
+            Nothing -> collapseAb (M.insert tm (toNum inv) m) l
+            Just n  ->
+                let n' = n + toNum inv in
+                if n' == 0 then collapseAb (M.delete tm m) l
+                           else collapseAb (M.insert tm n' m) l
 
       smartMul x (In GroupUnit) = x
       smartMul x y              = In $ GroupMul x y

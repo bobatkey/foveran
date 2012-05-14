@@ -20,4 +20,21 @@ tm3 g1 g2 = inv (g1 # g2)
 test3 : (g1 g2 : GA) -> tm3 g1 g2 == (inv g2 # inv g1)
 test3 g1 g2 = refl
 
+--------------------------------------------------------------------------------
+-- Abelian Groups
+UOM : Set
+UOM = AbGroup[UOM]
+
+tm4 : UOM -> UOM -> UOM
+tm4 g1 g2 = inv g1 # g2 # g1
+
+test4 : (g1 g2 : UOM) -> tm4 g1 g2 == g2
+test4 g1 g2 = refl
+
+normalise tm4
+
+test5 : (g1 g2 : UOM) ->
+        (g1 # g2 # g1 # g2) == (g1 # g1 # g2 # g2)
+test5 g1 g2 = refl
+
 ;

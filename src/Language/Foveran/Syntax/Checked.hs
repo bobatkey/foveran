@@ -5,6 +5,8 @@ module Language.Foveran.Syntax.Checked
 
     , Irrelevant (..)
 
+    , Abelian (..)
+
     , Term
     , TermCon (..)
     , tmApp
@@ -28,6 +30,7 @@ import           Data.List (elemIndex)
 import           Data.Traversable
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
+import           Language.Foveran.Syntax.Common (Abelian)
 
 newtype Irrelevant a = Irrelevant { fromIrrelevant :: a }
     deriving (Show)
@@ -91,7 +94,7 @@ data TermCon tm
     | InductionI
 
     {- Group stuff -}
-    | Group      Ident
+    | Group      Ident Abelian
     | GroupUnit
     | GroupMul   tm tm
     | GroupInv   tm
@@ -163,7 +166,7 @@ traverseSyn (LiftI tI tD i tA i' a tP tx) =
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
 
-traverseSyn (Group nm)       = pure (Group nm)
+traverseSyn (Group nm ab)    = pure (Group nm ab)
 traverseSyn GroupUnit        = pure GroupUnit
 traverseSyn (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 traverseSyn (GroupInv t)     = GroupInv <$> t
@@ -295,7 +298,7 @@ toDisplay (LiftI _ tD ix tA ii ia tP tx) =
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
 
-toDisplay (Group nm)              = pure (DS.Group nm)
+toDisplay (Group nm ab)           = pure (DS.Group nm ab)
 toDisplay GroupUnit               = pure DS.GroupUnit
 toDisplay (GroupMul t1 t2)        = DS.GroupMul <$> t1 <*> t2
 toDisplay (GroupInv t)            = DS.GroupInv <$> t
@@ -429,8 +432,8 @@ cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
 cmp compareLevel (In InductionI)       (In InductionI)
     = True
 
-cmp compareLevel (In (Group nm))       (In (Group nm'))
-    = nm == nm'
+cmp compareLevel (In (Group nm ab))    (In (Group nm' ab'))
+    = nm == nm' && ab == ab'
 cmp compareLevel (In GroupUnit)        (In GroupUnit)
     = True
 cmp compareLevel (In (GroupMul t1 t2)) (In (GroupMul t1' t2'))

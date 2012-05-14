@@ -79,6 +79,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "[" :==>               emit LSqBracket
     , "]" :==>               emit RSqBracket
     , "Group" :==>           emit Group
+    , "AbGroup" :==>         emit AbGroup
     , "unit" :==>            emit GroupUnit
     , "#" :==>               emit GroupMul
     , "inv" :==>             emit GroupInv

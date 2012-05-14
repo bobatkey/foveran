@@ -78,6 +78,7 @@ data Token
     | InductionI
 
     | Group
+    | AbGroup
     | GroupUnit
     | GroupInv
     | GroupMul
@@ -163,6 +164,7 @@ instance SyntaxHighlight Token where
     lexicalClass AbsurdBy    = Keyword
     lexicalClass Hole        = Keyword
     lexicalClass Group       = Keyword
+    lexicalClass AbGroup     = Keyword
     lexicalClass GroupUnit   = Operator
     lexicalClass GroupMul    = Operator
     lexicalClass GroupInv    = Operator
@@ -244,6 +246,7 @@ instance Show Token where
   show AbsurdBy    = "absurdBy"
   show Hole        = "?"
   show Group       = "Group"
+  show AbGroup     = "AbGroup"
   show GroupUnit   = "unit"
   show GroupMul    = "#"
   show GroupInv    = "inv"
