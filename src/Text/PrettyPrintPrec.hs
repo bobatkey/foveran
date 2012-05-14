@@ -4,8 +4,10 @@ module Text.PrettyPrintPrec
      atPrecedenceLevel,
      resetPrec,
      text,
+     empty,
      (<>), (<+>), ($$), hang, nest, hsep, hcat, punctuate, sep, paren, cat, down, vcat,
      int,
+     comma,
      render)
     where
 
@@ -26,6 +28,9 @@ fromDoc d = PrecDoc (const d)
 
 text :: String -> PrecDoc
 text s = fromString s
+
+empty :: PrecDoc
+empty = PrecDoc $ \_ -> PP.empty
 
 (<>) :: PrecDoc -> PrecDoc -> PrecDoc
 p1 <> p2 = PrecDoc $ \lev -> (PP.<>) (p1 `atPrecedenceLevel` lev) (p2 `atPrecedenceLevel` lev)
@@ -77,6 +82,9 @@ resetPrec p = PrecDoc $ \_ -> p `atPrecedenceLevel` 10
 
 int :: Int -> PrecDoc
 int i = PrecDoc $ \_ -> PP.int i
+
+comma :: PrecDoc
+comma = PrecDoc $ \_ -> PP.comma
 
 render :: PrecDoc -> String
 render d = PP.render (d `atPrecedenceLevel` 10)
