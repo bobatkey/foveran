@@ -20,30 +20,39 @@ import           Language.Foveran.Parsing.PrettyPrinter
 
 {------------------------------------------------------------------------------}
 data TypeError
-    = ExpectingPiTypeForLambda    Value
-    | ExpectingSigmaTypeForPair   Value
-    | ExpectingSumTypeForInl      Value
-    | ExpectingSumTypeForInr      Value
-    | ExpectingUnitTypeForUnit    Value
-    | ExpectingDescTypeForDesc    Value
-    | ExpectingMuTypeForConstruct Value
-    | UnknownIdentifier           Ident
-    | ApplicationOfNonFunction    Value
-    | CaseOnNonSum                Value
-    | ExpectingSet
-    | SetLevelMismatch            Int Int
+    -- Checking errors
+    = SetLevelMismatch            Int Int
+    | TermIsALambdaAbstraction    Value
+    | TermIsAPairing              Value
+    | TermIsASumIntroduction      Value
+    | TermIsAUnitIntroduction     Value
+    | TermIsADesc                 Value
+    | TermIsAConstruct Value
     | TermIsASet                  Value
     | TermIsAGroupExpression      Value
-    | UnableToSynthesise          LN.TermPos
-    | Proj1FromNonSigma           Value
-    | Proj2FromNonSigma           Value
-    | TypesNotEqual               Value Value
+
+    -- Checking errors for equality
     | ReflCanOnlyProduceHomogenousEquality Value Value
     | ReflCanOnlyProduceEquality  Value Value Value
-    | ReflExpectingEqualityType   Value
-    | ElimEqCanOnlyHandleHomogenousEq Value Value
+    | TermIsAnEquality            Value
+
+    -- Change of direction error
+    | TypesNotEqual               Value Value
+
+    -- Synthesis errors
+    | UnknownIdentifier           Ident
+    | ExpectingPiType             Value
+    | ExpectingSumType            Value
+    | ExpectingSet                Value
     | ExpectingEqualityType       Value
-    | ExpectingIDescForSemI       Value
+    | ExpectingHomogeneousEquality Value Value
+    | ExpectingIDesc              Value
+    | Proj1FromNonSigma           Value
+    | Proj2FromNonSigma           Value
+
+    -- Term not well-formed
+    | UnableToSynthesise          LN.TermPos
+
     | OtherError                  String -- FIXME: try to get rid of this
 
 ppType :: UsesIdentifiers ctxt =>
@@ -63,63 +72,36 @@ ppTerm ctxt v vty =
 
 
 ppTypeError :: UsesIdentifiers ctxt => ctxt -> TypeError -> Doc
-ppTypeError ctxt (ExpectingPiTypeForLambda ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsALambdaAbstraction ty)
+    = "This term is a lambda-abstraction, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a lambda-abstraction"
-ppTypeError ctxt (ExpectingSigmaTypeForPair ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsAPairing ty)
+    = "This term is a pairing, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term constructs a pair"
-ppTypeError ctxt (ExpectingSumTypeForInl ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsASumIntroduction ty)
+    = "This term constructs a value of sum type, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a left injection"
-ppTypeError ctxt (ExpectingSumTypeForInr ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsAUnitIntroduction ty)
+    = "This term constructs a value of the unit type, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is a right injection"
-ppTypeError ctxt (ExpectingUnitTypeForUnit ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsADesc ty)
+    = "This term constructs a datatype description, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term has type Unit"
-ppTypeError ctxt (ExpectingDescTypeForDesc ty)
-    = "Expecting Desc type for description"
-ppTypeError ctxt (ExpectingMuTypeForConstruct ty)
-    = "Expecting term to have type"
+ppTypeError ctxt (TermIsAConstruct ty)
+    = "This term constructs a value of an inductive type, but the context expects it to have type"
       $$ nest 4 (ppType ctxt ty)
-      $$ "but this term is an inductive type constructor"
-ppTypeError ctxt (UnknownIdentifier nm)
-    = "Unknown identifier" <+> "“" <> ppIdent nm <> "”"
-ppTypeError ctxt (ApplicationOfNonFunction ty)
-    = "Application of non function. Term has type"
-      $$ nest 4 (ppType ctxt ty)
-ppTypeError ctxt (CaseOnNonSum ty)
-    = "Case on value of non-sum type. Term has type"
-      $$ nest 4 (ppType ctxt ty)
-ppTypeError ctxt (ExpectingSet)
-    = "Expecting a term of sort Set"
-ppTypeError ctxt (SetLevelMismatch l1 l2)
-    = "Set level problem: 'Set" <+> int l1 <> "' does not have type 'Set" <+> int l2 <> "'"
 ppTypeError ctxt (TermIsASet v)
     = "This term is a set, but the context was expecting a term of type"
       $$ nest 4 (ppType ctxt v)
 ppTypeError ctxt (TermIsAGroupExpression v)
     = "This term is a group expression, but the context was expecting a term of type" 
       $$ nest 4 (ppType ctxt v)
-ppTypeError ctxt (UnableToSynthesise t)
-    = "Unable to synthesise type for this term: " <> text (show t)
-ppTypeError ctxt (Proj1FromNonSigma ty)
-    = "First projection from non Sigma-type. Actual type is"
+ppTypeError ctxt (TermIsAnEquality ty)
+    = "This term produces a value of equality type, but the context was expecting a term of type"
       $$ nest 4 (ppType ctxt ty)
-ppTypeError ctxt (Proj2FromNonSigma ty)
-    = "Second projection from non Sigma-type. Actual type is"
-      $$ nest 4 (ppType ctxt ty)
-ppTypeError ctxt (TypesNotEqual ty1 ty2)
-    = "Expecting term to have type "
-      $$ nest 4 (ppType ctxt ty1)
-      $$ "but term has type"
-      $$ nest 4 (ppType ctxt ty2)
+ppTypeError ctxt (SetLevelMismatch l1 l2)
+    = "Set level problem: 'Set" <+> int l1 <> "' does not have type 'Set" <+> int l2 <> "'"
+
 ppTypeError ctxt (ReflCanOnlyProduceHomogenousEquality tyA tyB)
     = "'refl' can only produce homogenous equalities; types given:"
       $$ nest 4 (ppType ctxt tyA)
@@ -131,21 +113,45 @@ ppTypeError ctxt (ReflCanOnlyProduceEquality ty a b)
       $$ "and"
       $$ nest 4 (ppTerm ctxt b ty)
       $$ "are not equal."
-ppTypeError ctxt (ReflExpectingEqualityType ty)
-    = "Term produces a value of equality type, checker is expecting the type"
+
+-- Synthesis errors
+ppTypeError ctxt (UnknownIdentifier nm)
+    = "Unknown identifier" <+> "“" <> ppIdent nm <> "”"
+ppTypeError ctxt (ExpectingPiType ty)
+    = "Application of non function. Term has type"
       $$ nest 4 (ppType ctxt ty)
-ppTypeError ctxt (ElimEqCanOnlyHandleHomogenousEq ty1 ty2)
-    = "Equality elimination can only handle elimination of homogenous equalities, types involved are:"
+ppTypeError ctxt (ExpectingSumType ty)
+    = "Case on value of non-sum type. Term has type"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (ExpectingSet ty)
+    = "Expecting a term of type 'Set i', for some level i, but term has type"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (Proj1FromNonSigma ty)
+    = "First projection from non Sigma-type. Actual type is"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (Proj2FromNonSigma ty)
+    = "Second projection from non Sigma-type. Actual type is"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (ExpectingEqualityType ty)
+    = "Expecting term to have an equality type, but type is"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (ExpectingHomogeneousEquality ty1 ty2)
+    = "Equality elimination can only handle elimination of homogeneous equalities, types involved are:"
       $$ nest 4 (ppType ctxt ty1)
       $$ "and"
       $$ nest 4 (ppType ctxt ty2)
-ppTypeError ctxt (ExpectingEqualityType ty)
-    = "Expecting term to have type"
-      $$ nest 4 (ppType ctxt ty)
-      $$ "but this term generates equalities"
-ppTypeError ctxt (ExpectingIDescForSemI ty)
+ppTypeError ctxt (ExpectingIDesc ty)
     = "Expecting term to have indexed description type, but type is"
       $$ nest 4 (ppType ctxt ty)
+
+ppTypeError ctxt (UnableToSynthesise t)
+    = "Unable to synthesise type for this term: " <> text (show t)
+ppTypeError ctxt (TypesNotEqual ty1 ty2)
+    = "Expecting term to have type "
+      $$ nest 4 (ppType ctxt ty1)
+      $$ "but term has type"
+      $$ nest 4 (ppType ctxt ty2)
+
 ppTypeError ctxt (OtherError msg)
     = text msg
 
