@@ -17,7 +17,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
-import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close)
+import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..))
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.LocalContext
 import           Language.Foveran.Typing.DefinitionContext
@@ -84,9 +84,12 @@ eval term =
 
 lookupIdent :: DefinitionContext ctxt =>
                Ident
+            -> GlobalFlag
             -> TypingMonad ctxt (Maybe Value)
-lookupIdent ident =
-    lookupType ident <$> getFullContext
+lookupIdent ident IsGlobal =
+    lookupType ident <$> ask -- "getGlobalContext"
+lookupIdent ident IsLocal =
+    lookupType ident <$> getLocalContext
 
 raiseError :: Span -> TypeError -> TypingMonad ctxt a
 raiseError p err = do
@@ -203,10 +206,6 @@ hasType (Annot p (Set l1)) v = do
 hasType (Annot p (Pi ident tA tB)) (VSet l) = do
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
-  -- FIXME: do something cleverer here: should make sure that the name
-  -- chosen for the variable cannot be used elsewhere there is a
-  -- similar problem in the sigma case below. And in the cases in
-  -- 'hasType' above.
   tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 
@@ -537,8 +536,8 @@ synthesiseTypeFor :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
 synthesiseTypeFor (Annot p (Bound _)) =
     error "internal: 'bound' variable discovered during type synthesis"
 
-synthesiseTypeFor (Annot p (Free nm)) = do
-  result <- lookupIdent nm
+synthesiseTypeFor (Annot p (Free nm globalFlag)) = do
+  result <- lookupIdent nm globalFlag
   case result of
     Nothing -> raiseError p (UnknownIdentifier nm)
     Just tA -> return (tA, In $ CS.Free nm)

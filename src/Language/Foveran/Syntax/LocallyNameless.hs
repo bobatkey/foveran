@@ -3,6 +3,7 @@
 module Language.Foveran.Syntax.LocallyNameless
     ( TermPos
     , TermCon (..)
+    , GlobalFlag (..)
     , Abelian (..)
     , toLocallyNamelessClosed
     , toLocallyNameless
@@ -22,8 +23,13 @@ import           Language.Foveran.Syntax.Common (Abelian)
 type TermPos = AnnotRec Span TermCon
 type TermPos' p = AnnotRec p TermCon
 
+data GlobalFlag
+    = IsGlobal
+    | IsLocal
+    deriving Show
+
 data TermCon tm
-  = Free  Ident
+  = Free  Ident GlobalFlag
   | Bound Int
   | Lam   Ident tm
   | App   tm tm
@@ -104,7 +110,7 @@ lookupVar nm (p:ps) k = lookupVarInPattern nm p k <|> lookupVar nm ps (k+1)
 
 toLN :: DS.TermCon ([DS.Pattern] -> a) -> [DS.Pattern] -> FM TermCon a
 toLN (DS.Var nm)          bv = case lookupVar nm bv 0 of
-                                 Nothing -> Layer $ Free nm
+                                 Nothing -> Layer $ Free nm IsGlobal
                                  Just t  -> t
 toLN (DS.Lam nms body)    bv = doBinders nms bv
     where
@@ -214,11 +220,12 @@ binder :: (Int -> a) -> Int -> a
 binder f i = f (i+1)
 
 close' :: [Ident] -> TermCon (Int -> a) -> Int -> TermCon a
-close' fnm (Free nm)        = pure $ Free nm
+close' fnm (Free nm global) = pure $ Free nm global
 close' fnm (Bound k)        = \i -> if k < i then Bound k
                                     else let j = k - i
                                              l = length fnm
-                                         in if j < length fnm then Free (fnm !! j)
+                                         in if j < length fnm
+                                            then Free (fnm !! j) IsLocal
                                             else Bound (k - l)
 close' fnm (Lam nm body)    = Lam nm <$> binder body
 close' fnm (App t ts)       = App <$> t <*> ts
