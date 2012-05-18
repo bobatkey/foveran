@@ -71,6 +71,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "_" :==>               emit Underscore
     , "then" :==>            emit Then
     , "absurdBy" :==>        emit AbsurdBy
+    , "generalise" :==>      emit Generalise
     , "semI" :==>            emit SemI
     , "liftI" :==>           emit LiftI
     , "mapI" :==>            emit MapI

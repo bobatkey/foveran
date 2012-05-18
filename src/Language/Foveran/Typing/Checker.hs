@@ -492,6 +492,17 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
     v ->
         do raiseError (annot t) (ExpectingSumType v)
 
+-- this is an application, where we are pushing a type in instead of
+-- having it inferred. This means we have to guess what the function
+-- type is. FIXME: this should generate a term with a type ascription
+-- in it.
+hasType (Annot p (Generalise t1 t2)) v = do
+  (ty1,tm1) <- synthesiseTypeFor t1
+  tm1normalised <- reify ty1 <$> eval tm1 <*> pure 0
+  v' <- evalA (CS.generalise [tm1normalised] $ reifyType0 v)
+  tm2 <- t2 `hasType` (forall "x" ty1 $ \x -> v' [x])
+  return (In $ CS.App tm2 tm1)
+
 {------------------------------}
 {- Built-in group operations -}
 

@@ -1,20 +1,28 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data List (A : Set) : Set where
+  nil  : List A
+  cons : A -> List A -> List A
 
-data List (A : Set) : Set :=
-  | nil  :
-  | cons : A List
-  ;
+nil : (A : Set) -> List A
+nil A = construct «inl (), refl»
 
-foldList : (A B : Set) → B → (A → B → B) → List A → B ;
-foldList A B n c = induction (ListDesc A)
-                             (λx. B)
-                             (λx. case x for x. lift (ListDesc A) (List A) (λx. B) x → B with
-                                     { inl u. λu'. n
-                                     ; inr p. λp'. c (fst p) (snd p')
-                                     });
+cons : (A : Set) -> A -> List A -> List A
+cons A a l = construct «inr (), a, l, refl»
 
-length : (A : Set) → List A → Nat ;
-length A = foldList A Nat zero (\a n. succ n) ;
+elimList :
+  (A : Set) ->
+  (P : List A -> Set 2) ->
+  (P (nil A)) ->
+  ((a : A) -> (l : List A) -> P l -> P (cons A a l)) ->
+  (l : List A) ->
+  P l
+elimList A P pnil pcons =
+  inductionI Unit (List:code A) (λu. P)
+    (λ_ «constructor, arguments».
+      generalise arguments then
+      case constructor with
+        { inl _. λeq       _.     rewriteBy eq then pnil
+        ; inr _. λ«a,l,eq» «p,_». rewriteBy eq then pcons a l p
+        })
+    ()
+
+;

@@ -80,6 +80,8 @@ data TermCon tm
   | GroupMul   tm tm
   | GroupInv   tm
 
+  | Generalise  tm tm
+
   | UserHole
   | Hole       Ident [tm]
   deriving (Show, Functor)
@@ -201,6 +203,8 @@ toLN (DS.LiftI tD i tA i' a tP tx) bv =
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 
+toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
+
 toLN (DS.Group nm ab ty)  bv = Layer $ Group nm ab ((return . ($bv)) <$> ty)
 toLN DS.GroupUnit         bv = Layer $ GroupUnit
 toLN (DS.GroupMul t1 t2)  bv = Layer $ GroupMul (return $ t1 bv) (return $ t2 bv)
@@ -284,6 +288,8 @@ close' fnm (Group nm ab ty) = Group nm ab <$> sequenceA ty
 close' fnm GroupUnit        = pure GroupUnit
 close' fnm (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 close' fnm (GroupInv t)     = GroupInv <$> t
+
+close' fnm (Generalise t1 t2) = Generalise <$> t1 <*> t2
 
 close :: [Ident] -> AnnotRec a TermCon -> Int -> AnnotRec a TermCon
 close nms x offset = translate (close' nms) x offset

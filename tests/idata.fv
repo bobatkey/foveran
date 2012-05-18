@@ -57,6 +57,22 @@ Nat:elim P pzero psucc =
       } d)
     ()
 
+Nat:elim2 :
+  (P : Nat -> Set 2) ->
+  P zero ->
+  ((n : Nat) -> P n -> P (succ n)) ->
+  (n : Nat) ->
+  P n
+Nat:elim2 P pzero psucc =
+  inductionI Unit Nat:code (λ_. P)
+    (λ_ «c,d».
+      generalise d then
+      case c with
+        { inl _. λz      _.     rewriteBy z then pzero
+        ; inr _. λ«n,eq» «p,_». rewriteBy eq then psucc n p
+        })
+    ()
+
 add : Nat -> Nat -> Nat
 add n₁ n₂ =
 – eliminate n₁ with { zero. n₂; succ n₁. succ (recurse n₁) }
@@ -65,6 +81,16 @@ add n₁ n₂ =
       { inl u. λz      q.     n₂ – rewriteBy z for u p. Nat then n₂
       ; inr _. λ«n,eq» «p,_». succ p – rewriteBy eq for u p. Nat then succ p
       } d)
+    ()
+    n₁
+
+add2 : Nat -> Nat -> Nat
+add2 n₁ n₂ =
+  inductionI Unit Nat:code (λ_ _. Nat)
+    (λ_ «c,d». generalise d then case c with
+      { inl _. λz      q.     n₂
+      ; inr _. λ«n,eq» «p,_». succ p
+      })
     ()
     n₁
 
@@ -219,6 +245,32 @@ Vector:elim A Φ φnil φcons =
         { inl _. λz               _.      rewriteBy z then φnil
         ; inr _. λ«n', a, xs, eq» «φ, _». rewriteBy eq then φcons n' a xs φ
         } arguments)
+
+Vector:elim2 :
+  (A : Set) ->
+  (Φ : (n : Nat) -> Vector A n -> Set 2) ->
+  Φ zero (vnil A) ->
+  ((n : Nat) -> (a : A) -> (xs : Vector A n) -> Φ n xs -> Φ (succ n) (vcons A n a xs)) ->
+  (n : Nat) ->
+  (xs : Vector A n) ->
+  Φ n xs
+Vector:elim2 A Φ φnil φcons =
+  inductionI Nat (Vector:code A) Φ
+    (λn «constructor, arguments».
+      generalise arguments then
+      case constructor with
+        { inl _. λz               _.      rewriteBy z then φnil
+        ; inr _. λ«n', a, xs, eq» «φ, _». rewriteBy eq then φcons n' a xs φ
+        })
+
+– inductionOn xs with
+–   n (construct «c,d») p.
+–     generalise p then
+–     generalise d then
+–     case c with { ... }
+
+testEq : Vector:elim == Vector:elim2
+testEq = refl
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 data Emp : Set where

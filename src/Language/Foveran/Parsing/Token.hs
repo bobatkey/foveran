@@ -77,6 +77,8 @@ data Token
     | MuI
     | InductionI
 
+    | Generalise
+
     | Group
     | AbGroup
     | GroupUnit
@@ -157,6 +159,7 @@ instance SyntaxHighlight Token where
     lexicalClass Refl        = Constructor
     lexicalClass ElimEq      = Keyword
     lexicalClass RewriteBy   = Keyword
+    lexicalClass Generalise  = Keyword
     lexicalClass Where       = Keyword
     lexicalClass In          = Keyword
     lexicalClass Underscore  = Punctuation
@@ -238,6 +241,7 @@ instance Show Token where
   show Refl        = "refl"
   show ElimEq      = "elimEq"
   show RewriteBy   = "rewriteBy"
+  show Generalise  = "generalise"
   show Normalise   = "normalise"
   show Where       = "where"
   show In          = "in"

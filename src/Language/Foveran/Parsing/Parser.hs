@@ -260,6 +260,12 @@ term01 =
       <*  token Tok.In
       <*> term10
     <|>
+    (\p t1 t2 -> Annot (makeSpan p t2) (Generalise t1 t2))
+      <$> token Tok.Generalise
+      <*> term10
+      <*  token Tok.Then
+      <*> term10
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t

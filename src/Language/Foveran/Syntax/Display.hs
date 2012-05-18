@@ -155,6 +155,8 @@ data TermCon tm
     | GroupMul   tm tm
     | GroupInv   tm
 
+    | Generalise  tm tm
+
     | UserHole
     | Hole       Ident [tm]
     deriving (Show, Functor)
