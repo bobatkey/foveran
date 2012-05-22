@@ -92,6 +92,9 @@ data TermCon tm
     | MapI       tm tm (Irrelevant Ident) tm (Irrelevant Ident) tm tm tm
     | LiftI      tm tm (Irrelevant Ident) tm (Irrelevant Ident) (Irrelevant Ident) tm tm
     | InductionI
+    | Eliminate  tm tm tm tm
+                 (Irrelevant Ident) (Irrelevant Ident) tm
+                 (Irrelevant Ident) (Irrelevant Ident) (Irrelevant Ident) tm
 
     {- Group stuff -}
     | Group      Ident Abelian (Maybe tm)
@@ -165,6 +168,10 @@ traverseSyn (LiftI tI tD i tA i' a tP tx) =
     LiftI <$> tI <*> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
 traverseSyn InductionI       = pure InductionI
+traverseSyn (Eliminate tI tD ti t i1 x1 tP i2 x2 p2 tK) =
+    Eliminate <$> tI <*> tD <*> ti <*> t
+              <*> pure i1 <*> pure x1 <*> binder (binder tP)
+              <*> pure i2 <*> pure x2 <*> pure p2 <*> binder (binder (binder tK))
 
 traverseSyn (Group nm ab ty) = Group nm ab <$> sequenceA ty
 traverseSyn GroupUnit        = pure GroupUnit
@@ -297,6 +304,17 @@ toDisplay (LiftI _ tD ix tA ii ia tP tx) =
           a = fromIrrelevant ia
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
 toDisplay InductionI              = pure DS.InductionI
+toDisplay (Eliminate _ _ _ t ii1 ix1 tP ii2 ix2 ip2 tK) =
+    do (i1', (x1', tP')) <- bind i1 (bind x1 tP)
+       (i2', (x2', (p2', tK'))) <- bind i2 (bind x2 (bind p2 tK))
+       DS.Eliminate <$> t
+                    <*> pure (Just (DS.PatVar i1',DS.PatVar x1',tP'))
+                    <*> pure (DS.PatVar i2') <*> pure (DS.PatVar x2') <*> pure (DS.PatVar p2') <*> pure tK'
+    where i1 = fromIrrelevant ii1
+          x1 = fromIrrelevant ix1
+          i2 = fromIrrelevant ii2
+          x2 = fromIrrelevant ix2
+          p2 = fromIrrelevant ip2
 
 toDisplay (Group nm ab paramTy)   = DS.Group nm ab <$> sequenceA paramTy
 toDisplay GroupUnit               = pure DS.GroupUnit

@@ -335,6 +335,18 @@ term00 =
                         <*  token Tok.Inr <*> pattern <* token Tok.FullStop <*> term10)
               <*> token Tok.RBrace
     <|>
+    -- FIXME: this should be more like the Haskell precedence, like Case
+    (\p t tP pi px pp tK -> Annot (makeSpan p tK) (Eliminate t tP pi px pp tK))
+      <$> token Tok.Eliminate
+      <*> term10
+      <*> optional ((,,) <$ token Tok.For <*> pattern <*> pattern <* token Tok.FullStop <*> term10)
+      <*  token Tok.With
+      <*> pattern
+      <*> pattern
+      <*> pattern
+      <*  token Tok.FullStop
+      <*> term10
+    <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
                        Just (l,p') -> Annot (makeSpan p p') (Set l)) <$> token Tok.Set <*> optional number
     <|>

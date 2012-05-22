@@ -85,6 +85,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "#" :==>               emit GroupMul
     , "inv" :==>             emit GroupInv
     , "?" :==>               emit Hole
+    , "eliminate" :==>       emit Eliminate
     , tok (nameStartChar .&. complement (singleton '\x03bb')) .>>. zeroOrMore (tok nameChar) :==>
                              emit Ident
     , oneOrMore (tok digit) :==>

@@ -91,6 +91,7 @@ data Token
     | Then
     | AbsurdBy
     | Hole
+    | Eliminate
       deriving (Eq,Ord)
 
 deriveLift ''Token
@@ -171,6 +172,7 @@ instance SyntaxHighlight Token where
     lexicalClass GroupUnit   = Operator
     lexicalClass GroupMul    = Operator
     lexicalClass GroupInv    = Operator
+    lexicalClass Eliminate   = Keyword
 
 instance Layout Token where
     lbrace = LBrace
@@ -254,3 +256,4 @@ instance Show Token where
   show GroupUnit   = "unit"
   show GroupMul    = "#"
   show GroupInv    = "inv"
+  show Eliminate   = "eliminate"

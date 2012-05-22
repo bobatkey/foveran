@@ -142,6 +142,10 @@ eval InductionI         = pure (VLam "I" $ \vI ->
                                 VLam "i" $ \vi ->
                                 VLam "x" $ \vx ->
                                 vinductionI vI vD vP vk vi vx)
+eval (Eliminate tyI tD ti t i1 x1 tP i2 x2 p2 tK) =
+    veliminate <$> tyI <*> tD <*> ti <*> t
+               <*> pure (fromIrrelevant i1) <*> pure (fromIrrelevant x1) <*> binder (binder tP)
+               <*> pure (fromIrrelevant i2) <*> pure (fromIrrelevant x2) <*> pure (fromIrrelevant p2) <*> binder (binder (binder tK))
 
 eval (Group nm ab ty)   = vgroup nm ab <$> sequenceA ty
 eval GroupUnit          = pure vgroupUnit

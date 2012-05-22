@@ -74,6 +74,7 @@ data TermCon tm
   | MapI       tm Ident tm Ident tm tm tm
   | MuI        tm tm
   | InductionI
+  | Eliminate  tm (Maybe (Ident, Ident, tm)) Ident Ident Ident tm
 
   | Group      Ident Abelian (Maybe tm)
   | GroupUnit
@@ -202,6 +203,13 @@ toLN (DS.LiftI tD i tA i' a tP tx) bv =
                   (return $ tx bv)
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
+toLN (DS.Eliminate t tP i x p tK) bv =
+    Layer $ Eliminate (return $ t bv)
+                      ((\(x,y,t) -> (identOfPattern x, identOfPattern y, return $ t (y:x:bv))) <$> tP)
+                      (identOfPattern i)
+                      (identOfPattern x)
+                      (identOfPattern p)
+                      (return $ tK (p:x:i:bv))
 
 toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
 
@@ -281,6 +289,10 @@ close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm (LiftI tD i tA i' a tP tx) =
     LiftI <$> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 close' fnm InductionI       = pure InductionI
+close' fnm (Eliminate t tP i x p tK) =
+    Eliminate <$> t
+              <*> traverse (\(i,x,tP) -> (i,x,) <$> binder (binder tP)) tP
+              <*> pure i <*> pure x <*> pure p <*> binder (binder (binder tK))
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms
 

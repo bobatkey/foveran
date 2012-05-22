@@ -30,6 +30,7 @@ module Language.Foveran.Typing.Conversion.Value
     , vliftI
     , vmuI
     , vinductionI
+    , veliminate
 
     , vgroup
     , vgroupUnit
@@ -472,6 +473,38 @@ vinductionI vI vD vP vk = loop
                                   vP $$ i $$ VConstruct x) vk
                    `tmApp` reify vI vi
                    `tmApp` n)
+
+veliminate :: Value -- ^ The index type (@I : Set@)
+           -> Value -- ^ The description (@D : I -> IDesc I@)
+           -> Value -- ^ The index (@i : I@)
+           -> Value -- ^ The target (@xs : MuI I D i@)
+           -> Ident -> Ident -> (Value -> Value -> Value) -- ^ The predicate (@i : I, x : MuI I D i |- P type@)
+           -> Ident -> Ident -> Ident -> (Value -> Value -> Value -> Value) -- ^ The body
+           -> Value
+veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
+    where
+      loop vi (VConstruct x) =
+          vK vi x
+             -- FIXME: vallI should be a built-in, because it needs to
+             -- define stuff with type arguments
+             (vallI $$ vI $$ (vD $$ vi) $$ vmuI vi vD
+                    $$ (VLam "i" $ \i -> VLam "x" $ \x -> vP i x)
+                    $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x)
+                    $$ x)
+      loop vi (VNeutral n) =
+          VNeutral (In <$> (Eliminate
+                            <$> reifyType vI
+                            <*> reify (vI .->. VIDesc vI) vD
+                            <*> reify vI vi
+                            <*> n
+                            <*> pure (Irrelevant i1) <*> pure (Irrelevant x1)
+                            <*> bound vI (\vi -> bound (VMuI vI vD vi) (\vx -> reifyType (vP vi vx)))
+                            <*> pure (Irrelevant i2) <*> pure (Irrelevant x2) <*> pure (Irrelevant p2)
+                            <*> bound vI (\vi ->
+                                  bound (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$)) (\vx ->
+                                    bound (vliftI vI (vD $$ vi) "i" (vmuI vI vD $$) "i" "a" vP vx) (\vp ->
+                                      reify (vP vi (VConstruct vx)) (vK vi vx vp))))))
+      loop vi x = error $ "internal: eliminate/loop got : " ++ show x
 
 {------------------------------------------------------------------------------}
 vgroup :: Ident -> Abelian -> Maybe Value -> Value

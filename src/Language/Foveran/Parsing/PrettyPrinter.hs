@@ -115,6 +115,14 @@ pprint (LiftI tD x tA i a tP tx) =
                                 , "]" ]
 pprint (MuI t1 t2)         = paren 01 ("µI" <+> sep [down t1, down t2])
 pprint InductionI          = "inductionI"
+pprint (Eliminate t Nothing i x p tK) =
+    "eliminate" <+> t <+> "with" <+> ppPattern i <+> ppPattern x <+> ppPattern p $$
+    nest 2 tK
+pprint (Eliminate t (Just (iP,xP,tP)) i x p tK) =
+    "eliminate" <+> t <+>
+    "for" <+> ppPattern iP <+> ppPattern xP <> "." <+> tP <+>
+    "with" <+> ppPattern i <+> ppPattern x <+> ppPattern p <> "."
+    $$ nest 2 tK
 
 pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"

@@ -492,6 +492,31 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
     v ->
         do raiseError (annot t) (ExpectingSumType v)
 
+hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
+  (ty,tm) <- synthesiseTypeFor t
+  (vI, vDesc, vi) <-
+      case ty of
+        VMuI vI vDesc vi ->
+            return (vI, vDesc, vi)
+        _                ->
+            raiseError (annot t) (OtherError "expecting a term of recursive type")
+  -- generate the elimination type
+  tmi <- return (reify vI vi 0)
+  tm' <- reify ty <$> eval tm <*> pure 0
+  let tmP = CS.generalise [tm',tmi] $ reifyType0 vty
+  -- check the algebra
+  vP  <- evalA tmP
+  tmK <- bindVar' 2 inm vI tK $ \i tK ->
+         bindVar' 1 xnm (vsemI vI (vDesc $$ i) "i" (vmuI vI vDesc $$)) tK $ \x tK ->
+         bindVar' 0 pnm (vliftI vI (vDesc $$ i) "i" (vmuI vI vDesc $$) "i" "a" (\i a -> vP [a,i]) x) tK $ \p tK ->
+         tK `hasType` (vP [VConstruct x,i])
+  vtm <- eval tm
+  let tyI  = reifyType0 vI
+      desc = reify (vI .->. VIDesc vI) vDesc 0
+  return ( In $ CS.Eliminate tyI desc tmi tm
+                             (CS.Irrelevant "i") (CS.Irrelevant "x") tmP
+                             (CS.Irrelevant inm) (CS.Irrelevant xnm) (CS.Irrelevant pnm) tmK)
+
 -- this is an application, where we are pushing a type in instead of
 -- having it inferred. This means we have to guess what the function
 -- type is. FIXME: this should generate a term with a type ascription
@@ -721,6 +746,33 @@ synthesiseTypeFor (Annot p InductionI) = do
            forall "x" (vmuI vI vD $$ i) $ \x ->
            vP $$ i $$ x
          , In $ CS.InductionI)
+
+synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
+  (ty,tm) <- synthesiseTypeFor t
+  (vI, vDesc, vi) <-
+      case ty of
+        VMuI vI vDesc vi ->
+            return (vI, vDesc, vi)
+        _                ->
+            raiseError (annot t) (OtherError "expecting a term of recursive type")
+  -- check the elimination type
+  tmP <- bindVar' 1 i vI tP $ \i tP ->
+         bindVar x (VMuI vI vDesc i) tP $ \x tP ->
+         isType tP
+  -- check the algebra
+  vP  <- evalA tmP
+  tmK <- bindVar' 2 inm vI tK $ \i tK ->
+         bindVar' 1 xnm (vsemI vI (vDesc $$ i) "i" (vmuI vI vDesc $$)) tK $ \x tK ->
+         bindVar' 0 pnm (vliftI vI (vDesc $$ i) "i" (vmuI vI vDesc $$) "i" "a" (\i a -> vP [a,i]) x) tK $ \p tK ->
+         tK `hasType` (vP [VConstruct x,i])
+  vtm <- eval tm
+  let tyI  = reifyType0 vI
+      desc = reify (vI .->. VIDesc vI) vDesc 0
+      tmi  = reify vI vi 0
+  return ( vP [vtm,vi]
+         , In $ CS.Eliminate tyI desc tmi tm
+                             (CS.Irrelevant i) (CS.Irrelevant x) tmP
+                             (CS.Irrelevant inm) (CS.Irrelevant xnm) (CS.Irrelevant pnm) tmK)
 
 synthesiseTypeFor (Annot p (Group nm ab (Just ty))) = do
   tyTm <- ty `hasType` VSet 0

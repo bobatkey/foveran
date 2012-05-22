@@ -148,6 +148,7 @@ data TermCon tm
     | LiftI      tm Pattern tm Pattern Pattern tm tm
     | MuI        tm tm
     | InductionI
+    | Eliminate  tm (Maybe (Pattern, Pattern, tm)) Pattern Pattern Pattern tm
 
     {- Group stuff -}
     | Group      Ident Abelian (Maybe tm)
