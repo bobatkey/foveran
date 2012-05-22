@@ -1,0 +1,10 @@
+– Testing error messages
+– These should both fail with 'TermIsASet'
+
+X : Unit
+X = Set
+
+X : Unit + Unit
+X = (u : Unit) -> Set
+
+;

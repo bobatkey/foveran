@@ -1,0 +1,7 @@
+– Test error messages
+– This should return 'SetLevelMismatch'
+
+X : Set
+X = Set
+
+;
