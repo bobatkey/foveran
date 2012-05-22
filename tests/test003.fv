@@ -1,0 +1,28 @@
+– Test to expose missing 'reflect' in Value.veliminate
+
+data Nat : Set where
+  zero : Nat
+  succ : Nat -> Nat
+
+zero : Nat
+zero = construct «inl (), refl»
+
+succ : Nat -> Nat
+succ n = construct «inr (), n, refl»
+
+add : Nat -> Nat -> Nat
+add m = eliminate m with _ «c,d» p.
+  generalise p then
+  generalise d then
+  case c with
+    { inl _. \_ _. \n. n
+    ; inr _. \_ «f,_». \n. succ (f n)
+    }
+
+assume n : Nat
+
+– with the bug, this fails with 'internal: vapp given non-function: VNeutral <function>'
+normalise add n n
+
+;
+ 

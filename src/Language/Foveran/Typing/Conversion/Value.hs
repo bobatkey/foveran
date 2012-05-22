@@ -492,18 +492,19 @@ veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
                     $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x)
                     $$ x)
       loop vi (VNeutral n) =
-          VNeutral (In <$> (Eliminate
-                            <$> reifyType vI
-                            <*> reify (vI .->. VIDesc vI) vD
-                            <*> reify vI vi
-                            <*> n
-                            <*> pure (Irrelevant i1) <*> pure (Irrelevant x1)
-                            <*> bound vI (\vi -> bound (VMuI vI vD vi) (\vx -> reifyType (vP vi vx)))
-                            <*> pure (Irrelevant i2) <*> pure (Irrelevant x2) <*> pure (Irrelevant p2)
-                            <*> bound vI (\vi ->
-                                  bound (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$)) (\vx ->
-                                    bound (vliftI vI (vD $$ vi) "i" (vmuI vI vD $$) "i" "a" vP vx) (\vp ->
-                                      reify (vP vi (VConstruct vx)) (vK vi vx vp))))))
+          reflect (vP vi (VNeutral n))
+                  (In <$> (Eliminate
+                           <$> reifyType vI
+                           <*> reify (vI .->. VIDesc vI) vD
+                           <*> reify vI vi
+                           <*> n
+                           <*> pure (Irrelevant i1) <*> pure (Irrelevant x1)
+                           <*> bound vI (\vi -> bound (VMuI vI vD vi) (\vx -> reifyType (vP vi vx)))
+                           <*> pure (Irrelevant i2) <*> pure (Irrelevant x2) <*> pure (Irrelevant p2)
+                           <*> bound vI (\vi ->
+                                 bound (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$)) (\vx ->
+                                   bound (vliftI vI (vD $$ vi) "i" (vmuI vI vD $$) "i" "a" vP vx) (\vp ->
+                                     reify (vP vi (VConstruct vx)) (vK vi vx vp))))))
       loop vi x = error $ "internal: eliminate/loop got : " ++ show x
 
 {------------------------------------------------------------------------------}
