@@ -1,0 +1,25 @@
+data Nat : Set where
+  zero : Nat
+  succ : Nat -> Nat
+
+succ : Nat -> Nat
+succ n = construct «inr (), n, refl»
+
+add : Nat -> Nat -> Nat
+add n1 n2 =
+  eliminate n1 with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \_ _. n2
+      ; inr _. \_ «f,_». succ f
+      }
+
+assume X : Nat -> Set
+
+– this should type check, but there is a bug in Syntax.Checked.cmp:
+– there is a missing case for Eliminate.
+test : (n : Nat) -> X (add n n) -> X (add n n)
+test n x = x
+
+;

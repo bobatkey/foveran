@@ -449,6 +449,15 @@ cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
       cmp compareLevel tx tx'
 cmp compareLevel (In InductionI)       (In InductionI)
     = True
+cmp compareLevel (In (Eliminate tI  tD  ti  tx  _ _ tP  _ _ _ tK))
+                 (In (Eliminate tI' tD' ti' tx' _ _ tP' _ _ _ tK'))
+    = all id [ cmp (==) tI tI'
+             , cmp (==) tD tD'
+             , cmp (==) ti ti'
+             , cmp (==) tx tx'
+             , cmp (==) tP tP' -- FIXME: should this be variant? should the other elimination forms be invariant in any position?
+             , cmp (==) tK tK'
+             ]
 
 cmp compareLevel (In (Group nm ab Nothing)) (In (Group nm' ab' Nothing))
     = nm == nm' && ab == ab'
