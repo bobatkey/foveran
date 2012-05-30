@@ -46,9 +46,6 @@ instance Error InputError where
 instance ParsingError Token InputError where
     parseError = PE_ParsingError
 
-instance LayoutError InputError where
-    layoutError = PE_LayoutError
-
 --------------------------------------------------------------------------------
 ppToken :: Maybe Token -> Doc
 ppToken Nothing  = "End of file"
@@ -89,7 +86,7 @@ exceptIgnorable = filter f
           f (Lexeme (Emit   t) p s) = Just (Lexeme t p s)
 
 parser :: T.Text -> Either InputError [Declaration]
-parser text = lexer text |>| (exceptIgnorable >>| (layout >>| parse file))
+parser text = lexer text |>| (exceptIgnorable >>| (layout (OnLayoutError $ Left . PE_LayoutError) >>| parse file))
 
 {------------------------------------------------------------------------------}
 parseFile :: FilePath
