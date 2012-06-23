@@ -94,22 +94,27 @@ identOfPattern (DS.PatVar nm)  = nm
 identOfPattern (DS.PatTuple _) = "p" -- FIXME: concatenate all the names, or something
 identOfPattern DS.PatNull      = "__x"
 
-lookupVarInPattern :: Ident -> DS.Pattern -> Int -> Maybe (FM TermCon a)
-lookupVarInPattern nm (DS.PatVar nm') k | nm == nm' = Just (Layer $ Bound k)
-                                        | otherwise = Nothing
-lookupVarInPattern nm (DS.PatTuple l) k = do
-  (t, isLast) <- lookupVarInTuplePattern l
-  return $ if isLast then t else (Layer $ Proj1 t)
-    where lookupVarInTuplePattern []     = Nothing
-          lookupVarInTuplePattern [p]    = do t <- lookupVarInPattern nm p k; return (t, True)
-          lookupVarInTuplePattern (p:ps) = do t <- lookupVarInPattern nm p k; return (t, False)
-                                           <|>
-                                           do (t,isLast) <- lookupVarInTuplePattern ps; return (Layer $ Proj2 t, isLast)
-lookupVarInPattern nm (DS.PatNull)    k = Nothing
+lookupVarInPattern :: Ident -> DS.Pattern -> FM TermCon a -> Maybe (FM TermCon a)
+lookupVarInPattern nm DS.PatNull      t =
+    Nothing
+lookupVarInPattern nm (DS.PatVar nm') t
+    | nm == nm' = Just t
+    | otherwise = Nothing
+lookupVarInPattern nm (DS.PatTuple l) t =
+    lookupVarInTuplePattern l t
+    where
+      lookupVarInTuplePattern []     t =
+          Nothing
+      lookupVarInTuplePattern [p]    t =
+          lookupVarInPattern nm p t
+      lookupVarInTuplePattern (p:ps) t =
+          lookupVarInPattern nm p (Layer $ Proj1 t)
+          <|>
+          lookupVarInTuplePattern ps (Layer $ Proj2 t)
 
 lookupVar :: Ident -> [DS.Pattern] -> Int -> Maybe (FM TermCon a)
 lookupVar nm []     k = Nothing
-lookupVar nm (p:ps) k = lookupVarInPattern nm p k <|> lookupVar nm ps (k+1)
+lookupVar nm (p:ps) k = lookupVarInPattern nm p (Layer $ Bound k) <|> lookupVar nm ps (k+1)
 
 toLN :: DS.TermCon ([DS.Pattern] -> a) -> [DS.Pattern] -> FM TermCon a
 toLN (DS.Var nm)          bv = case lookupVar nm bv 0 of

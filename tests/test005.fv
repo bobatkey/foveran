@@ -1,0 +1,43 @@
+– test the tuple pattern matching syntax
+
+assume A : Set
+assume B : Set
+assume C : Set
+
+test0 : A -> A
+test0 «a» = a
+
+test1 : A × B -> B
+test1 «a,b» = b
+
+test2 : A × B -> A
+test2 «a,b» = a
+
+test3 : (A × B) × C -> C
+test3 ««a,b»,c» = c
+
+test4 : (A × B) × C -> A
+test4 ««a,b»,c» = a
+
+test5 : (A × B) × C -> B
+test5 ««a,b»,c» = b
+
+test6 : A × (B × C) -> A
+test6 «a,b,c» = a
+
+test7 : A × (B × C) -> A
+test7 «a,«b,c»» = a
+
+test8 : A × (B × C) -> B
+test8 «a,b,c» = b
+
+test9 : A × (B × C) -> B
+test9 «a,«b,c»» = b
+
+test10 : A × (B × C) -> C
+test10 «a,b,c» = c
+
+test11 : A × (B × C) -> C
+test11 «a,«b,c»» = c
+
+;
