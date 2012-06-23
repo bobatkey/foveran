@@ -19,7 +19,7 @@ data Code : Set where
   rec   : Code
   pair  : Code -> Code -> Code
   sum   : Code -> Code -> Code
-  unit  : Code
+  u     : Code
 
 – These should all be generated automatically
 param : Code
@@ -34,8 +34,8 @@ pair c₁ c₂ = construct «inr (inr (inl ())), c₁, c₂, refl»
 sum : Code -> Code -> Code
 sum c₁ c₂ = construct «inr (inr (inr (inl ()))), c₁, c₂, refl»
 
-unit : Code
-unit = construct «inr (inr (inr (inr ()))), refl»
+u : Code
+u = construct «inr (inr (inr (inr ()))), refl»
 
 --------------------------------------------------------------------------------
 Code:constructors : Set
@@ -70,7 +70,7 @@ elimCode : (P : Code -> Set 2) ->
            P rec ->
            ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (pair c₁ c₂)) ->
            ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (sum c₁ c₂)) ->
-           P unit ->
+           P u ->
            (c : Code) -> P c
 elimCode P Pparam Prec Ppair Psum Punit =
   inductionI Unit Code:code (λ_. P)
@@ -184,7 +184,7 @@ map C A B f =
 --------------------------------------------------------------------------------
 – A example with lists
 listcode : Code
-listcode = sum unit (pair param rec)
+listcode = sum u (pair param rec)
 
 list : Set -> Set
 list A = reify listcode A
