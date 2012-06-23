@@ -80,16 +80,14 @@ vecElim :
   (n : Nat) →
   (xs : vec α n) →
   Φ n xs;
-vecElim α Φ φnil φcons =
-  inductionI Nat (vecDesc α) Φ
-    (λn x.
-      case fst x for b. (z : semI[body α n b, n. vec α n]) →
-                        liftI[body α n b, n. vec α n, n v. Φ n v, z] →
-                        Φ n (construct «b,z») with
-        { inl _. λz _. rewriteBy z for n p. Φ n (construct «inl (), p») then φnil
-        ; inr _. λz φ. rewriteBy snd (snd (snd z)) for n p. Φ n (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), p») then
-                       φcons (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ)
-        } (snd x));
+vecElim α Φ φnil φcons n xs =
+  eliminate xs with n «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. λeq           _.     rewriteBy eq then φnil
+      ; inr _. λ«n',a,xs,eq» «p,_». rewriteBy eq then φcons n' a xs p
+      }
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 add : Nat → Nat → Nat ;

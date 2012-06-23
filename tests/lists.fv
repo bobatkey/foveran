@@ -15,14 +15,13 @@ elimList :
   ((a : A) -> (l : List A) -> P l -> P (cons A a l)) ->
   (l : List A) ->
   P l
-elimList A P pnil pcons =
-  inductionI Unit (List:code A) (λu. P)
-    (λ_ «constructor, arguments».
-      generalise arguments then
-      case constructor with
-        { inl _. λeq       _.     rewriteBy eq then pnil
-        ; inr _. λ«a,l,eq» «p,_». rewriteBy eq then pcons a l p
-        })
-    ()
+elimList A P pnil pcons l =
+  eliminate l with _ «constructor,arguments» p.
+    generalise p then
+    generalise arguments then
+    case constructor with
+      { inl _. λeq       _.     rewriteBy eq then pnil
+      ; inr _. λ«a,l,eq» «p,_». rewriteBy eq then pcons a l p
+      }
 
 ;

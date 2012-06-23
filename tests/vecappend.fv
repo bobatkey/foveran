@@ -45,11 +45,14 @@ VecInduction :
   (Φ zero vnil) →
   ((n : Nat) → (a : A) → (v : Vec n) → Φ n v → Φ (succ n) (vcons n a v)) →
   (n : Nat) → (v : Vec n) → Φ n v;
-VecInduction Φ φnil φcons =
-  inductionI Nat VecDesc Φ
-    (natCase (λn. (x : semI[VecDesc n, i. Vec i]) → liftI[VecDesc n, n. Vec n, n v. Φ n v, x] → Φ n (construct x))
+VecInduction Φ φnil φcons n v =
+  eliminate v with n x p.
+    generalise p then
+    generalise x then
+    natCase (λn. (x : semI[VecDesc n, i. Vec i]) → liftI[VecDesc n, n. Vec n, n v. Φ n v, x] → Φ n (construct x))
        (λx φ. φnil)
-       (λn x φ. φcons n (fst x) (snd x) φ));
+       (λn x φ. φcons n (fst x) (snd x) φ)
+       n
 
 vecappend : (n₁ n₂ : Nat) → Vec n₁ → Vec n₂ → Vec (add n₁ n₂);
 vecappend n₁ n₂ v₁ v₂ =

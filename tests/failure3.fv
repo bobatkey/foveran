@@ -2,9 +2,8 @@
 data Emp : Set where
 
 Emp:elim : (P : Emp -> Set) -> (e : Emp) -> P e
-Emp:elim P =
-  inductionI Unit Emp:code (λi e. P e)
-    (λ_ «constructor, arguments». absurdBy constructor)
-    ()
+Emp:elim P e =
+  eliminate e with _ «constructor,arguments» _.
+    absurdBy constructor
     
 ;
