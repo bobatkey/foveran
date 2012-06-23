@@ -487,7 +487,7 @@ veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
           vK vi x
              -- FIXME: vallI should be a built-in, because it needs to
              -- define stuff with type arguments
-             (vallI $$ vI $$ (vD $$ vi) $$ vmuI vi vD
+             (vallI $$ vI $$ (vD $$ vi) $$ vmuI vI vD
                     $$ (VLam "i" $ \i -> VLam "x" $ \x -> vP i x)
                     $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x)
                     $$ x)
