@@ -42,7 +42,7 @@ processIDataDecl d = do
 
   -- Generate the type itself
   let typ = paramsType   (dataParameters d) (makeMuTy d) []
-      trm = paramsLambda (dataParameters d) (makeMu d constructors) []
+      trm = paramsLambda (dataParameters d) (makeMu d) []
   checkDefinition (dataPos d) (dataName d) typ (Just trm)
 
 --------------------------------------------------------------------------------
@@ -105,7 +105,11 @@ checkConstructorBits d (Annot p (ConsEnd nm tms)) = do
   idxTm <- checkParameters p (isJust (dataIndexType d)) tms (map paramIdent $ dataParameters d)
   return ([], idxTm)
 
-checkParameters :: Span -> Bool -> [TermPos] -> [Ident] -> DeclCheckM TermPos
+checkParameters :: Span      -- ^ The position at which to report any errors
+                -> Bool      -- ^ Whether or not we are looking for an index argument at the end
+                -> [TermPos] -- ^ The supplied list of arguments
+                -> [Ident]   -- ^ The list of declared names of the parameter arguments
+                -> DeclCheckM TermPos -- ^ The index argument. Will be UnitI if we are not expecting a user supplied index argument
 checkParameters pos False   []       []     = return (pos @| UnitI)
 checkParameters pos False   []       (p:ps) = reportDataDeclError pos NotEnoughArgumentsForDatatype
 checkParameters pos True    [x]      []     = return x
@@ -154,6 +158,15 @@ paramsLambda (param:params) tm bv = pos @| LN.Lam nm tmCod
     where DataParameter pos nm ty = param
           tmCod = paramsLambda params tm (PatVar nm:bv)
 
+-- assumes that the list of parameters is bound with the correct names
+paramsApp :: [DataParameter]
+          -> LN.TermPos
+          -> [Pattern] -> LN.TermPos
+paramsApp []             tm bv = tm
+paramsApp (param:params) tm bv =
+    paramsApp params (pos @| LN.App tm (LN.toLocallyNameless (pos @| Var nm) bv)) bv
+    where DataParameter pos nm ty = param
+
 --------------------------------------------------------------------------------
 makeMuTy :: IDataDecl
          -> [Pattern]
@@ -164,30 +177,32 @@ makeMuTy d bv =
       Just idxTy -> pos @| LN.Pi Nothing (LN.toLocallyNameless idxTy bv) (pos @| LN.Set 0)
     where pos     = dataPos d
 
--- FIXME: instead of regenerating the code, generate a reference to it
+-- assumes that the parameter names are bound
 makeMu :: IDataDecl
-       -> [Constructor]
        -> [Pattern]
        -> LN.TermPos
-makeMu d constrs bv =
+makeMu d bv =
     case dataIndexType d of
       Nothing    -> pos @| LN.App (pos @| LN.MuI (pos @| LN.Unit) code) (pos @| LN.UnitI)
       Just idxTy -> pos @| LN.MuI (LN.toLocallyNameless idxTy bv) code
     where pos     = dataPos d
-          code    = makeCode d constrs bv
+          codeVar = pos @| LN.Free (dataName d <+> ":code") LN.IsGlobal
+          code    = paramsApp (dataParameters d) codeVar bv
 
 --------------------------------------------------------------------------------
 -- Generates the type of the code for the datatype, given a binding
 -- environment for the parameters
-codeType :: IDataDecl -> [Pattern] -> LN.TermPos
-codeType d bv = pos @| LN.Pi Nothing idxType1 (pos @| LN.App (pos @| LN.IDesc) idxType2)
-    where pos      = dataPos d
-          idxType1 = case dataIndexType d of
-                       Nothing    -> pos @| LN.Unit
-                       Just idxTy -> LN.toLocallyNameless idxTy bv
-          idxType2 = case dataIndexType d of
-                       Nothing    -> pos @| LN.Unit
-                       Just idxTy -> LN.toLocallyNameless idxTy (PatNull:bv)
+codeType :: IDataDecl
+         -> [Pattern]
+         -> LN.TermPos
+codeType d bv =
+    pos @| LN.Pi Nothing (idxType bv)
+           (pos @| LN.App (pos @| LN.IDesc) (idxType (PatNull:bv)))
+    where
+      pos     = dataPos d
+      idxType = case dataIndexType d of
+                  Nothing    -> \bv -> pos @| LN.Unit
+                  Just idxTy -> LN.toLocallyNameless idxTy
 
 --------------------------------------------------------------------------------
 -- generate the big sum type to name the constructors

@@ -1,0 +1,14 @@
+-- Test of the desugaring of data declarations with multiple parameters
+
+assume A : Set
+assume B : Set
+assume C : A -> Set
+assume D : B -> Set
+
+data X (a : A) (b : B) : Set where
+  cons : C a -> D b -> X a b
+
+cons : (a : A) -> (b : B) -> C a -> D b -> X a b
+cons a b c d = construct «(), c, d, refl»
+
+;
