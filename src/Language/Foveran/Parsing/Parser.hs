@@ -194,7 +194,11 @@ term08 =
 
 term07 :: Parser Tok.Token TermPos
 term07 =
-    optBinary <$> term01 <*> (optional $ (Eq,) <$ token Tok.Eq <*> term07)
+    optBinary <$> term06 <*> (optional $ (Eq,) <$ token Tok.Eq <*> term06)
+
+term06 :: Parser Tok.Token TermPos
+term06 =
+    optBinary <$> term01 <*> (optional $ (TypeAscrip,) <$ token Tok.Colon <*> term01)
 
 term01 :: Parser Tok.Token TermPos
 term01 =

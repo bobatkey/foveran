@@ -251,7 +251,10 @@ consEndCode d idxTm bv idxVar =
     where
       p      = dataPos d -- FIXME: this location ought to be the location of the ConsEnd bit
       idx    = p @| LN.Bound idxVar
-      idxTm' = LN.toLocallyNameless idxTm bv
+      idxTy  = case dataIndexType d of
+                 Nothing   -> p @| LN.Unit
+                 Just ty   -> LN.toLocallyNameless ty bv
+      idxTm' = p @| LN.TypeAscrip (LN.toLocallyNameless idxTm bv) idxTy
 
 consBitCode :: IDataDecl
             -> ConstructorArg

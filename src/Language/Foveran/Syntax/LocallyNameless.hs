@@ -81,6 +81,8 @@ data TermCon tm
   | GroupMul   tm tm
   | GroupInv   tm
 
+  | TypeAscrip tm tm
+
   | Generalise  tm tm
 
   | UserHole
@@ -216,6 +218,7 @@ toLN (DS.Eliminate t tP i x p tK) bv =
                       (identOfPattern p)
                       (return $ tK (p:x:i:bv))
 
+toLN (DS.TypeAscrip t1 t2) bv = Layer $ TypeAscrip (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
 
 toLN (DS.Group nm ab ty)  bv = Layer $ Group nm ab ((return . ($bv)) <$> ty)
@@ -305,6 +308,8 @@ close' fnm (Group nm ab ty) = Group nm ab <$> sequenceA ty
 close' fnm GroupUnit        = pure GroupUnit
 close' fnm (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 close' fnm (GroupInv t)     = GroupInv <$> t
+
+close' fnm (TypeAscrip tm ty) = TypeAscrip <$> tm <*> ty
 
 close' fnm (Generalise t1 t2) = Generalise <$> t1 <*> t2
 

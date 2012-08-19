@@ -130,6 +130,8 @@ pprint GroupUnit           = "unit"
 pprint (GroupMul t1 t2)    = paren 08 (t1 <+> "#" <+> down t2)
 pprint (GroupInv t)        = paren 07 ("inv" <+> down t)
 
+pprint (TypeAscrip t1 t2)  = paren 06 (down t1 <+> ":" <+> down t2)
+
 pprint (Generalise t1 t2)  = paren 01 ("generalise" <+> resetPrec t1 <+> "then"
                                        $$ resetPrec t2)
 

@@ -1,0 +1,16 @@
+-- Test the type ascription syntax
+
+test1 : (A : Set) -> A -> A
+test1 A a = a : A
+
+test2 : (A B : Set) -> A × B -> B × A
+test2 A B x = «snd x, fst x» : (B × A)
+
+eq1 : (A B : Set) ->
+      (a c : A) -> (b d : B) ->
+      «a,b» : (A × B) == «c,d» : (A × B) ->
+      a == c
+eq1 A B a b c d eq =
+  rewriteBy eq for x p. a == fst x then refl
+
+;

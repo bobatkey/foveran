@@ -157,6 +157,7 @@ data TermCon tm
     | GroupInv   tm
 
     | Generalise  tm tm
+    | TypeAscrip  tm tm
 
     | UserHole
     | Hole       Ident [tm]

@@ -807,5 +807,14 @@ synthesiseTypeFor (Annot p (GroupInv t)) = do
     _ ->
         raiseError (annot t) (OtherError "Operand is not a group element")
 
+--------------------------------------------------------------------------------
+-- Type ascription
+synthesiseTypeFor (Annot p (TypeAscrip t ty)) = do
+  ty1 <- isType ty
+  vty <- eval ty1
+  tm  <- t `hasType` vty
+  return (vty, tm)
+
+--------------------------------------------------------------------------------
 synthesiseTypeFor (Annot p t) = do
   raiseError p (UnableToSynthesise (Annot p t))
