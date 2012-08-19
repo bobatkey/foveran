@@ -31,7 +31,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "snd" :==>             emit Snd
     , "inl" :==>             emit Inl
     , "inr" :==>             emit Inr
-    , "“K”" :==>             emit QuoteK
+    , "“K”" .|. "\"K\"" :==> emit QuoteK
     , "µ" :==>               emit Mu
     , "construct" :==>       emit Construct
     , "induction" :==>       emit Induction
@@ -56,13 +56,13 @@ lexicalSpec = $([|compileLexicalSpecification
     , "data" :==>            emit Data
     , "|" :==>               emit Pipe
     , "IDesc" :==>           emit IDesc
-    , "“IId”" :==>           emit Quote_IId
-    , "“Σ”" :==>             emit Quote_Sg
-    , "“Π”" :==>             emit Quote_Pi
+    , "“IId”".|. "\"IId\"" :==> emit Quote_IId
+    , "“Σ”" .|. "\"Sg\"" :==> emit Quote_Sg
+    , "“Π”" .|. "\"Pi\"" :==> emit Quote_Pi
     , "elimID" :==>          emit IDesc_Elim
-    , "µI" :==>              emit MuI
+    , "µI" .|. "muI" :==>    emit MuI
     , "inductionI" :==>      emit InductionI
-    , "≡" .|. "==" :==>      emit Eq
+    , "≡" .|. "==" :==>     emit Eq
     , "refl" :==>            emit Refl
     , "rewriteBy" :==>       emit RewriteBy
     , "elimEq" :==>          emit ElimEq
