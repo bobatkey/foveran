@@ -501,6 +501,9 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
         _                ->
             raiseError (annot t) (OtherError "expecting a term of recursive type")
   -- generate the elimination type
+  -- FIXME: this does not work when the index is a pair, and 'vty' refers to the parts separately
+  -- need to make a better 'generalise' that can spot that the term being generalised over is a tuple
+  -- see interpreter.fv, definitions "lookup" and "eval"
   tmi <- return (reify vI vi 0)
   tm' <- reify ty <$> eval tm <*> pure 0
   let tmP = CS.generalise [tm',tmi] $ reifyType0 vty
