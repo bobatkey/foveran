@@ -1,60 +1,156 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data Nat : Set where
+  zero : Nat
+  succ : Nat -> Nat
 
-natInduction : (Φ : Nat → Set 2) →
-               (Φ zero) →
-               ((n : Nat) → Φ n → Φ (succ n)) →
-               (n : Nat) → Φ n;
-natInduction Φ φ0 φS =
-  induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
-                    { inl u. \u'. φ0
-                    ; inr n. \φn. φS n φn
-                    });
+zero : Nat
+zero = construct «inl (), refl»
 
-natCase : (A : Nat → Set 2) → A zero → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
-natCase A a f = induction NatDesc A
-                          (λx p. case x for x. A (construct x) with
-                                    { inl u. a
-                                    ; inr n. f n
-                                    });
+succ : Nat -> Nat
+succ n = construct «inr (), n, refl»
+
+succ_ne_zero : (n : Nat) -> succ n == zero -> Empty
+succ_ne_zero n eq =
+  elimEq eq
+     for n p.
+       eliminate n for _ _. Set
+       with _ «c,_» p. case c with { inl _. Empty; inr _. Unit }
+    with ()
+
+natInduction : (P : Nat -> Set 2) ->
+               (P zero) ->
+               ((n : Nat) -> P n -> P (succ n)) ->
+               (n : Nat) -> P n;
+natInduction P p0 pS n =
+  eliminate n with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \eq      _.       rewriteBy eq then p0
+      ; inr _. \«n, eq» «pn, _». rewriteBy eq then pS n pn
+      }
+
+natCase : (A : Nat -> Set 2) -> A zero -> ((n : Nat) -> A (succ n)) -> (n : Nat) -> A n;
+natCase A a f n =
+  natInduction A a (\n _. f n) n
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 Bool : Set;
 Bool = Unit + Unit;
 
-finDesc : Nat → IDesc Nat;
+finDesc : Nat -> IDesc Nat;
 finDesc =
   natCase (λn. IDesc Nat)
    (“K” Empty)
    (λn. “Σ” Bool (λb. case b with { inl u. “K” Unit; inr u. “IId” n }));
 
-fin : Nat → Set;
+fin : Nat -> Set;
 fin = µI Nat finDesc;
 
-fz : (n : Nat) → fin (succ n);
+fz : (n : Nat) -> fin (succ n);
 fz n = construct «inl (), ()»;
 
-fs : (n : Nat) → fin n → fin (succ n);
+fs : (n : Nat) -> fin n -> fin (succ n);
 fs n i = construct «inr (), i»;
 
 finElim :
-  (Φ : (n : Nat) → fin n → Set 2) →
-  ((n : Nat) → Φ (succ n) (fz n)) →
-  ((n : Nat) → (x : fin n) → Φ n x → Φ (succ n) (fs n x)) →
-  (n : Nat) → (x : fin n) → Φ n x;
-finElim Φ φz φs =
-  inductionI Nat finDesc Φ
-    (natCase (λn. (x : semI[finDesc n, n. fin n]) → liftI[finDesc n, n. fin n, n f. Φ n f, x] → Φ n (construct x))
-      (λx φ. elimEmpty x)
-      (λn x. case fst x
-                for y. (z : semI[case y for y. IDesc Nat with { inl u. “K” Unit; inr u. “IId” n }, n. fin n]) →
-                       liftI[case y for y. IDesc Nat with { inl u. “K” Unit; inr u. “IId” n }, n. fin n, n f. Φ n f, z] →
-                       Φ (succ n) (construct «y,z»)
-                with { inl u. λu u. φz n
-                     ; inr u. λz p. φs n z p
-                     }
-               (snd x)));
+  (P : (n : Nat) -> fin n -> Set 2) ->
+  ((n : Nat) -> P (succ n) (fz n)) ->
+  ((n : Nat) -> (x : fin n) -> P n x -> P (succ n) (fs n x)) ->
+  (n : Nat) -> (x : fin n) -> P n x;
+finElim P pz ps n x =
+  eliminate x with n d p.
+    generalise p then
+    generalise d then
+    eliminate n with _ «c,d» p.
+      generalise d then
+      case c with
+        { inl _. \eq. rewriteBy eq then \x. absurdBy x
+        ; inr _.
+          \«n, eq».
+          rewriteBy eq then
+          \«c,d».
+          generalise d then
+          case c with
+            { inl _. \_ _. pz n
+            ; inr _. \x px. ps n x px
+            }
+        }
 
+--------------------------------------------------------------------------------
+data fin2 : Nat -> Set where
+  fz2 : (n : Nat) -> fin2 (succ n)
+  fs2 : (n : Nat) -> fin2 n -> fin2 (succ n)
+
+fz2 : (n : Nat) -> fin2 (succ n)
+fz2 n = construct «inl (), n, refl»
+
+fs2 : (n : Nat) -> fin2 n -> fin2 (succ n)
+fs2 n f = construct «inr (), n, f, refl»
+
+fin2Elim :
+  (P : (n : Nat) -> fin2 n -> Set 2) ->
+  ((n : Nat) -> P (succ n) (fz2 n)) ->
+  ((n : Nat) -> (x : fin2 n) -> P n x -> P (succ n) (fs2 n x)) ->
+  (n : Nat) -> (x : fin2 n) -> P n x;
+fin2Elim P pz ps n x =
+  eliminate x with n «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \«n, eq»    _.       rewriteBy eq then pz n
+      ; inr _. \«n, f, eq» «pf, _». rewriteBy eq then ps n f pf
+      }
+
+elim-finzero :
+  (P : fin2 zero -> Set) ->
+  (i : fin2 zero) ->
+  P i
+elim-finzero P i =
+  (eliminate i for n i. (i' : fin2 zero) -> n == zero -> i == i' -> P i'
+   with n «c,d» p.
+     generalise p then
+     generalise d then
+     case c with
+       { inl _.
+         \«n, eq1».
+         rewriteBy eq1 then
+         \_ _ eq2 _.
+         absurdBy (succ_ne_zero n eq2)
+       ; inr _.
+         \«n, _, eq1».
+         rewriteBy eq1 then
+         \_ _ eq2 _.
+         absurdBy (succ_ne_zero n eq2)
+       }) i refl refl
+
+--------------------------------------------------------------------------------
+up : (n : Nat) ->
+     fin2 n ->
+     fin2 (succ n)
+up n f =
+  eliminate f with n «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \«n, eq»    _.         rewriteBy eq then fz2 (succ n)
+      ; inr _. \«n, f, eq» «up_f, _». rewriteBy eq then fs2 (succ n) up_f
+      }
+
+--------------------------------------------------------------------------------
+one : Nat;
+one = succ zero;
+
+two : Nat;
+two = succ one;
+
+three : Nat;
+three = succ two;
+
+i : fin2 three;
+i = fs2 two (fz2 one);
+
+normalise i;
+
+normalise up three i;
+
+;
