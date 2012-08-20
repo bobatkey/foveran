@@ -1,3 +1,14 @@
+data Nat : Set where
+  zero : Nat
+  succ : Nat -> Nat
+
+zero : Nat
+zero = construct «inl (), refl»
+
+succ : Nat -> Nat
+succ n = construct «inr (), n, refl»
+
+--------------------------------------------------------------------------------
 data List (A : Set) : Set where
   nil  : List A
   cons : A -> List A -> List A
@@ -22,6 +33,29 @@ elimList A P pnil pcons l =
     case constructor with
       { inl _. λeq       _.     rewriteBy eq then pnil
       ; inr _. λ«a,l,eq» «p,_». rewriteBy eq then pcons a l p
+      }
+
+map : (A B : Set) ->
+      (A -> B) ->
+      List A ->
+      List B
+map A B f l =
+  eliminate l with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \eq         _.          nil B
+      ; inr _. \«a, l, eq» «map_l, _». cons B (f a) map_l
+      }
+
+length : (A : Set) -> List A -> Nat
+length A l =
+  eliminate l with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \_ _.             zero
+      ; inr _. \_ «length_l, _». succ length_l
       }
 
 ;
