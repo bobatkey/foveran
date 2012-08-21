@@ -54,6 +54,16 @@ add-comm n1 n2 =
         refl
       }
 
+add-assoc : (n1 n2 n3 : Nat) -> add n1 (add n2 n3) == add (add n1 n2) n3
+add-assoc n1 n2 n3 =
+  eliminate n1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _.         rewriteBy eq then refl
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
+      }
+
 zero_ne_succ : (n : Nat) -> `zero : Nat == `succ n : Nat -> Empty
 zero_ne_succ n eq =
   elimEq eq
@@ -70,6 +80,41 @@ inj n1 n2 eq =
          generalise d then
          case c with { inl _. \_. Unit; inr _. \«n,_». n1 == n }
     with refl
+
+nat_eq_dec : (n1 n2 : Nat) -> (n1 == n2) + (n1 == n2 -> Empty)
+nat_eq_dec n1 =
+  eliminate n1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _.
+        rewriteBy eq then
+        \n2.
+        eliminate n2 with _ «c,d» _.
+          generalise d then
+          case c with
+            { inl _. \eq.
+              rewriteBy eq then inl refl
+            ; inr _. \«n,eq».
+              rewriteBy eq then inr (zero_ne_succ n)
+            }
+      ; inr _. \«n1,eq» «r,_».
+        rewriteBy eq then
+        \n2.
+        eliminate n2 with _ «c,d» _.
+          generalise d then
+          case c with
+            { inl _. \eq.
+              rewriteBy eq then
+              inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
+            ; inr _. \«n2,eq».
+              rewriteBy eq then
+              case r n2 with
+                { inl eq.  rewriteBy eq then inl refl
+                ; inr neq. inr (\eq. neq (inj n1 n2 eq))
+                }
+            }
+      }
 
 --------------------------------------------------------------------------------
 data vector (A : Set) : Nat -> Set where
