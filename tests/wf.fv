@@ -1,0 +1,36 @@
+data acc (A : Set) (lt : A -> A -> Set) : A -> Set where
+  `step : (a : A) -> ((a' : A) -> lt a' a -> acc A lt a') -> acc A lt a
+
+wf : (A : Set) -> (A -> A -> Set) -> Set
+wf A r = (a : A) -> acc A r a
+
+--------------------------------------------------------------------------------
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+symmetry : (n1 n2 : Nat) -> n1 == n2 -> n2 == n1
+symmetry n1 n2 eq = rewriteBy eq then refl
+
+lt : Nat -> Nat -> Set
+lt n1 n2 =
+  eliminate n2 with _ «c,d» _.
+    generalise d then
+    case c with
+      { inl _. \eq.     rewriteBy eq then Empty
+      ; inr _. \«n,eq». rewriteBy eq then n1 == n
+      }
+
+nat_lt_wf : wf Nat lt
+nat_lt_wf n =
+  eliminate n with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq     _    . rewriteBy eq then `step `zero     (\n' e. absurdBy e)
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then `step (`succ n) (\n' e. rewriteBy symmetry n' n e then r)
+      }
+
+– how to do proper lessthan relation?
+
+;
