@@ -46,7 +46,7 @@ eq2 : (A B : Set) ->
       «a,b» : (A × B) == «c,d» : (A × B) ->
       b == d
 eq2 A B a c b d eq =
-  rewriteBy eq for x p. b == snd x then refl
+  rewriteBy eq for x p. b == snd x then refl;
 
 --------------------------------------------------------------------------------
 data Index : Context × Type -> Set where
@@ -71,11 +71,9 @@ lookup A G T v =
       }
 
 --------------------------------------------------------------------------------
-{-
-data Index2 (T : Type) : Context -> Set where
-  here2 : (G : Context) -> Index2 T (ext G T)
-  next2 : (G : Context) -> (S : Type) -> Index2 T G -> Index2 T (ext G S)
--}
+– data Index2 (T : Type) : Context -> Set where
+–  here2 : (G : Context) -> Index2 T (ext G T)
+–  next2 : (G : Context) -> (S : Type) -> Index2 T G -> Index2 T (ext G S)
 
 --------------------------------------------------------------------------------
 data Term : Context × Type -> Set where
@@ -115,8 +113,8 @@ eval A G T tm =
       ; inr constructor.
         case constructor with
           { inl _. \«G', S, T', tm, eq» «recurse, _».
-            rewriteBy eq1 Context Type G' G (arr S T') T eq then
-            rewriteBy eq2 Context Type G' G (arr S T') T eq then
+            rewriteBy eq1 Context Type G' G (`arr S T') T eq then
+            rewriteBy eq2 Context Type G' G (`arr S T') T eq then
             \env. \x. recurse «env, x»
           ; inr _. \«G', S, T', tm1, tm2, eq» «recurse1, recurse2, _».
             rewriteBy eq1 Context Type G' G T' T eq then
@@ -134,13 +132,13 @@ term : Term «`eps, `arr `base `base»
 term = `lam `eps `base `base (`var (`ext `eps `base) `base (`here `eps `base))
 
 term2 : Term «`eps, `arr (`arr `base `base) (`arr `base `base)»
-term2 = lam `eps (`arr `base `base) (`arr `base `base)
-            (`var (`ext `eps (`arr `base `base)) (`arr `base `base)
-                  (`here `eps (`arr `base `base))) 
+term2 = `lam `eps (`arr `base `base) (`arr `base `base)
+             (`var (`ext `eps (`arr `base `base)) (`arr `base `base)
+                   (`here `eps (`arr `base `base)))
 
 assume A : Set
 
-normalise eval A eps (`arr `base `base) term ()
-normalise eval A eps (`arr (`arr `base `base) (`arr `base `base)) term2 ()
+normalise eval A `eps (`arr `base `base) term ()
+normalise eval A `eps (`arr (`arr `base `base) (`arr `base `base)) term2 ()
 
 ;
