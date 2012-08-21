@@ -7,152 +7,141 @@ true = inl ⋄;
 false : bool;
 false = inr ⋄;
 
-or : bool → bool → bool;
-or b₁ = case b₁ for b₁. bool → bool with
-          { inl u. λb₂. true
-          ; inr u. λb₂. b₂
+or : bool -> bool -> bool;
+or b1 = case b1 with
+          { inl u. \b2. true
+          ; inr u. \b2. b2
           };
 
-{-
-or' : bool → bool → bool;
-or' b₁ b₂ = case b₁ for b₁. bool with
-              { inl u → true
-              ; inr u → b₂
-              };
-
-equal : (A : Set) → A → A → Set 1;
-equal A a₁ a₂ = (F : A → Set) → F a₁ → F a₂;
-
-or-equal : equal (bool → bool) (or true) (or' true);
-or-equal F p = p;
--}
-
-and : bool → bool → bool;
-and b₁ = case b₁ with { inl u. λb₂. b₂; inr u. λb₂. false };
+and : bool -> bool -> bool;
+and b1 = case b1 with { inl u. \b2. b2; inr u. \b2. false };
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-alphabet : Set;
-alphabet = Unit + Unit;
+symbol : Set;
+symbol = Unit + Unit;
 
-a : alphabet;
+a : symbol;
 a = inl ();
 
-b : alphabet;
+b : symbol;
 b = inr ();
 
-symbol-eq : alphabet → alphabet → bool;
-symbol-eq s₁ s₂ =
-  case s₁ with
-    { inl u. case s₂ with { inl u. true; inr u. false }
-    ; inr u. case s₂ with { inl u. false; inr u. true }
+symbol-eq : symbol -> symbol -> bool;
+symbol-eq s1 s2 =
+  case s1 with
+    { inl u. case s2 with { inl u. true; inr u. false }
+    ; inr u. case s2 with { inl u. false; inr u. true }
     };
 
-data regexp : Set :=
-  | eps  :
-  | emp  :
-  | alt  : regexp regexp
-  | seq  : regexp regexp
-  | star : regexp
-  | tok  : alphabet
-  ;
+--------------------------------------------------------------------------------
+data regexp : Set where
+  `eps  : regexp
+  `emp  : regexp
+  `alt  : regexp -> regexp -> regexp
+  `seq  : regexp -> regexp -> regexp
+  `star : regexp -> regexp
+  `tok  : symbol -> regexp
 
-– goodness me...
-regexpInduction : (Φ : regexp → Set 2) →
-                  (Φ eps) →
-                  (Φ emp) →
-                  ((r₁ r₂ : regexp) → Φ r₁ → Φ r₂ → Φ (alt r₁ r₂)) →
-                  ((r₁ r₂ : regexp) → Φ r₁ → Φ r₂ → Φ (seq r₁ r₂)) →
-                  ((r : regexp) → Φ r → Φ (star r)) →
-                  ((s : alphabet) → Φ (tok s)) →
-                  (r : regexp) → Φ r;
-regexpInduction Φ φeps φemp φalt φseq φstar φtok =
-  induction regexpDesc Φ
-  (λr. case r with
-          { inl u. λu'. φeps
-          ; inr r.
-             case r with
-               { inl u. λu'. φemp
-               ; inr r.
-                  case r with
-                    { inl p. λφ. φalt (fst p) (snd p) (fst φ) (snd φ)
-                    ; inr r.
-                       case r with
-                         { inl p. λφ. φseq (fst p) (snd p) (fst φ) (snd φ)
-                         ; inr r.
-                            case r with
-                              { inl r. λφ. φstar r φ
-                              ; inr s. λu. φtok s
-                              }
-                         }
-                    }
-               }
-           });
+regexpInduction :
+  (P : regexp -> Set 2) ->
+  (P `eps) ->
+  (P `emp) ->
+  ((r1 r2 : regexp) -> P r1 -> P r2 -> P (`alt r1 r2)) ->
+  ((r1 r2 : regexp) -> P r1 -> P r2 -> P (`seq r1 r2)) ->
+  ((r : regexp) -> P r -> P (`star r)) ->
+  ((s : symbol) -> P (`tok s)) ->
+  (r : regexp) -> P r
+regexpInduction P peps pemp palt pseq pstar ptok r =
+  eliminate r with _ «c,d» rec.
+    generalise rec then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then peps
+      ; inr c.
+        case c with
+          { inl _. \eq _. rewriteBy eq then pemp
+          ; inr c. 
+            case c with
+              { inl _. \«r1,r2,eq» «p1,p2,_». rewriteBy eq then palt r1 r2 p1 p2
+              ; inr c.
+                case c with
+                  { inl _. \«r1,r2,eq» «p1,p2,_». rewriteBy eq then pseq r1 r2 p1 p2
+                  ; inr c .
+                    case c with
+                      { inl _. \«r,eq» «p,_». rewriteBy eq then pstar r p
+                      ; inr _. \«s,eq» _. rewriteBy eq then ptok s
+                      }
+                  }
+              }
+          }
+      };
 
-acceptsEmpty : regexp → bool;
+acceptsEmpty : regexp -> bool;
 acceptsEmpty =
-  regexpInduction (λr. bool)
+  regexpInduction (\r. bool)
                   (true)
                   (false)
-                  (λr₁ r₂ accEmpty₁ accEmpty₂. or  accEmpty₁ accEmpty₂)
-                  (λr₁ r₂ accEmpty₁ accEmpty₂. and accEmpty₁ accEmpty₂)
-                  (λr accEmpty. true)
-                  (λs. false);
+                  (\r1 r2 accEmpty1 accEmpty2. or  accEmpty1 accEmpty2)
+                  (\r1 r2 accEmpty1 accEmpty2. and accEmpty1 accEmpty2)
+                  (\r accEmpty. true)
+                  (\s. false);
 
-step : regexp → alphabet → regexp;
+step : regexp -> symbol -> regexp;
 step r s =
-  regexpInduction (λr. regexp)
-                  (emp)
-                  (emp)
-                  (λr₁ r₂ step₁ step₂. alt step₁ step₂)
-                  (λr₁ r₂ step₁ step₂.
-                      case acceptsEmpty r₁ with
-                        { inl u. alt (seq step₁ r₂) step₂
-			; inr u. seq step₁ r₂
+  regexpInduction (\r. regexp)
+                  `emp
+                  `emp
+                  (\r1 r2 step1 step2. `alt step1 step2)
+                  (\r1 r2 step1 step2.
+                      case acceptsEmpty r1 with
+                        { inl u. `alt (`seq step1 r2) step2
+			; inr u. `seq step1 r2
                         })
-                  (λr step. seq step (star r))
-                  (λs'. case symbol-eq s s' with
-                           { inl u. eps
-                           ; inr u. emp
+                  (\r step. `seq step (`star r))
+                  (\s'. case symbol-eq s s' with
+                           { inl u. `eps
+                           ; inr u. `emp
                            })
                   r;
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-data List (α : Set) : Set :=
-  | nil  :
-  | cons : α List
-  ;
+--------------------------------------------------------------------------------
+data List (A : Set) : Set where
+  `nil  : List A
+  `cons : A -> List A -> List A
 
-listInduction : (A : Set) →
-                (Φ : List A → Set 2) →
-                (Φ (nil A)) →
-                ((a : A) → (l : List A) → Φ l → Φ (cons A a l)) →
-                (l : List A) → Φ l;
-listInduction A Φ pnil pcons =
-  induction (ListDesc A) Φ
-    (\x. case x with
-            { inl u. λu'. pnil
-            ; inr p. λih. pcons (fst p) (snd p) (snd ih)
-            });
+listInduction : (A : Set) ->
+                (P : List A -> Set 2) ->
+                (P `nil) ->
+                ((a : A) -> (l : List A) -> P l -> P (`cons a l)) ->
+                (l : List A) -> P l;
+listInduction A P pnil pcons l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then pnil
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then pcons a l r
+      }
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-match : List alphabet → regexp → bool;
+--------------------------------------------------------------------------------
+match : List symbol -> regexp -> bool;
 match =
-  listInduction alphabet (λl. regexp → bool)
-    (λr. acceptsEmpty r)
-    (λa rest f r. f (step r a));
+  listInduction symbol (\l. regexp -> bool)
+    (\r. acceptsEmpty r)
+    (\a rest f r. f (step r a));
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+--------------------------------------------------------------------------------
 test : regexp;
-test = seq (star (alt (tok a) (tok b))) (tok a); – wouldn't it be great if there was support for infix syntax?
+test = `seq (`star (`alt (`tok a) (`tok b))) (`tok a); – wouldn't it be great if there was support for infix syntax?
 
-input1 : List alphabet;
-input1 = cons alphabet a (cons alphabet b (cons alphabet a (nil alphabet)));
+input1 : List symbol;
+input1 = `cons a (`cons b (`cons a `nil));
 
-input2 : List alphabet;
-input2 = cons alphabet a (cons alphabet b (nil alphabet));
+input2 : List symbol;
+input2 = `cons a (`cons b `nil);
 
-test1 : match input1 test ≡ true;
+test1 : match input1 test == true;
 test1 = refl;
 
-test2 : match input2 test ≡ false;
+test2 : match input2 test == false;
 test2 = refl;
