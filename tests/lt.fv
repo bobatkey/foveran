@@ -1,0 +1,42 @@
+– try to do lt, as a Brady-style datatype
+
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+lt:code : Nat × Nat -> IDesc (Nat × Nat)
+lt:code «n1,n2» =
+  eliminate n1 with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \eq _. eliminate n2 with _ «c,d» p. generalise p then generalise d then case c with { inl _. \_ _. “K” Empty; inr _. \_ _. “K” Unit }
+      ; inr _. \«n,_» _. eliminate n2 with _ «c,d» p. generalise p then generalise d then case c with { inl _. \_ _. “K” Empty; inr _. \«n',_» _. “IId” «n,n'» } }
+
+lt : Nat × Nat -> Set
+lt = µI (Nat × Nat) lt:code
+
+zero_lt_one : lt «`zero, `succ `zero»
+zero_lt_one = construct ()
+
+one_lt_two : lt «`succ `zero, `succ (`succ `zero)»
+one_lt_two = construct (construct ())
+
+lt' : Nat -> Nat -> Set
+lt' n1 =
+  eliminate n1 with _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. \_ _ n2. eliminate n2 with _ «c,d» _. generalise d then case c with { inl _. \_. Empty; inr _. \_. Unit }
+      ; inr _. \_ «f,_» n2. eliminate n2 with _ «c,d» _. generalise d then case c with { inl _. \_. Empty; inr _. \«n2',_». f n2' } }
+
+one_lt_two' : lt' (`succ `zero) (`succ (`succ `zero))
+one_lt_two' = ()
+
+step : (n1 n2 : Nat) ->
+       lt' n1 n2 ->
+       lt' (`succ n1) (`succ n2)
+step n1 n2 x = x
+
+;
