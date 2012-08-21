@@ -1,0 +1,68 @@
+Monoid : Set → Set;
+Monoid A =
+  (m : A → A → A) ×
+  (e : A) ×
+  ((a : A) → m e a ≡ a) ×
+  ((a : A) → m a e ≡ a) ×
+  ((a b c : A) → m a (m b c) ≡ m (m a b) c);
+
+{-
+record Monoid (A : Set) : Set where
+  m         : A -> A -> A
+  e         : A
+  leftUnit  : (a : A) -> m e a ≡ a
+  rightUnit : (a : A) -> m a e ≡ a
+  assoc     : (a₁ a₂ a₃ : A) -> m a₁ (m a₂ a₃) ≡ m (m a₁ a₂) a₃
+-}
+
+mult : (A : Set) → Monoid A → A → A → A;
+mult A m = fst m;
+
+munit : (A : Set) → Monoid A → A;
+munit A m = fst (snd m);
+
+leftUnit :
+  (A : Set) → (m : Monoid A) →
+  (a : A) → mult A m (munit A m) a ≡ a;
+leftUnit A m = fst (snd (snd m));
+
+rightUnit :
+  (A : Set) -> (m : Monoid A) ->
+  (a : A) -> mult A m a (munit A m) == a
+rightUnit A m = fst (snd (snd (snd m)));
+
+assoc :
+  (A : Set) -> (m : Monoid A) ->
+  (a b c : A) -> mult A m a (mult A m b c) == mult A m (mult A m a b) c
+assoc A m = snd (snd (snd (snd m)))
+
+EndoFunMonoid :
+  (A : Set) → Monoid (A → A);
+EndoFunMonoid A =
+  « λf g a. f (g a)
+  , λa. a
+  , λa. refl
+  , λa. refl
+  , λa b c. refl
+  »;
+
+symmetry : (A : Set) -> (a b : A) -> a == b -> b == a
+symmetry A a b eq = rewriteBy eq then refl
+
+PairMonoid : (A B : Set) → Monoid A → Monoid B → Monoid (A × B);
+PairMonoid A B mA mB =
+  « λx y. «mult A mA (fst x) (fst y), mult B mB (snd x) (snd y)»
+  , «munit A mA, munit B mB»
+  , λ«a,b».
+    rewriteBy symmetry A (mult A mA (munit A mA) a) a (leftUnit A mA a) then
+    rewriteBy symmetry B (mult B mB (munit B mB) b) b (leftUnit B mB b) then
+    refl
+  , \«a,b».
+    rewriteBy symmetry A (mult A mA a (munit A mA)) a (rightUnit A mA a) then
+    rewriteBy symmetry B (mult B mB b (munit B mB)) b (rightUnit B mB b) then
+    refl
+  , \«a1,b1» «a2,b2» «a3,b3».
+    rewriteBy symmetry A (mult A mA a1 (mult A mA a2 a3)) (mult A mA (mult A mA a1 a2) a3) (assoc A mA a1 a2 a3) then
+    rewriteBy symmetry B (mult B mB b1 (mult B mB b2 b3)) (mult B mB (mult B mB b1 b2) b3) (assoc B mB b1 b2 b3) then
+    refl
+  »;
