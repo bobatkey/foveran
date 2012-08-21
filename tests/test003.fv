@@ -1,14 +1,8 @@
 – Test to expose missing 'reflect' in Value.veliminate
 
 data Nat : Set where
-  zero : Nat
-  succ : Nat -> Nat
-
-zero : Nat
-zero = construct «inl (), refl»
-
-succ : Nat -> Nat
-succ n = construct «inr (), n, refl»
+  `zero : Nat
+  `succ : Nat -> Nat
 
 add : Nat -> Nat -> Nat
 add m = eliminate m with _ «c,d» p.
@@ -16,7 +10,7 @@ add m = eliminate m with _ «c,d» p.
   generalise d then
   case c with
     { inl _. \_ _. \n. n
-    ; inr _. \_ «f,_». \n. succ (f n)
+    ; inr _. \_ «f,_». \n. `succ (f n)
     }
 
 assume n : Nat

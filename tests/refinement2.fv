@@ -26,8 +26,8 @@ unitI I D A =
     (λi a. ⋄)
     (λA' a'. ⋄)
     (λD₁ D₂ unit₁ unit₂ x. « unit₁ (fst x), unit₂ (snd x) »)
-    (λB D unit x. unit (fst x) (snd x))
-    (λB D unit x. λb. unit b (x b))
+    (λB D unitI x. unitI (fst x) (snd x))
+    (λB D unitI x. λb. unitI b (x b))
     D;
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
@@ -58,7 +58,7 @@ icata : (I : Set) →
         (A : I → Set) →
         ((i : I) → semI[D i, i. A i] → A i) →
         (i : I) → µI I D i → A i;
-icata I D A k =
+icata I D A k i x = – eliminate x with i x p. k i (drop I D A i x p)
   inductionI I D
     (λi x. A i)
     (λi x φ. k i (drop I D A i x φ));

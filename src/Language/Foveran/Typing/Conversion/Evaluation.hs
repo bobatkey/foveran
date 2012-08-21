@@ -81,7 +81,8 @@ eval (Case t tA tB x tP y tL z tR) = vcase <$> t
                                      <*> pure (fromIrrelevant y) <*> binder tL
                                      <*> pure (fromIrrelevant z) <*> binder tR
 
-eval Unit      = pure VUnit
+eval (Unit (Irrelevant tag)) =
+    pure (VUnit tag)
 eval UnitI     = pure VUnitI
 eval Empty     = pure VEmpty
 eval (ElimEmpty x a) = velimEmpty <$> x <*> a
@@ -105,7 +106,7 @@ eval Desc_Elim          = pure (VLam "P" $ \p ->
                                 vdesc_elim p k i pr su tg)
 eval Sem                = pure (VLam "D" $ vsem)
 eval (Mu t)             = VMu <$> t
-eval (Construct t)      = VConstruct <$> t
+eval (Construct tag t)  = VConstruct (fromIrrelevant tag) <$> t
 eval Induction          = pure (VLam "F" $ \f ->
                                 VLam "P" $ \p ->
                                 VLam "k" $ \k ->

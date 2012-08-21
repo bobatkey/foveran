@@ -1,12 +1,6 @@
 data Type : Set where
-  base : Type
-  arr  : Type -> Type -> Type
-
-base : Type
-base = construct «inl (), refl»
-
-arr : Type -> Type -> Type
-arr s t = construct «inr (), s, t, refl»
+  `base : Type
+  `arr  : Type -> Type -> Type
 
 semType : Type -> Set -> Set
 semType T A =
@@ -18,19 +12,16 @@ semType T A =
       ; inr _. λ«t1, t2, _» «S1, S2, _». S1 -> S2
       }
 
-testType : Type
-testType = arr (arr base base) base
+-- semType : Type -> Set -> Set
+-- semType T A = 
+--   by_structural_recursion_on T with
+--     `base.      A
+--     `arr T1 T2. (recurseOn T1) -> (recurseOn T2)
 
 --------------------------------------------------------------------------------
 data Context : Set where
-  eps : Context
-  ext : Context -> Type -> Context
-
-eps : Context
-eps = construct «inl (), refl»
-
-ext : Context -> Type -> Context
-ext ctxt t = construct «inr (), ctxt, t, refl»
+  `eps : Context
+  `ext : Context -> Type -> Context
 
 semContext : Context -> Set -> Set
 semContext C A =
@@ -59,14 +50,8 @@ eq2 A B a c b d eq =
 
 --------------------------------------------------------------------------------
 data Index : Context × Type -> Set where
-  here : (G : Context) -> (T : Type) -> Index «ext G T, T»
-  next : (G : Context) -> (S : Type) -> (T : Type) -> Index «G, T» -> Index «ext G S, T»
-
-here : (G : Context) -> (T : Type) -> Index «ext G T, T»
-here G T = construct «inl (), G, T, refl»
-
-next : (G : Context) -> (S T : Type) -> Index «G, T» -> Index «ext G S, T»
-next G S T v = construct «inr (), G, S, T, v, refl»
+  `here : (G : Context) -> (T : Type) ->                               Index «`ext G T, T»
+  `next : (G : Context) -> (S : Type) -> (T : Type) -> Index «G, T» -> Index «`ext G S, T»
 
 lookup : (A : Set) -> (G : Context) -> (T : Type) -> Index «G,T» -> semContext G A -> semType T A
 lookup A G T v =
@@ -76,41 +61,39 @@ lookup A G T v =
     generalise arguments then
     case constructor with
       { inl _. \«G', T', eq» _.
-        rewriteBy eq1 Context Type (ext G' T') G T' T eq then
-        rewriteBy eq2 Context Type (ext G' T') G T' T eq then
+        rewriteBy eq1 Context Type (`ext G' T') G T' T eq then
+        rewriteBy eq2 Context Type (`ext G' T') G T' T eq then
         \«_, x». x
       ; inr _. \«G', S, T', v, eq» «recurse, _». 
-        rewriteBy eq1 Context Type (ext G' S) G T' T eq then
-        rewriteBy eq2 Context Type (ext G' S) G T' T eq then
+        rewriteBy eq1 Context Type (`ext G' S) G T' T eq then
+        rewriteBy eq2 Context Type (`ext G' S) G T' T eq then
         \«env, _». recurse env
       }
 
 --------------------------------------------------------------------------------
-data Term : Context × Type → Set where
-  var : (G : Context) ->
-        (T : Type) ->
-        Index «G,T» ->
-        Term «G,T»
-  lam : (G : Context) ->
-        (S : Type) ->
-        (T : Type) ->
-        Term «ext G S, T» ->
-        Term «G, arr S T»
-  app : (G : Context) ->
-        (S : Type) ->
-        (T : Type) ->
-        Term «G, arr S T» ->
-        Term «G, S» ->
-        Term «G, T»
+{-
+data Index2 (T : Type) : Context -> Set where
+  here2 : (G : Context) -> Index2 T (ext G T)
+  next2 : (G : Context) -> (S : Type) -> Index2 T G -> Index2 T (ext G S)
+-}
 
-var : (G : Context) -> (T : Type) -> Index «G,T» -> Term «G,T»
-var G T v = construct «inl (), G, T, v, refl»
-
-lam : (G : Context) -> (S T : Type) -> Term «ext G S, T» -> Term «G, arr S T»
-lam G S T tm = construct «inr (inl ()), G, S, T, tm, refl»
-
-app : (G : Context) -> (S T : Type) -> Term «G, arr S T» -> Term «G, S» -> Term «G, T»
-app G S T tm1 tm2 = construct «inr (inr ()), G, S, T, tm1, tm2, refl»
+--------------------------------------------------------------------------------
+data Term : Context × Type -> Set where
+  `var : (G : Context) ->
+         (T : Type) ->
+         Index «G,T» ->
+         Term «G,T»
+  `lam : (G : Context) ->
+         (S : Type) ->
+         (T : Type) ->
+         Term «`ext G S, T» ->
+         Term «G, `arr S T»
+  `app : (G : Context) ->
+         (S : Type) ->
+         (T : Type) ->
+         Term «G, `arr S T» ->
+         Term «G, S» ->
+         Term «G, T»
 
 --------------------------------------------------------------------------------
 eval : (A : Set) ->
@@ -142,17 +125,22 @@ eval A G T tm =
           }
       }
 
-term : Term «eps, arr base base»
-term = lam eps base base (var (ext eps base) base (here eps base))
+-- byStructuralRecursionOn tm with
+--   `var G T v.       \env. lookup A G T v
+--   `lam G T tm.      \env. \x. recurseOn tm (env, x)
+--   `app G T tm1 tm2. \env. recurseOn tm1 env (recurseOn tm2 env)
 
-term2 : Term «eps, arr (arr base base) (arr base base)»
-term2 = lam eps (arr base base) (arr base base)
-            (var (ext eps (arr base base)) (arr base base)
-                 (here eps (arr base base))) 
+term : Term «`eps, `arr `base `base»
+term = `lam `eps `base `base (`var (`ext `eps `base) `base (`here `eps `base))
+
+term2 : Term «`eps, `arr (`arr `base `base) (`arr `base `base)»
+term2 = lam `eps (`arr `base `base) (`arr `base `base)
+            (`var (`ext `eps (`arr `base `base)) (`arr `base `base)
+                  (`here `eps (`arr `base `base))) 
 
 assume A : Set
 
-normalise eval A eps (arr base base) term ()
-normalise eval A eps (arr (arr base base) (arr base base)) term2 ()
+normalise eval A eps (`arr `base `base) term ()
+normalise eval A eps (`arr (`arr `base `base) (`arr `base `base)) term2 ()
 
 ;

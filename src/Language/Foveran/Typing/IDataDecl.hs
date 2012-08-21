@@ -183,7 +183,7 @@ makeMu :: IDataDecl
        -> LN.TermPos
 makeMu d bv =
     case dataIndexType d of
-      Nothing    -> pos @| LN.App (pos @| LN.MuI (pos @| LN.Unit) code) (pos @| LN.UnitI)
+      Nothing    -> pos @| LN.App (pos @| LN.MuI (pos @| LN.Unit Nothing) code) (pos @| LN.UnitI)
       Just idxTy -> pos @| LN.MuI (LN.toLocallyNameless idxTy bv) code
     where pos     = dataPos d
           codeVar = pos @| LN.Free (dataName d <+> ":code") LN.IsGlobal
@@ -201,15 +201,15 @@ codeType d bv =
     where
       pos     = dataPos d
       idxType = case dataIndexType d of
-                  Nothing    -> \bv -> pos @| LN.Unit
+                  Nothing    -> \bv -> pos @| LN.Unit Nothing
                   Just idxTy -> LN.toLocallyNameless idxTy
 
 --------------------------------------------------------------------------------
 -- generate the big sum type to name the constructors
-namesSumType :: Span -> [a] -> LN.TermPos
+namesSumType :: Span -> [Constructor] -> LN.TermPos
 namesSumType pos []     = pos @| LN.Empty
-namesSumType pos [x]    = pos @| LN.Unit
-namesSumType pos (x:xs) = pos @| LN.Sum (pos @| LN.Unit) (namesSumType pos xs)
+namesSumType pos [x]    = pos @| LN.Unit (Just $ consIdent x)
+namesSumType pos (x:xs) = pos @| LN.Sum (pos @| LN.Unit (Just $ consIdent x)) (namesSumType pos xs)
 
 --------------------------------------------------------------------------------
 makeCode :: IDataDecl
@@ -243,7 +243,7 @@ codeBody d bv idxVar (constr:constrs) =
 
       discrimVar = p @| LN.Bound 0
       idxType    = case dataIndexType d of
-                     Nothing    -> p @| LN.Unit
+                     Nothing    -> p @| LN.Unit Nothing
                      Just idxTy -> LN.toLocallyNameless idxTy (PatNull:bv)
       resultType = p @| LN.App (p @| LN.IDesc) idxType
       thisCase   = consCode d constr (PatNull:bv) (idxVar+1)
@@ -267,7 +267,7 @@ consEndCode d idxTm bv idxVar =
       p      = dataPos d -- FIXME: this location ought to be the location of the ConsEnd bit
       idx    = p @| LN.Bound idxVar
       idxTy  = case dataIndexType d of
-                 Nothing   -> p @| LN.Unit
+                 Nothing   -> p @| LN.Unit Nothing
                  Just ty   -> LN.toLocallyNameless ty bv
       idxTm' = p @| LN.TypeAscrip (LN.toLocallyNameless idxTm bv) idxTy
 

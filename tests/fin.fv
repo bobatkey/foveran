@@ -1,14 +1,8 @@
 data Nat : Set where
-  zero : Nat
-  succ : Nat -> Nat
+  `zero : Nat
+  `succ : Nat -> Nat
 
-zero : Nat
-zero = construct «inl (), refl»
-
-succ : Nat -> Nat
-succ n = construct «inr (), n, refl»
-
-succ_ne_zero : (n : Nat) -> succ n == zero -> Empty
+succ_ne_zero : (n : Nat) -> `succ n : Nat == `zero : Nat -> Empty
 succ_ne_zero n eq =
   elimEq eq
      for n p.
@@ -16,9 +10,63 @@ succ_ne_zero n eq =
        with _ «c,_» p. case c with { inl _. Empty; inr _. Unit }
     with ()
 
+ne2 : (n : Nat) -> `succ (`succ n) : Nat == `succ `zero : Nat -> Empty
+ne2 n eq =
+  elimEq eq
+     for n p.
+       eliminate n for _ _. Set with _ «c,d» _. 
+         generalise d then
+         case c with
+           { inl _. \_. Empty
+           ; inr _. \«n,_».
+             eliminate n with _ «c,d» _.
+               case c with { inl _. Empty; inr _. Unit }
+           }
+    with ()
+
+inj : (n1 n2 : Nat) -> `succ n1 : Nat == `succ n2 : Nat -> n1 == n2
+inj n1 n2 eq =
+  elimEq eq
+     for n p.
+       eliminate n for _ _. Set with _ «c, d» _.
+         generalise d then
+         case c with { inl _. \_. Unit; inr _. \«n,_». n1 == n }
+    with refl
+
+inj-construct : (I : Set) ->
+                (D : I -> IDesc I) ->
+                (i : I) ->
+                (x y : semI[D i, i. µI I D i]) ->
+                construct x : µI I D i == construct y : µI I D i ->
+                x == y
+inj-construct I D i x y eq =
+  elimEq eq
+     for z p. eliminate z for _ _. Set with _ y _. x == y
+    with refl
+
+inj-sigma1 : (A : Set) ->
+             (B : A -> Set) ->
+             (x1 x2 : A) ->
+             (y1 : B x1) ->
+             (y2 : B x2) ->
+             «x1,y1» : ((x : A) × B x) == «x2,y2» : ((x : A) × B x) ->
+             x1 == x2
+inj-sigma1 A B x1 x2 y1 y2 eq =
+  elimEq eq for x p. x1 == fst x with refl
+
+inj-sigma2 : (A : Set) ->
+             (B : A -> Set) ->
+             (x1 x2 : A) ->
+             (y1 : B x1) ->
+             (y2 : B x2) ->
+             «x1,y1» : ((x : A) × B x) == «x2,y2» : ((x : A) × B x) ->
+             y1 == y2
+inj-sigma2 A B x1 x2 y1 y2 eq =
+  elimEq eq for x p. y1 == snd x with refl
+
 natInduction : (P : Nat -> Set 2) ->
-               (P zero) ->
-               ((n : Nat) -> P n -> P (succ n)) ->
+               (P `zero) ->
+               ((n : Nat) -> P n -> P (`succ n)) ->
                (n : Nat) -> P n;
 natInduction P p0 pS n =
   eliminate n with _ «c,d» p.
@@ -29,7 +77,7 @@ natInduction P p0 pS n =
       ; inr _. \«n, eq» «pn, _». rewriteBy eq then pS n pn
       }
 
-natCase : (A : Nat -> Set 2) -> A zero -> ((n : Nat) -> A (succ n)) -> (n : Nat) -> A n;
+natCase : (A : Nat -> Set 2) -> A `zero -> ((n : Nat) -> A (`succ n)) -> (n : Nat) -> A n;
 natCase A a f n =
   natInduction A a (\n _. f n) n
 
@@ -46,16 +94,16 @@ finDesc =
 fin : Nat -> Set;
 fin = µI Nat finDesc;
 
-fz : (n : Nat) -> fin (succ n);
+fz : (n : Nat) -> fin (`succ n);
 fz n = construct «inl (), ()»;
 
-fs : (n : Nat) -> fin n -> fin (succ n);
+fs : (n : Nat) -> fin n -> fin (`succ n);
 fs n i = construct «inr (), i»;
 
 finElim :
   (P : (n : Nat) -> fin n -> Set 2) ->
-  ((n : Nat) -> P (succ n) (fz n)) ->
-  ((n : Nat) -> (x : fin n) -> P n x -> P (succ n) (fs n x)) ->
+  ((n : Nat) -> P (`succ n) (fz n)) ->
+  ((n : Nat) -> (x : fin n) -> P n x -> P (`succ n) (fs n x)) ->
   (n : Nat) -> (x : fin n) -> P n x;
 finElim P pz ps n x =
   eliminate x with n d p.
@@ -78,19 +126,13 @@ finElim P pz ps n x =
 
 --------------------------------------------------------------------------------
 data fin2 : Nat -> Set where
-  fz2 : (n : Nat) -> fin2 (succ n)
-  fs2 : (n : Nat) -> fin2 n -> fin2 (succ n)
-
-fz2 : (n : Nat) -> fin2 (succ n)
-fz2 n = construct «inl (), n, refl»
-
-fs2 : (n : Nat) -> fin2 n -> fin2 (succ n)
-fs2 n f = construct «inr (), n, f, refl»
+  `fz2 : (n : Nat) -> fin2 (`succ n)
+  `fs2 : (n : Nat) -> fin2 n -> fin2 (`succ n)
 
 fin2Elim :
   (P : (n : Nat) -> fin2 n -> Set 2) ->
-  ((n : Nat) -> P (succ n) (fz2 n)) ->
-  ((n : Nat) -> (x : fin2 n) -> P n x -> P (succ n) (fs2 n x)) ->
+  ((n : Nat) -> P (`succ n) (`fz2 n)) ->
+  ((n : Nat) -> (x : fin2 n) -> P n x -> P (`succ n) (`fs2 n x)) ->
   (n : Nat) -> (x : fin2 n) -> P n x;
 fin2Elim P pz ps n x =
   eliminate x with n «c,d» p.
@@ -102,11 +144,11 @@ fin2Elim P pz ps n x =
       }
 
 elim-finzero :
-  (P : fin2 zero -> Set) ->
-  (i : fin2 zero) ->
+  (P : fin2 `zero -> Set) ->
+  (i : fin2 `zero) ->
   P i
 elim-finzero P i =
-  (eliminate i for n i. (i' : fin2 zero) -> n == zero -> i == i' -> P i'
+  (eliminate i for n i. (i' : fin2 `zero) -> n == `zero : Nat -> i == i' -> P i'
    with n «c,d» p.
      generalise p then
      generalise d then
@@ -126,28 +168,28 @@ elim-finzero P i =
 --------------------------------------------------------------------------------
 up : (n : Nat) ->
      fin2 n ->
-     fin2 (succ n)
+     fin2 (`succ n)
 up n f =
   eliminate f with n «c,d» p.
     generalise p then
     generalise d then
     case c with
-      { inl _. \«n, eq»    _.         rewriteBy eq then fz2 (succ n)
-      ; inr _. \«n, f, eq» «up_f, _». rewriteBy eq then fs2 (succ n) up_f
+      { inl _. \«n, eq»    _.         rewriteBy eq then `fz2 (`succ n)
+      ; inr _. \«n, f, eq» «up_f, _». rewriteBy eq then `fs2 (`succ n) up_f
       }
 
 --------------------------------------------------------------------------------
 one : Nat;
-one = succ zero;
+one = `succ `zero;
 
 two : Nat;
-two = succ one;
+two = `succ one;
 
 three : Nat;
-three = succ two;
+three = `succ two;
 
 i : fin2 three;
-i = fs2 two (fz2 one);
+i = `fs2 two (`fz2 one);
 
 normalise i;
 

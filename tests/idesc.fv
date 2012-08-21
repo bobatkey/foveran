@@ -93,15 +93,3 @@ vnil = construct ⋄;
 vcons : (n : Nat) -> Nat -> vector n -> vector (succ n);
 vcons n a t = construct « a, t »;
 
-{-
-velim :
-  (Φ : (n : Nat) -> vector n -> Set 2) ->
-  (Φ zero vnil) ->
-  ((n : Nat) -> (a : Nat) -> (t : vector n) -> Φ n t -> Φ (succ n) (vcons n a t)) ->
-  (n : Nat) -> (v : vector n) -> Φ n v;
-velim Φ φnil φcons =
-  inductionI Nat vectorDesc Φ
-    (caseNat (λn. (x : semI[vectorDesc n, n. vector n]) -> lift4 Nat (vectorDesc n) vector Φ x -> Φ n (construct x))
-             (λx u. φnil)
-             (λn x p. φcons n (fst x) (snd x) (snd p)));
--}

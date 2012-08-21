@@ -1,69 +1,205 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
 
---NatD : Desc ;
---NatD = “K” Unit “+” “Id” ;
+add : Nat -> Nat -> Nat
+add n1 n2 =
+  eliminate n1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. n2
+      ; inr _. \«n,eq» «r,_». `succ r
+      }
 
---Nat : Set ;
---Nat = µ NatD ;
+normalise add (`succ `zero) (`succ `zero)
 
---zero : Nat ;
---zero = construct NatD (inl ()) ;
+add-zero : (n : Nat) -> n == add n `zero
+add-zero n =
+  eliminate n with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq     _.     rewriteBy eq then refl
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
+      }
 
---succ : Nat → Nat ;
---succ = \n → construct NatD (inr n) ;
+add-succ : (n1 n2 : Nat) -> add n1 (`succ n2) == `succ (add n1 n2) : Nat
+add-succ n1 n2 =
+  eliminate n1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then refl
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
+      }
 
-foldNat : (A : Set 1) → A → (A → A) → Nat → A ;
-foldNat A a f = induction NatDesc (λx. A)
-                          (λx. case x for x. lift NatDesc Nat (λx. A) x → A with
-                                  { inl u. λu'. a
-				  ; inr x. λa. f a
-                                  });
+symmetry : (n1 n2 : Nat) -> n1 == n2 -> n2 == n1
+symmetry n1 n2 eq = rewriteBy eq then refl
 
-{-
-FoldNat : (A : Set 1) → A → (A → A) → Nat → A ;
-FoldNat = \A a f → fold NatDesc A (\s → case s for x. A with { inl u → a; inr a → f a }) ;
--}
+add-comm : (n1 n2 : Nat) -> add n1 n2 == add n2 n1
+add-comm n1 n2 =
+  eliminate n1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq     _.
+        rewriteBy eq then
+        rewriteBy add-zero n2 then
+        refl
+      ; inr _. \«n,eq» «r,_».
+        rewriteBy eq then
+        rewriteBy symmetry (add n n2) (add n2 n) r then
+        rewriteBy add-succ n2 n then
+        refl
+      }
 
---primrec : (F : Desc) → (A : Set) → (µ F → sem F A → A) → µ F → A ;
---primrec F A k = induction F (λx → A)
---                          (λx a → k (construct F x) a);
+zero_ne_succ : (n : Nat) -> `zero : Nat == `succ n : Nat -> Empty
+zero_ne_succ n eq =
+  elimEq eq
+     for n p.
+       eliminate n for _ _. Set
+       with _ «c,_» p. case c with { inl _. Unit; inr _. Empty }
+    with ()
 
-plus : Nat → Nat → Nat ;
-plus = foldNat (Nat → Nat) (\x. x) (\f n. succ (f n)) ;
+inj : (n1 n2 : Nat) -> `succ n1 : Nat == `succ n2 : Nat -> n1 == n2
+inj n1 n2 eq =
+  elimEq eq
+     for n p.
+       eliminate n for _ _. Set with _ «c, d» _.
+         generalise d then
+         case c with { inl _. \_. Unit; inr _. \«n,_». n1 == n }
+    with refl
 
-vec : (A : Set) → Nat → Set ;
-vec = \A. foldNat Set Unit (\B. A × B) ;
+--------------------------------------------------------------------------------
+data vector (A : Set) : Nat -> Set where
+  `nil  : vector A `zero
+  `cons : (n : Nat) -> A -> vector A n -> vector A (`succ n)
 
-two : Nat ;
-two = succ (succ zero) ;
+append : (A : Set) ->
+         (n1 n2 : Nat) ->
+         vector A n1 ->
+         vector A n2 ->
+         vector A (add n1 n2)
+append A n1 n2 v1 v2 =
+  eliminate v1 with n «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq         _.     rewriteBy eq then v2
+      ; inr _. \«n,a,v,eq» «r,_». rewriteBy eq then `cons (add n n2) a r
+      }
 
-pair : (A : Set) → A → A → vec A two ;
-pair = \A a1 a2. «a1, «a2, ()»» ;
+reverse : (A : Set) ->
+          (n : Nat) ->
+          vector A n ->
+          vector A n
+reverse A n v =
+  eliminate v with n «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq         _.
+        rewriteBy eq then `nil
+      ; inr _. \«n,a,v,eq» «r,_».
+        rewriteBy eq then
+        rewriteBy symmetry n (add n `zero) (add-zero n) then
+        rewriteBy add-succ n `zero then
+        append A n (`succ `zero) r (`cons `zero a `nil)
+      }
 
-conVec : (A : Set) → (n : Nat) → A → vec A n → vec A (succ n) ;
-conVec = \A n a v. «a,v» ;
+assume B : Set
+assume x : B
+assume y : B
 
-natInduction : (P : Nat → Set 2) →
-               (P zero) →
-               ((n : Nat) → P n → P (succ n)) →
-               (n : Nat) → P n;
-natInduction P p0 pS =
-  induction NatDesc P
-            (\x. case x for x. lift NatDesc Nat P x → P (construct x) with
-                    { inl u. \u'. p0
-                    ; inr n. \pn. pS n pn
-                    });
+test : vector B (`succ `zero)
+test = `cons `zero x `nil
 
-natPrimrec : (A : Set) → A → (Nat → A → A) → Nat → A ;
-natPrimrec A = natInduction (\x. A);
+– normalise append B (`succ `zero) (`succ `zero) test test
 
+--------------------------------------------------------------------------------
+elim-veczero : (A : Set) ->
+               (P : vector A `zero -> Set) ->
+               (P `nil) ->
+               (v : vector A `zero) -> P v
+elim-veczero A P pnil v =
+  (eliminate v for n v. n == `zero : Nat -> (v' : vector A `zero) -> v == v' -> P v'
+   with n «c,d» _.
+     generalise d then
+     case c with
+       { inl _.
+         \eq.
+         rewriteBy eq then
+         \eq1.
+         rewriteBy eq1 then
+         \v' eq2.
+         rewriteBy eq2 then
+         pnil
+       ; inr _.
+         \«n,a,v,eq».
+         rewriteBy eq then
+         \eq1.
+         absurdBy (zero_ne_succ n (rewriteBy eq1 then refl))
+       }) refl v refl
 
-append : (A : Set) → (m n : Nat) → vec A m → vec A n → vec A (plus m n) ;
-append A m n = natInduction
-                 (\m. vec A m → vec A n → vec A (plus m n))
-                 (\xs ys. ys)
-                 (\m f xs ys. conVec A (plus m n) (fst xs) (f (snd xs) ys))
-                 m;
+is-nil : (A : Set) -> (v : vector A `zero) -> v == `nil : vector A `zero
+is-nil A v =
+  elim-veczero A (\v. v == `nil : vector A `zero) refl v
+
+--------------------------------------------------------------------------------
+head : (A : Set) ->
+       (n : Nat) ->
+       vector A (`succ n) -> A
+head A n v =
+  (eliminate v
+   for n v.
+     (n' : Nat) ->
+     (v' : vector A (`succ n')) ->
+     n == `succ n' : Nat ->
+     v == v' ->
+     A
+   with n «c,d» _.
+     generalise d then
+     case c with
+       { inl _.
+         \eq.
+         rewriteBy eq then
+         \n' v' eq _.
+         absurdBy (zero_ne_succ n' eq)
+       ; inr _.
+         \«n,a,v,eq».
+         rewriteBy eq then
+         \n' v' _ _.
+         a
+       }) n v refl refl
+
+elim-vecsucc : (A : Set) ->
+               (P : (n : Nat) -> vector A (`succ n) -> Set) ->
+               ((n : Nat) -> (a : A) -> (xs : vector A n) -> P n (`cons n a xs)) ->
+               (n : Nat) -> (xs : vector A (`succ n)) -> P n xs
+elim-vecsucc A P pcons n v =
+  (eliminate v for n v. (n' : Nat) -> n == `succ n' : Nat -> (v' : vector A (`succ n')) -> v == v' -> P n' v'
+   with n «c,d» _.
+     generalise d then
+     case c with
+       { inl _.
+         \eq.
+         rewriteBy eq then
+         \n' eq.
+         absurdBy (zero_ne_succ n' eq)
+       ; inr _.
+         \«n,a,v,eq».
+         rewriteBy eq then
+         \n' eq1.
+         rewriteBy inj n n' eq1 then
+         \v' eq2.
+         rewriteBy eq2 then
+         pcons n a v
+       }) n refl v refl
+
+head2 : (A : Set) ->
+        (n : Nat) ->
+        vector A (`succ n) -> A
+head2 A n v = elim-vecsucc A (\n v. A) (\n a xs. a) n v
+
+;

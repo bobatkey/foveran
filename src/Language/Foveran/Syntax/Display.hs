@@ -149,6 +149,7 @@ data TermCon tm
     | MuI        tm tm
     | InductionI
     | Eliminate  tm (Maybe (Pattern, Pattern, tm)) Pattern Pattern Pattern tm
+    | NamedConstructor Ident [tm]
 
     {- Group stuff -}
     | Group      Ident Abelian (Maybe tm)

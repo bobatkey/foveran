@@ -69,7 +69,7 @@ data Value
     | VInl   Value
     | VInr   Value
 
-    | VUnit
+    | VUnit  (Maybe Ident)
     | VUnitI
 
     | VEmpty
@@ -83,7 +83,7 @@ data Value
     | VDesc_Id
     | VDesc_Prod  Value Value
     | VDesc_Sum   Value Value
-    | VConstruct  Value
+    | VConstruct  (Maybe Ident) Value
 
     | VIDesc      Value
     | VMuI        Value Value Value
@@ -302,7 +302,7 @@ vlift = VLam "D" $ \d ->
                     (vsem d $$ vA) .->. VSet 2)
                    (VLam "A" $ \a ->
                     VLam "x" $ \x ->
-                    VUnit)
+                    VUnit Nothing)
                    (VLam "x" $ \x ->
                     p $$ x)
                    (VLam "F" $ \fd ->
@@ -362,7 +362,7 @@ vall = VLam "D" $ \vF ->
 vinduction :: Value -> Value -> Value -> Value -> Value
 vinduction vF vP vK = loop
     where
-      loop (VConstruct x) =
+      loop (VConstruct _ x) =
           vK $$ x $$ (vall $$ vF $$ (VMu vF) $$ vP $$ (VLam "x" loop) $$ x)
       loop (VNeutral n) =
           reflect (vP $$ VNeutral n)
@@ -371,7 +371,7 @@ vinduction vF vP vK = loop
                    `tmApp` reify (VMu vF .->. VSet 2) vP
                    `tmApp` reify (VPi (Just "x") (vsem vF $$ VMu vF) $ \x ->
                                   (vlift $$ vF $$ VMu vF $$ vP $$ x) .->.
-                                  vP $$ VConstruct x)
+                                  vP $$ VConstruct Nothing x)
                                  vK
                    `tmApp` n)
       loop v = error ("internal: vinduction stuck on " ++ show v)
@@ -402,7 +402,7 @@ vliftI :: Value   -- ^ index type
 vliftI vI vD x vA i a vP vx = loop vD vx
     where
       loop (VIDesc_Id i)       vx = vP i vx
-      loop (VIDesc_K vB)       vx = VUnit
+      loop (VIDesc_K vB)       vx = VUnit Nothing
       loop (VIDesc_Pair d1 d2) vx = loop d1 (vfst vx) .*. loop d2 (vsnd vx)
       loop (VIDesc_Sg vB d)    vx = loop (d $$ vfst vx) (vsnd vx)
       loop (VIDesc_Pi vB d)    vx = forall "b" vB $ \vb -> loop (d $$ vb) (vx $$ vb)
@@ -459,7 +459,7 @@ vinductionI :: Value -- ^ The index type (@I : Set@)
             -> Value -- ^ The result (@P i x@)
 vinductionI vI vD vP vk = loop
     where
-      loop vi (VConstruct x) =
+      loop vi (VConstruct _ x) =
           vk $$ vi $$ x $$ (vallI $$ vI $$ (vD $$ vi) $$ vmuI vI vD $$ vP $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x) $$ x)
       loop vi (VNeutral n) =
           reflect (vP $$ vi $$ VNeutral n)
@@ -470,7 +470,7 @@ vinductionI vI vD vP vk = loop
                    `tmApp` reify (forall "i" vI $ \i ->
                                   forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
                                   (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
-                                  vP $$ i $$ VConstruct x) vk
+                                  vP $$ i $$ VConstruct Nothing x) vk
                    `tmApp` reify vI vi
                    `tmApp` n)
 
@@ -483,7 +483,7 @@ veliminate :: Value -- ^ The index type (@I : Set@)
            -> Value
 veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
     where
-      loop vi (VConstruct x) =
+      loop vi (VConstruct _ x) =
           vK vi x
              -- FIXME: vallI should be a built-in, because it needs to
              -- define stuff with type arguments
@@ -504,7 +504,7 @@ veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
                            <*> bound vI (\vi ->
                                  bound (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$)) (\vx ->
                                    bound (vliftI vI (vD $$ vi) "i" (vmuI vI vD $$) "i" "a" vP vx) (\vp ->
-                                     reify (vP vi (VConstruct vx)) (vK vi vx vp))))))
+                                     reify (vP vi (VConstruct Nothing vx)) (vK vi vx vp))))))
       loop vi x = error $ "internal: eliminate/loop got : " ++ show x
 
 {------------------------------------------------------------------------------}
@@ -529,7 +529,7 @@ reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
                               in VPair v1 v2
-reflect VUnit            tm = VUnitI
+reflect (VUnit _)        tm = VUnitI
 reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
 reflect (VGroup nm ab _) tm = VGroupTerm [(False, tm)]
@@ -542,7 +542,7 @@ reifyType (VPi x v f)     = \i -> In $ Pi (Irrelevant x) (reifyType v i) (reifyT
 reifyType (VSigma x v f)  = \i -> In $ Sigma (Irrelevant x) (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
 reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
 reifyType (VSet l)        = \i -> In $ Set l
-reifyType VUnit           = \i -> In $ Unit
+reifyType (VUnit tag)     = \i -> In $ Unit (Irrelevant tag)
 reifyType VEmpty          = \i -> In $ Empty
 reifyType (VEq vA vB va vb) = \i -> In $ Eq (reifyType vA i) (reifyType vB i) (reify vA va i) (reify vB vb i)
 reifyType VDesc           = \i -> In $ Desc
@@ -575,15 +575,15 @@ reify (VSigma _ tA tB) e = let v1 = vfst e
 reify (VSum tA tB)     (VInl v) = \i -> In $ Inl (reify tA v i)
 reify (VSum tA tB)     (VInr v) = \i -> In $ Inr (reify tB v i)
 
-reify VUnit            VUnitI   = \i -> In $ UnitI
-reify VUnit            _        = error "internal: reify: values of type unit should only be VUnitI"
+reify (VUnit _)        VUnitI   = \i -> In $ UnitI
+reify (VUnit _)        _        = error "internal: reify: values of type unit should only be VUnitI"
 
 reify VDesc            (VDesc_K v)         = \i -> In $ Desc_K (reifyType v i)
 reify VDesc            VDesc_Id            = \i -> In $ Desc_Id
 reify VDesc            (VDesc_Prod v1 v2)  = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
 reify VDesc            (VDesc_Sum v1 v2)   = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
-reify (VMu tA)         (VConstruct v)      = \i -> In $ Construct (reify (vsem tA $$ (VMu tA)) v i)
-reify (VMuI tI tD ti)  (VConstruct v)      = \i -> In $ Construct (reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v i)
+reify (VMu tA)         (VConstruct tag v)  = \i -> In $ Construct (Irrelevant tag) (reify (vsem tA $$ (VMu tA)) v i)
+reify (VMuI tI tD ti)  (VConstruct tag v)  = \i -> In $ Construct (Irrelevant tag) (reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v i)
 reify (VIDesc tI)      (VIDesc_Id x)       = \i -> In $ IDesc_Id (reify tI x i)
 reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)

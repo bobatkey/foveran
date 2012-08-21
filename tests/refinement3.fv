@@ -153,8 +153,7 @@ refinementSet I J D R = µI J (refinement:code I J D R)
 deconstruct : (I : Set) ->
               (D : I -> IDesc I) ->
               (i : I) -> µI I D i -> semI[D i, i. µI I D i]
-deconstruct I D =
-  inductionI I D (λi x. semI[D i, i. µI I D i]) (λi x _. x)
+deconstruct I D i x = eliminate x with i x _. x
 
 symm : (A : Set) ->
        (a₁ a₂ : A) ->
@@ -340,10 +339,14 @@ cata : (I : Set) ->
        (D : I -> IDesc I) ->
        (A : algebra I D) ->
        (i : I) -> µI I D i -> fst A i
-cata I D A =
+cata I D A i x =
+  eliminate x with
+    i x p. snd A i (drop I (D i) (µI I D) (fst A) x p)
+{-
   inductionI I D
     (λi x. fst A i)
     (λi x φ. snd A i (drop I (D i) (µI I D) (fst A) x φ))
+-}
 
 --------------------------------------------------------------------------------
 -- Generic forgetful functions
@@ -354,7 +357,7 @@ dropIDesc :
   (A B : I -> Set) ->
   (D : IDesc I) ->
   (x : semI[D, i. A i]) ->
-  semI[liftIDesc I D A x,  i. B (fst i)] -> – this is equivalent to semI[bind «i,_» <- liftIDesc I D J x in “IId” i, i. B i]
+  semI[liftIDesc I D A x, i. B (fst i)] -> – this is equivalent to semI[bind «i,_» <- liftIDesc I D J x in “IId” i, i. B i]
   semI[D, i. B i]
 dropIDesc I A B D =
   elimID I (λD. (x : semI[D, i. A i]) ->
@@ -427,8 +430,8 @@ algRefinement I D A =
   , λ«i, a». (x : semI[D i, i. fst A i]) × snd A i x ≡ a
   , λ«i, a» «x, _».
       mapI[D i, i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i,
-        λi a. ««i, a», refl»,
-        x]
+           λi a. ««i, a», refl»,
+           x]
 –      fmapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
 –        (λi a. ««i, a», refl»)
 –        x
@@ -493,19 +496,15 @@ vector2:elim :
   (n : Nat) ->
   (v : vector2 A n) ->
   P n v
-vector2:elim A P pnil pcons =
-  inductionI Nat (refinement:code Unit Nat (list:code A) (vectorRefinement2 A))
-    (λn v. P n v)
-    (λn «c, x».
-       case c for c. (x : semI[realiseBody Unit Nat (λn. ()) (list:code A ()) (snd (snd (vectorRefinement2 A)) n c), n. vector2 A n]) ->
-                     liftI[ realiseBody Unit Nat (λn. ()) (list:code A ()) (snd (snd (vectorRefinement2 A)) n c)
-                           , n. vector2 A n
-                           , n v. P n v
-                           , x] ->
-                     P n (construct «c,x») with
-         { inl eq. λ_ _. rewriteBy eq then pnil
-         ; inr «n', a, eq». λ«v, _» «ih, _». rewriteBy eq then pcons n' a v ih
-         } x)
+vector2:elim A P pnil pcons n v =
+  eliminate v with
+    n «constructor, arguments» p.
+      generalise p then
+      generalise arguments then
+      case constructor with
+        { inl eq.          λ_      _.       rewriteBy eq then pnil
+        ; inr «n', a, eq». λ«v, _» «ih, _». rewriteBy eq then pcons n' a v ih
+        }
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 algRefinementSet : (I : Set) ->
@@ -525,14 +524,24 @@ forgetAlg : (I : Set) ->
 forgetAlg I D A i a x =
   forget I ((i : I) × fst A i) D (algRefinement I D A) «i,a» x
 
-{-
 recompute : (I : Set) ->
             (D : I -> IDesc I) ->
             (A : algebra I D) ->
             (i : I) ->
             (a : fst A i) ->
             (x : algRefinementSet I D A «i,a») ->
-            cata I D A i (forgetAlg I D A i a x) ≡ a
+            cata I D A i (forgetAlg I D A i a x) == a
+recompute I D A i a x =
+  eliminate x with
+    «i,a» ««x,eq»,rest» p.
+      rewriteBy eq then
+      generalise p then
+      generalise rest then
+      generalise x then
+      ?
+–       eliminate D i with
+
+{-
 recompute I D A i a x =
   inductionI ((i : I) × fst A i)
     (refinement:code I ((i : I) × fst A i) D (algRefinement I D A))
@@ -647,6 +656,7 @@ mapI' I D A B f x =
   drop I D A B x (allI I D (λi. A i) (λi _. B i) f x)
 
 – we could attempt to make this hold definitionally...
+{-
 drop-all : (I : Set) ->
            (D : IDesc I) ->
            (A B : I -> Set) ->
@@ -668,6 +678,7 @@ drop-all I D A B f =
       refl)
     (λA D ih f. ?) – stuck: due to lack of extensionality...
     D
+-}
 
 helper : (I : Set) ->
          (D : I -> IDesc I) ->
@@ -782,21 +793,27 @@ decorate :
   (i : I) ->
   (x : µI I D i) ->
   refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x»
-decorate I D A =
+decorate I D A i x =
+  eliminate x with
+    i x p. construct « « mapI' I (D i) (µI I D) (fst A) (cata I D A) x, refl »
+                     , helper2 I D A i x p
+                     »
+
+{-
   inductionI I D
     (λi x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x»)
     (λi x φ. construct « « mapI' I (D i) (µI I D) (fst A) (cata I D A) x
                          – mapI I (D i) (λi. µI I D i) (λi. fst A i) (cata I D A) x  -- to do this, we would need to know that drop . all = mapI
                          – this completely recomputes the underlying value! We ought to be able to extract it from φ
                          , refl»
-                       , helper2 I D A i x φ
+                       , helper2 I D A i x φ -}
                {- lift-to-liftIDesc I (D i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
                      (λi x. refinementSet I ((i : I) × fst A i) D (algRefinement I D A) (fst x))
                      (mapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
                        (λi a. ««i, a», refl»)
                        (drop I D (fst A) i x (allI I (D i) (λi. µI I D i) (λi _. fst A i) (cata I D A) x)))
                      (helper I D A i x φ) -}
-                       »)
+{-                       ») -}
 
 toVector : (A : Set) ->
            (l : list A) ->

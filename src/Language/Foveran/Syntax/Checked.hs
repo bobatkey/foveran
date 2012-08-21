@@ -58,7 +58,7 @@ data TermCon tm
     | Inl   tm
     | Inr   tm
     | Case  tm tm tm (Irrelevant Ident) tm (Irrelevant Ident) tm (Irrelevant Ident) tm
-    | Unit
+    | Unit  (Irrelevant (Maybe Ident))
     | UnitI
     | Empty
     | ElimEmpty tm tm
@@ -75,7 +75,7 @@ data TermCon tm
     | Desc_Elim
     | Sem
     | Mu        tm
-    | Construct tm
+    | Construct (Irrelevant (Maybe Ident)) tm
     | Induction
       
     {- Descriptions of indexed types -}
@@ -132,7 +132,7 @@ traverseSyn (Case t1 tA tB x t2 y t3 z t4)
            <*> pure x <*> binder t2
            <*> pure y <*> binder t3
            <*> pure z <*> binder t4
-traverseSyn Unit             = pure Unit
+traverseSyn (Unit tag)       = pure (Unit tag)
 traverseSyn UnitI            = pure UnitI
 traverseSyn Empty            = pure Empty
 traverseSyn (ElimEmpty t1 t2) = ElimEmpty <$> t1 <*> t2
@@ -150,7 +150,7 @@ traverseSyn (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
 traverseSyn Desc_Elim        = pure Desc_Elim
 traverseSyn Sem              = pure Sem
 traverseSyn (Mu t)           = Mu <$> t
-traverseSyn (Construct t)    = Construct <$> t
+traverseSyn (Construct tag t)= Construct tag <$> t
 traverseSyn Induction        = pure Induction
 
 traverseSyn IDesc            = pure IDesc
@@ -253,7 +253,7 @@ toDisplay (Case t1 _ _ ix t2 iy t3 iz t4)
     where x = fromIrrelevant ix
           y = fromIrrelevant iy
           z = fromIrrelevant iz
-toDisplay Unit                    = pure DS.Unit
+toDisplay (Unit tag)              = pure DS.Unit
 toDisplay UnitI                   = pure DS.UnitI
 toDisplay Empty                   = pure DS.Empty
 toDisplay (ElimEmpty t1 t2)       = DS.ElimEmpty <$> t1 <*> (Just <$> t2)
@@ -274,7 +274,12 @@ toDisplay (Desc_Sum t1 t2)        = DS.Desc_Sum <$> t1 <*> t2
 toDisplay Desc_Elim               = pure DS.Desc_Elim
 toDisplay Sem                     = pure DS.Sem
 toDisplay (Mu t)                  = DS.Mu <$> t
-toDisplay (Construct t)           = DS.Construct <$> t
+toDisplay (Construct (Irrelevant Nothing) t) =
+    DS.Construct <$> t
+toDisplay (Construct (Irrelevant (Just nm)) t) =
+    DS.NamedConstructor <$> pure nm <*> (gatherParts <$> t)
+        where gatherParts (In (DS.Tuple l)) = tail (init l)
+              gatherParts _ = error "internal: malformed constructor found"
 toDisplay Induction               = pure DS.Induction
 
 toDisplay IDesc                   = pure DS.IDesc
@@ -381,7 +386,7 @@ cmp compareLevel (In (Case t1  tA  tB  _ t2  _ t3  _ t4))
       cmp compareLevel t3 t3' &&
       cmp compareLevel t4 t4'
 
-cmp compareLevel (In Unit)              (In Unit)                = True
+cmp compareLevel (In (Unit _))          (In (Unit _))            = True
 cmp compareLevel (In UnitI)             (In UnitI)               = True
 cmp compareLevel (In Empty)             (In Empty)               = True
 cmp compareLevel (In (ElimEmpty t1 t2)) (In (ElimEmpty t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
@@ -410,7 +415,7 @@ cmp compareLevel (In (Desc_Sum t1 t2))  (In (Desc_Sum t1' t2'))  = cmp compareLe
 cmp compareLevel (In Desc_Elim)         (In Desc_Elim)           = True
 cmp compareLevel (In Sem)               (In Sem)                 = True
 cmp compareLevel (In (Mu t))            (In (Mu t'))             = cmp compareLevel t t'
-cmp compareLevel (In (Construct t))     (In (Construct t'))      = cmp compareLevel t t'
+cmp compareLevel (In (Construct _ t))   (In (Construct _ t'))    = cmp compareLevel t t'
 cmp compareLevel (In Induction)         (In Induction)           = True
 
 cmp compareLevel (In IDesc)             (In IDesc)               = True

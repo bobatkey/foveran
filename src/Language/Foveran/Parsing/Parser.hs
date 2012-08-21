@@ -134,10 +134,10 @@ iconstructors =
 iconstructor :: Parser Tok.Token IConstructor
 iconstructor =
     (\(nm,p) bits -> IConstructor (makeSpan p bits) nm bits)
-    <$> tokenWithText Tok.Ident
+    <$> tokenWithText Tok.ConstructorName
     <*  token Tok.Colon
     <*> constructorbits
-    where 
+    where
       constructorbits =
           (\p ident t1 t2 -> Annot (makeSpan p t2) (ConsPi ident t1 t2))
             <$> token Tok.LParen
@@ -270,6 +270,11 @@ term01 =
       <*  token Tok.Then
       <*> term10
     <|>
+    (\(nm,p) ts -> case ts of [] -> Annot p (NamedConstructor nm [])
+                              ts -> Annot (makeSpan p (last ts)) (NamedConstructor nm ts))
+      <$> tokenWithText Tok.ConstructorName
+      <*> some term00
+    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
@@ -282,6 +287,8 @@ term00 =
     unary Proj2 <$> token Tok.Snd <* commit <*> term00
     <|>
     binaryPrefix MuI <$> token Tok.MuI <*> term00 <*> term00
+    <|>
+    (\(nm,p) -> Annot p (NamedConstructor nm [])) <$> tokenWithText Tok.ConstructorName
     <|>
     keyword Induction <$> token Tok.Induction
     <|>

@@ -124,6 +124,9 @@ pprint (Eliminate t (Just (iP,xP,tP)) i x p tK) =
     "with" <+> ppPattern i <+> ppPattern x <+> ppPattern p <> "."
     $$ nest 2 tK
 
+pprint (NamedConstructor nm [])  = paren 00 (ppIdent nm)
+pprint (NamedConstructor nm tms) = paren 01 (sep (ppIdent nm: map (nest 2 . down) tms))
+
 pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint GroupUnit           = "unit"

@@ -43,7 +43,7 @@ data TermCon tm
   | Inl   tm
   | Inr   tm
   | Case  tm (Maybe (Ident, tm)) Ident tm Ident tm
-  | Unit
+  | Unit  (Maybe Ident)
   | UnitI
   | Empty
   | ElimEmpty tm (Maybe tm)
@@ -75,6 +75,8 @@ data TermCon tm
   | MuI        tm tm
   | InductionI
   | Eliminate  tm (Maybe (Ident, Ident, tm)) Ident Ident Ident tm
+
+  | NamedConstructor Ident [tm]
 
   | Group      Ident Abelian (Maybe tm)
   | GroupUnit
@@ -164,7 +166,7 @@ toLN (DS.Case t1 (Just (x, t2)) y t3 z t4) bv =
                  (return $ t3 (y:bv))
                  (identOfPattern z)
                  (return $ t4 (z:bv))
-toLN DS.Unit              bv = Layer $ Unit
+toLN DS.Unit              bv = Layer $ Unit Nothing
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
 toLN (DS.ElimEmpty t1 Nothing)   bv = Layer $ ElimEmpty (return $ t1 bv) Nothing
@@ -218,6 +220,9 @@ toLN (DS.Eliminate t tP i x p tK) bv =
                       (identOfPattern p)
                       (return $ tK (p:x:i:bv))
 
+toLN (DS.NamedConstructor nm tms) bv =
+    Layer $ NamedConstructor nm (map (\t -> return (t bv)) tms)
+
 toLN (DS.TypeAscrip t1 t2) bv = Layer $ TypeAscrip (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
 
@@ -263,7 +268,7 @@ close' fnm (Case t1 tP y t3 z t4) =
          <*> traverse (\(x,tP) -> (x,) <$> binder tP) tP
          <*> pure y <*> binder t3
          <*> pure z <*> binder t4
-close' fnm Unit             = pure Unit
+close' fnm (Unit tag)       = pure (Unit tag)
 close' fnm UnitI            = pure UnitI
 close' fnm Empty            = pure Empty
 close' fnm (ElimEmpty t1 t2) = ElimEmpty <$> t1 <*> sequenceA t2
@@ -301,6 +306,8 @@ close' fnm (Eliminate t tP i x p tK) =
     Eliminate <$> t
               <*> traverse (\(i,x,tP) -> (i,x,) <$> binder (binder tP)) tP
               <*> pure i <*> pure x <*> pure p <*> binder (binder (binder tK))
+close' fnm (NamedConstructor nm tms) = NamedConstructor nm <$> sequenceA tms
+
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms
 

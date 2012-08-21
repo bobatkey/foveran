@@ -115,6 +115,34 @@ runTypingMonad :: TypingMonad ctxt a
 runTypingMonad c context holeContext localContext =
     runReaderT (runStateT (runReaderT c context) holeContext) localContext
 
+makeTag :: Value
+        -> Value
+        -> Value
+        -> Ident
+        -> Span
+        -> TypingMonad ctxt TermPos
+makeTag vI vD vi nm p = do
+  constrsDesc <-
+      case vD $$ vi of
+        VIDesc_Sg constrsDesc _ ->
+            return constrsDesc
+        _ ->
+            raiseError p (OtherError "Expected type is not a datatype in canonical form")
+  let findTag VEmpty = raiseError p (OtherError "Datatype has no constructors")
+      findTag (VUnit (Just tag))          | tag == nm = return (Annot p $ UnitI)
+      findTag (VUnit _)                               = raiseError p (OtherError "constructor name not found")
+      findTag (VSum (VUnit (Just tag)) _) | tag == nm = return (Annot p $ Inl $ Annot p $ UnitI)
+      findTag (VSum _ x)                              = do t <- findTag x
+                                                           return (Annot p $ Inr t)
+      findTag _                                       = raiseError p (OtherError "Expected type is not a datatype in canonical form")
+  findTag constrsDesc
+
+-- FIXME: do this in LocallyNameless
+makeConstructorArguments :: Span -> [TermPos] -> TermPos
+makeConstructorArguments p [] = Annot p $ Refl
+makeConstructorArguments p (t:ts) = Annot p $ Pair t (makeConstructorArguments p ts)
+
+
 {------------------------------------------------------------------------------}
 compareTypes :: Span -> Value -> Value -> TypingMonad ctxt ()
 compareTypes p v1 v2 =
@@ -143,8 +171,8 @@ isType (Annot p (Sum t1 t2)) = do
   tm1 <- isType t1
   tm2 <- isType t2
   return (In $ CS.Sum tm1 tm2)
-isType (Annot p Unit) = do
-  return (In $ CS.Unit)
+isType (Annot p (Unit tag)) = do
+  return (In $ CS.Unit (CS.Irrelevant tag))
 isType (Annot p Empty) =do
   return (In $ CS.Empty)
 isType (Annot p (Eq tA tB)) = do
@@ -229,10 +257,10 @@ hasType (Annot p (Sum t1 t2)) (VSet l) = do
 hasType (Annot p (Sum t1 t2)) v = do
   raiseError p (TermIsASet v)
 
-hasType (Annot p Unit) (VSet l) = do
-  return (In $ CS.Unit)
+hasType (Annot p (Unit tag)) (VSet l) = do
+  return (In $ CS.Unit (CS.Irrelevant tag))
 
-hasType (Annot p Unit) v = do
+hasType (Annot p (Unit _)) v = do
   raiseError p (TermIsASet v)
 
 hasType (Annot p Empty) (VSet l) = do
@@ -327,7 +355,7 @@ hasType (Annot p (Inr t)) (VSum _ tB) = do
 hasType (Annot p (Inr t)) v = do
   raiseError p (TermIsASumIntroduction v)
 
-hasType (Annot p UnitI) VUnit = do
+hasType (Annot p UnitI) (VUnit tag) = do
   return (In $ CS.UnitI)
 
 hasType (Annot p UnitI) v = do
@@ -378,11 +406,11 @@ hasType (Annot p (Desc_Sum t1 t2)) v = do
 
 hasType (Annot p (Construct t)) (VMu f) = do
   tm <- t `hasType` (vsem f $$ VMu f)
-  return (In $ CS.Construct tm)
+  return (In $ CS.Construct (CS.Irrelevant Nothing) tm)
 
 hasType (Annot p (Construct t)) (VMuI a d i) = do
   tm <- t `hasType` (vsemI a (d $$ i) "i" (vmuI a d $$))
-  return (In $ CS.Construct tm)
+  return (In $ CS.Construct (CS.Irrelevant Nothing) tm)
 
 hasType (Annot p (Construct t)) v = do
   raiseError p (TermIsAConstruct v)
@@ -450,6 +478,15 @@ hasType (Annot p UserHole) v = do
 {------------------------------------------------------------------------------}
 -- The following are “high-level” features, and should be done using a general
 -- elaborator
+hasType (Annot p (NamedConstructor nm ts)) (VMuI vI vD vi) = do
+  tag <- makeTag vI vD vi nm p
+  let t = Annot p (Pair tag (makeConstructorArguments p ts))
+  tm <- t `hasType` (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$))
+  return (In $ CS.Construct (CS.Irrelevant (Just nm)) tm)
+
+hasType (Annot p (NamedConstructor nm ts)) v = do
+  raiseError p (TermIsAConstruct v) -- FIXME: better error message?
+
 hasType (Annot p (ElimEq t Nothing tp)) tP =
     do (ty, tm) <- synthesiseTypeFor t
        case ty of
@@ -512,7 +549,7 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
   tmK <- bindVar' 2 inm vI tK $ \i tK ->
          bindVar' 1 xnm (vsemI vI (vDesc $$ i) "i" (vmuI vI vDesc $$)) tK $ \x tK ->
          bindVar' 0 pnm (vliftI vI (vDesc $$ i) "i" (vmuI vI vDesc $$) "i" "a" (\i a -> vP [a,i]) x) tK $ \p tK ->
-         tK `hasType` (vP [VConstruct x,i])
+         tK `hasType` (vP [VConstruct Nothing x,i])
   vtm <- eval tm
   let tyI  = reifyType0 vI
       desc = reify (vI .->. VIDesc vI) vDesc 0
@@ -673,7 +710,7 @@ synthesiseTypeFor (Annot p Induction) = do
            forall "P" (VMu f .->. VSet 2) $ \p ->
            (forall "x" (vsem f $$ VMu f) $ \x ->
             (vlift $$ f $$ VMu f $$ p $$ x) .->.
-            p $$ (VConstruct x)) .->.
+            p $$ (VConstruct Nothing x)) .->.
            (forall "x" (VMu f) $ \x -> p $$ x)
          , In CS.Induction)
 
@@ -692,7 +729,7 @@ synthesiseTypeFor (Annot p (Proj2 t)) = do
 
 -- FIXME: hack, to get the datatype descriptions going
 synthesiseTypeFor (Annot p UnitI) = do
-  return (VUnit, In $ CS.UnitI)
+  return (VUnit Nothing, In $ CS.UnitI)
 
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
@@ -744,7 +781,7 @@ synthesiseTypeFor (Annot p InductionI) = do
            forall "k" (forall "i" vI $ \i ->
                        forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
                        (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
-                       (vP $$ i $$ VConstruct x)) $ \k ->
+                       (vP $$ i $$ VConstruct Nothing x)) $ \k ->
            forall "i" vI $ \i ->
            forall "x" (vmuI vI vD $$ i) $ \x ->
            vP $$ i $$ x
@@ -767,7 +804,7 @@ synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
   tmK <- bindVar' 2 inm vI tK $ \i tK ->
          bindVar' 1 xnm (vsemI vI (vDesc $$ i) "i" (vmuI vI vDesc $$)) tK $ \x tK ->
          bindVar' 0 pnm (vliftI vI (vDesc $$ i) "i" (vmuI vI vDesc $$) "i" "a" (\i a -> vP [a,i]) x) tK $ \p tK ->
-         tK `hasType` (vP [VConstruct x,i])
+         tK `hasType` (vP [VConstruct Nothing x,i])
   vtm <- eval tm
   let tyI  = reifyType0 vI
       desc = reify (vI .->. VIDesc vI) vDesc 0

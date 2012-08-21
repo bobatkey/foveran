@@ -13,6 +13,7 @@ import           Language.Haskell.TH.Lift
 data Token
     = Assume
     | Ident
+    | ConstructorName
     | Colon
     | ColonEquals
     | Semicolon
@@ -99,6 +100,7 @@ deriveLift ''Token
 instance SyntaxHighlight Token where
     lexicalClass Assume      = Keyword
     lexicalClass Ident       = Identifier
+    lexicalClass ConstructorName = Constructor
     lexicalClass Colon       = Operator
     lexicalClass ColonEquals = Operator
     lexicalClass Semicolon   = Punctuation
@@ -183,6 +185,7 @@ instance Layout Token where
 instance Show Token where
   show Assume = "assume"
   show Ident  = "<identifier>"
+  show ConstructorName = "`<constructor-name>"
   show Colon  = ":"
   show ColonEquals = ":=" 
   show Semicolon   = ";"

@@ -1,9 +1,6 @@
 data Nat : Set where
-  zero : Nat
-  succ : Nat -> Nat
-
-succ : Nat -> Nat
-succ n = construct «inr (), n, refl»
+  `zero : Nat
+  `succ : Nat -> Nat
 
 add : Nat -> Nat -> Nat
 add n1 n2 =
@@ -12,7 +9,7 @@ add n1 n2 =
     generalise d then
     case c with
       { inl _. \_ _. n2
-      ; inr _. \_ «f,_». succ f
+      ; inr _. \_ «f,_». `succ f
       }
 
 assume X : Nat -> Set
