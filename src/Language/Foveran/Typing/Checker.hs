@@ -727,10 +727,6 @@ synthesiseTypeFor (Annot p (Proj2 t)) = do
                         return (tB v, In $ CS.Proj2 tmP)
     v             -> do raiseError p (Proj2FromNonSigma v)
 
--- FIXME: hack, to get the datatype descriptions going
-synthesiseTypeFor (Annot p UnitI) = do
-  return (VUnit Nothing, In $ CS.UnitI)
-
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
 synthesiseTypeFor (Annot p IDesc) = do
