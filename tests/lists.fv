@@ -1,29 +1,17 @@
 data Nat : Set where
-  zero : Nat
-  succ : Nat -> Nat
-
-zero : Nat
-zero = construct «inl (), refl»
-
-succ : Nat -> Nat
-succ n = construct «inr (), n, refl»
+  `zero : Nat
+  `succ : Nat -> Nat
 
 --------------------------------------------------------------------------------
 data List (A : Set) : Set where
-  nil  : List A
-  cons : A -> List A -> List A
-
-nil : (A : Set) -> List A
-nil A = construct «inl (), refl»
-
-cons : (A : Set) -> A -> List A -> List A
-cons A a l = construct «inr (), a, l, refl»
+  `nil  : List A
+  `cons : A -> List A -> List A
 
 elimList :
   (A : Set) ->
   (P : List A -> Set 2) ->
-  (P (nil A)) ->
-  ((a : A) -> (l : List A) -> P l -> P (cons A a l)) ->
+  (P `nil) ->
+  ((a : A) -> (l : List A) -> P l -> P (`cons a l)) ->
   (l : List A) ->
   P l
 elimList A P pnil pcons l =
@@ -44,8 +32,8 @@ map A B f l =
     generalise p then
     generalise d then
     case c with
-      { inl _. \eq         _.          nil B
-      ; inr _. \«a, l, eq» «map_l, _». cons B (f a) map_l
+      { inl _. \eq         _.          `nil
+      ; inr _. \«a, l, eq» «map_l, _». `cons (f a) map_l
       }
 
 length : (A : Set) -> List A -> Nat
@@ -54,8 +42,8 @@ length A l =
     generalise p then
     generalise d then
     case c with
-      { inl _. \_ _.             zero
-      ; inr _. \_ «length_l, _». succ length_l
+      { inl _. \_ _.             `zero
+      ; inr _. \_ «length_l, _». `succ length_l
       }
 
 ;
