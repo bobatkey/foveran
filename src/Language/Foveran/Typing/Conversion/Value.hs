@@ -538,22 +538,22 @@ reflect _                tm = VNeutral tm
 
 {------------------------------------------------------------------------------}
 reifyType :: Value -> (Int -> Term)
-reifyType (VPi x v f)     = \i -> In $ Pi (Irrelevant x) (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSigma x v f)  = \i -> In $ Sigma (Irrelevant x) (reifyType v i) (reifyType (f (reflect v $ vbound i)) (i+1))
-reifyType (VSum v1 v2)    = \i -> In $ Sum (reifyType v1 i) (reifyType v2 i)
-reifyType (VSet l)        = \i -> In $ Set l
-reifyType (VUnit tag)     = \i -> In $ Unit (Irrelevant tag)
-reifyType VEmpty          = \i -> In $ Empty
-reifyType (VEq vA vB va vb) = \i -> In $ Eq (reifyType vA i) (reifyType vB i) (reify vA va i) (reify vB vb i)
-reifyType VDesc           = \i -> In $ Desc
-reifyType (VMu v)         = \i -> In $ Mu (reify VDesc v i)
-reifyType (VMuI v1 v2 v3) = (\i -> In $ MuI (reifyType v1 i) (reify (v1 .->. VIDesc v1) v2 i)) `tmApp` reify v1 v3
+reifyType (VPi x v f)     = In <$> (Pi (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
+reifyType (VSigma x v f)  = In <$> (Sigma (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
+reifyType (VSum v1 v2)    = In <$> (Sum <$> reifyType v1 <*> reifyType v2)
+reifyType (VSet l)        = In <$> pure (Set l)
+reifyType (VUnit tag)     = In <$> pure (Unit (Irrelevant tag))
+reifyType VEmpty          = In <$> pure Empty
+reifyType (VEq vA vB va vb) = In <$> (Eq <$> reifyType vA <*> reifyType vB <*> reify vA va <*> reify vB vb)
+reifyType VDesc           = In <$> pure Desc
+reifyType (VMu v)         = In <$> (Mu <$> reify VDesc v)
+reifyType (VMuI v1 v2 v3) = (In <$> (MuI <$> reifyType v1 <*> reify (v1 .->. VIDesc v1) v2)) `tmApp` reify v1 v3
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
-reifyType (VGroup nm ab Nothing)  = \i -> In $ Group nm ab Nothing
+reifyType (VGroup nm ab Nothing)         = In <$> pure (Group nm ab Nothing)
 reifyType (VGroup nm ab (Just (t1, t2))) = (In <$> (Group nm ab <$> (Just <$> reifyType t1))) `tmApp` reify t1 t2
-reifyType (VNeutral t)    = \i -> t i
+reifyType (VNeutral t)    = t
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
 reifyType0 :: Value -> Term
@@ -564,33 +564,36 @@ reify :: Value -> Value -> (Int -> Term)
 
 reify (VSet _) a = reifyType a
 
-reify (VPi _ tA tB)    (VLam nm f) = \i -> let d = reflect tA (vbound i)
-                                           in In $ Lam (Irrelevant nm) $ reify (tB d) (f d) (i + 1)
+reify (VPi _ tA tB)    (VLam nm f) = In <$> (Lam (Irrelevant nm) <$> bound tA (\v -> reify (tB v) (f v)))
 reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-blah should only be VLam"
 
 reify (VSigma _ tA tB) e = let v1 = vfst e
                                v2 = vsnd e
-                           in \i -> In $ Pair (reify tA v1 i) (reify (tB v1) v2 i)
+                           in In <$> (Pair <$> reify tA v1 <*> reify (tB v1) v2)
 
-reify (VSum tA tB)     (VInl v) = \i -> In $ Inl (reify tA v i)
-reify (VSum tA tB)     (VInr v) = \i -> In $ Inr (reify tB v i)
+reify (VSum tA tB)     (VInl v) = In <$> (Inl <$> reify tA v)
+reify (VSum tA tB)     (VInr v) = In <$> (Inr <$> reify tB v)
 
-reify (VUnit _)        VUnitI   = \i -> In $ UnitI
+reify (VUnit _)        VUnitI   = In <$> pure UnitI
 reify (VUnit _)        _        = error "internal: reify: values of type unit should only be VUnitI"
 
-reify VDesc            (VDesc_K v)         = \i -> In $ Desc_K (reifyType v i)
-reify VDesc            VDesc_Id            = \i -> In $ Desc_Id
-reify VDesc            (VDesc_Prod v1 v2)  = \i -> In $ Desc_Prod (reify VDesc v1 i) (reify VDesc v2 i)
-reify VDesc            (VDesc_Sum v1 v2)   = \i -> In $ Desc_Sum (reify VDesc v1 i) (reify VDesc v2 i)
-reify (VMu tA)         (VConstruct tag v)  = \i -> In $ Construct (Irrelevant tag) (reify (vsem tA $$ (VMu tA)) v i)
-reify (VMuI tI tD ti)  (VConstruct tag v)  = \i -> In $ Construct (Irrelevant tag) (reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v i)
-reify (VIDesc tI)      (VIDesc_Id x)       = \i -> In $ IDesc_Id (reify tI x i)
-reify (VIDesc tI)      (VIDesc_K a)        = \i -> In $ IDesc_K (reifyType a i)
-reify (VIDesc tI)      (VIDesc_Pair d1 d2) = \i -> In $ IDesc_Pair (reify (VIDesc tI) d1 i) (reify (VIDesc tI) d2 i)
-reify (VIDesc tI)      (VIDesc_Sg a d)     = \i -> In $ IDesc_Sg (reifyType a i) (reify (a .->. VIDesc tI) d i)
-reify (VIDesc tI)      (VIDesc_Pi a d)     = \i -> In $ IDesc_Pi (reifyType a i) (reify (a .->. VIDesc tI) d i)
+reify VDesc            (VDesc_K v)         = In <$> (Desc_K <$> reifyType v)
+reify VDesc            VDesc_Id            = In <$> pure Desc_Id
+reify VDesc            (VDesc_Prod v1 v2)  = In <$> (Desc_Prod <$> reify VDesc v1 <*> reify VDesc v2)
+reify VDesc            (VDesc_Sum v1 v2)   = In <$> (Desc_Sum  <$> reify VDesc v1 <*> reify VDesc v2)
+reify (VMu tA)         (VConstruct tag v)  = In <$> (Construct (Irrelevant tag) <$> reify (vsem tA $$ (VMu tA)) v)
+reify (VMuI tI tD ti)  (VConstruct tag v)  = In <$> (Construct (Irrelevant tag) <$> reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v)
+reify (VIDesc tI)      (VIDesc_Id x)       = In <$> (IDesc_Id <$> reify tI x)
+reify (VIDesc tI)      (VIDesc_K a)        = In <$> (IDesc_K <$> reifyType a)
+reify (VIDesc tI)      (VIDesc_Pair d1 d2) = In <$> (IDesc_Pair <$> reify (VIDesc tI) d1 <*> reify (VIDesc tI) d2)
+reify (VIDesc tI)      (VIDesc_Sg a d)     = In <$> (IDesc_Sg <$> reifyType a <*> reify (a .->. VIDesc tI) d)
+reify (VIDesc tI)      (VIDesc_Pi a d)     = In <$> (IDesc_Pi <$> reifyType a <*> reify (a .->. VIDesc tI) d)
 reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
-     In <$> (IDesc_Bind <$> reifyType vA <*> reifyType tI <*> tm <*> pure (Irrelevant x) <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
+     In <$> (IDesc_Bind <$> reifyType vA
+                        <*> reifyType tI
+                        <*> tm
+                        <*> pure (Irrelevant x)
+                        <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
     In <$> (MapI <$> reifyType vI <*> tmD
@@ -599,7 +602,7 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
                  <*> reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
-reify (VEq tA _ ta _)  VRefl               = \i -> In $ Refl
+reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl
 reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
