@@ -92,14 +92,8 @@ realiseRefinement0 I J D h =
 
 --------------------------------------------------------------------------------
 data Nat : Set where
-  zero : Nat
-  succ : Nat -> Nat
-
-zero : Nat
-zero = construct «inl (), refl»
-
-succ : Nat -> Nat
-succ n = construct «inr (), n, refl»
+  `zero : Nat
+  `succ : Nat -> Nat
 
 lists0 : (A : Set) -> refinement0 Unit (λi. Unit) Nat:code;
 lists0 A i j = « Unit + A
@@ -253,18 +247,9 @@ l = cons A a (cons A b (nil A))
 
 --------------------------------------------------------------------------------
 data Term : Set where
-  var : Nat -> Term
-  lam : Term -> Term
-  app : Term -> Term -> Term
-
-var : Nat -> Term
-var k = construct «inl (), k, refl»
-
-lam : Term -> Term
-lam tm = construct «inr (inl ()), tm, refl»
-
-app : Term -> Term -> Term
-app tm1 tm2 = construct «inr (inr ()), tm1, tm2, refl»
+  `var : Nat -> Term
+  `lam : Term -> Term
+  `app : Term -> Term -> Term
 
 assume lt : Nat -> Nat -> Set
 
@@ -286,7 +271,7 @@ wellscoped:refinement =
                { inl «k, _». «inl (), k, refl»
                ; inr cons.
                  case cons with
-                   { inl _. «inr (inl ()), «succ n, refl», refl»
+                   { inl _. «inr (inl ()), «`succ n, refl», refl»
                    ; inr _. «inr (inr ()), «n, refl», «n, refl», refl»
                    }
                }
@@ -298,7 +283,7 @@ WSTerm = refinementSet Unit Nat Term:code wellscoped:refinement
 varWS : (n k : Nat) -> lt k n -> WSTerm n
 varWS n k k_lt_n = construct «inl «k, k_lt_n», ()»
 
-lamWS : (n : Nat) -> WSTerm (succ n) -> WSTerm n
+lamWS : (n : Nat) -> WSTerm (`succ n) -> WSTerm n
 lamWS n tm = construct «inr (inl ()), tm, ()»
 
 appWS : (n : Nat) -> WSTerm n -> WSTerm n -> WSTerm n
@@ -413,7 +398,7 @@ forget I J D R =
   cata J (refinement:code I J D R) (forgetAlgebra I J D R)
 
 two : Nat
-two = succ (succ zero)
+two = `succ (`succ `zero)
 
 test : forget Unit Unit Nat:code (listRefinement A) () l ≡ two
 test = refl
@@ -449,16 +434,16 @@ vector:code A =
 vector : (A : Set) -> Nat -> Set
 vector A n = µI ((u : Unit) × Nat) (vector:code A) «(), n»
 
-vnil : (A : Set) -> vector A zero
+vnil : (A : Set) -> vector A `zero
 vnil A = construct «««inl (), ()», refl», ()»
 
-vcons : (A : Set) -> (n : Nat) -> A -> vector A n -> vector A (succ n)
+vcons : (A : Set) -> (n : Nat) -> A -> vector A n -> vector A (`succ n)
 vcons A n a v = construct «««inr a, n, ()», refl», «v, ()»»
 
 – induction principle for algebraic refinements?
 
 v : vector A two
-v = vcons A (succ zero) a (vcons A zero b (vnil A))
+v = vcons A (`succ `zero) a (vcons A `zero b (vnil A))
 
 length : (A : Set) -> list A -> Nat
 length A = forget Unit Unit Nat:code (listRefinement A) ()
@@ -472,7 +457,7 @@ toList A n = forget Unit ((u : Unit) × Nat) (list:code A) (vectorRefinement A) 
 vectorRefinement2 : (A : Set) -> refinement Unit Nat (list:code A)
 vectorRefinement2 A =
   « λn. ()
-  , λn. (zero ≡ n) + ((n' : Nat) × A × (succ n' ≡ n))
+  , λn. (`zero : Nat == n) + ((n' : Nat) × A × (`succ n' : Nat == n))
   , λn c. case c with
             { inl _.          «inl (), ()»
             ; inr «n', a, _». «inr a, «n', refl», ()»
@@ -482,17 +467,17 @@ vectorRefinement2 A =
 vector2 : (A : Set) -> Nat -> Set
 vector2 A = refinementSet Unit Nat (list:code A) (vectorRefinement2 A)
 
-vnil2 : (A : Set) -> vector2 A zero
+vnil2 : (A : Set) -> vector2 A `zero
 vnil2 A = construct «inl refl, ()»
 
-vcons2 : (A : Set) -> (n : Nat) -> A -> vector2 A n -> vector2 A (succ n)
+vcons2 : (A : Set) -> (n : Nat) -> A -> vector2 A n -> vector2 A (`succ n)
 vcons2 A n a v = construct «inr «n, a, refl», v, ()»
 
 vector2:elim :
   (A : Set) ->
   (P : (n : Nat) -> vector2 A n -> Set) ->
-  P zero (vnil2 A) ->
-  ((n : Nat) -> (a : A) -> (v : vector2 A n) -> P n v -> P (succ n) (vcons2 A n a v)) ->
+  P `zero (vnil2 A) ->
+  ((n : Nat) -> (a : A) -> (v : vector2 A n) -> P n v -> P (`succ n) (vcons2 A n a v)) ->
   (n : Nat) ->
   (v : vector2 A n) ->
   P n v
