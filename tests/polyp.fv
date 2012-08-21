@@ -1,35 +1,19 @@
 data Code : Set where
-  param : Code
-  rec   : Code
-  pair  : Code -> Code -> Code
-  sum   : Code -> Code -> Code
-  u     : Code
-
-– These should all be generated automatically
-param : Code
-param = construct «inl (), refl»
-
-rec : Code
-rec = construct «inr (inl ()), refl»
-
-pair : Code -> Code -> Code
-pair c₁ c₂ = construct «inr (inr (inl ())), c₁, c₂, refl»
-
-sum : Code -> Code -> Code
-sum c₁ c₂ = construct «inr (inr (inr (inl ()))), c₁, c₂, refl»
-
-u : Code
-u = construct «inr (inr (inr (inr ()))), refl»
+  `param : Code
+  `rec   : Code
+  `pair  : Code -> Code -> Code
+  `sum   : Code -> Code -> Code
+  `u     : Code
 
 --------------------------------------------------------------------------------
 -- an eliminator for Codes
 -- this should be generated automatically
 elimCode : (P : Code -> Set 2) ->
-           P param ->
-           P rec ->
-           ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (pair c₁ c₂)) ->
-           ((c₁ c₂ : Code) -> P c₁ -> P c₂ -> P (sum c₁ c₂)) ->
-           P u ->
+           P `param ->
+           P `rec ->
+           ((c1 c2 : Code) -> P c1 -> P c2 -> P (`pair c1 c2)) ->
+           ((c1 c2 : Code) -> P c1 -> P c2 -> P (`sum c1 c2)) ->
+           P `u ->
            (c : Code) -> P c
 elimCode P Pparam Prec Ppair Psum Punit c =
   eliminate c with _ «c,d» p.
@@ -57,8 +41,8 @@ toDesc C A _ =
   elimCode (λ_. IDesc Unit)
     (“K” A)
     (“IId” ())
-    (λC₁ C₂ D₁ D₂. D₁ “×” D₂)
-    (λC₁ c₂ D₁ D₂. “Σ” (Unit + Unit) (λc. case c for c. IDesc Unit with { inl _. D₁; inr _. D₂ }))
+    (λC1 C2 D1 D2. D1 “×” D2)
+    (λC1 c2 D1 D2. “Σ” (Unit + Unit) (λc. case c for c. IDesc Unit with { inl _. D1; inr _. D2 }))
     (“K” Unit)
     C
 
@@ -69,8 +53,8 @@ toDesc2 C A _ =
   eliminate C with
     param.      “K” A
     rec.        “IId” ()
-    pair C₁ C₂. recurse C₁ “×” recurse C₂
-    sum C₁ C₂.  “Σ” (Unit + Unit) (λc. case c with { inl _. recurse C₁; inr _. recurse C₂ })
+    pair C1 C2. recurse C1 “×” recurse C2
+    sum C1 C2.  “Σ” (Unit + Unit) (λc. case c with { inl _. recurse C1; inr _. recurse C2 })
     unit.       “K” ()
 -}
 
@@ -113,8 +97,8 @@ drop I D A i =
           semI[D', i. A i])
     (λi x a. a)
     (λX x u. x)
-    (λD₁ D₂ drop₁ drop₂ x a.
-      «drop₁ (fst x) (fst a), drop₂ (snd x) (snd a)»)
+    (λD1 D2 drop1 drop2 x a.
+      «drop1 (fst x) (fst a), drop2 (snd x) (snd a)»)
     (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
     (λX D drop f a. λx. drop x (f x) (a x))
     (D i)
@@ -141,7 +125,7 @@ map C A B f =
 --------------------------------------------------------------------------------
 – A example with lists
 listcode : Code
-listcode = sum u (pair param rec)
+listcode = `sum `u (`pair `param `rec)
 
 list : Set -> Set
 list A = reify listcode A
