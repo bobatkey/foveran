@@ -1,3 +1,5 @@
+-- tests to do with sum types. These should all pass
+
 case1 : (A B : Set) → A + B → A + B ;
 case1 = \A B x. case x for a. A + B with { inl y. inl y; inr z. inr z } ;
 
