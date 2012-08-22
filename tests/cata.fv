@@ -1,18 +1,50 @@
-drop : (D : Desc) →
-       (A : Set) →
-       (x : sem D (µ D)) →
-       lift D (µ D) (λx. A) x →
+-- non-indexed catamorphisms
+drop : (D : Desc) ->
+       (A : Set) ->
+       (x : sem D (µ D)) ->
+       lift D (µ D) (λx. A) x ->
        sem D A ;
-drop D A = elimD (λD'. (x : sem D' (µ D)) → lift D' (µ D) (λx. A) x → sem D' A)
+drop D A = elimD (λD'. (x : sem D' (µ D)) -> lift D' (µ D) (λx. A) x -> sem D' A)
                  (λA x u. x)
                  (λx a. a)
                  (λF G f g x a. «f (fst x) (fst a), g (snd x) (snd a)»)
-                 (λF G f g x. case x for x. lift (F “+” G) (µ D) (λx. A) x → sem (F “+” G) A with
+                 (λF G f g x. case x for x. lift (F “+” G) (µ D) (λx. A) x -> sem (F “+” G) A with
                                  { inl y. λa. inl (f y a)
                                  ; inr z. λa. inr (g z a)
                                  })
                  D;
 
-cata : (D : Desc) → (α : Set) → (sem D α → α) → µ D → α ;
+cata : (D : Desc) -> (α : Set) -> (sem D α -> α) -> µ D -> α ;
 cata D α k = induction D (λx. α) (λx a. k (drop D α x a));
 
+--------------------------------------------------------------------------------
+-- catamorphisms for indexed data
+idrop : (I : Set) ->
+        (D : I -> IDesc I) ->
+        (A : I -> Set) ->
+        (i : I) ->
+        (x : semI[D i, i. muI I D i]) ->
+        liftI[D i, i. muI I D i, i x. A i, x] ->
+        semI[D i, i. A i]
+idrop I D A i =
+  elimID I
+    (λD'. (x : semI[D', i. muI I D i]) ->
+          liftI[D', i. muI I D i, i x. A i, x] ->
+          semI[D', i. A i])
+    (λi x a. a)
+    (λX x u. x)
+    (λD1 D2 drop1 drop2 x a.
+      «drop1 (fst x) (fst a), drop2 (snd x) (snd a)»)
+    (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
+    (λX D drop f a. λx. drop x (f x) (a x))
+    (D i);
+
+icata : (I : Set) ->
+        (D : I -> IDesc I) ->
+        (A : I -> Set) ->
+        ((i : I) -> semI[D i, i. A i] -> A i) ->
+        (i : I) -> muI I D i -> A i;
+icata I D A k i x =
+  eliminate x with i x φ. k i (idrop I D A i x φ)
+
+;
