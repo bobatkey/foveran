@@ -1,3 +1,0 @@
--- this is to test that th eta-rule for unit types is working
-elim𝟙 : (P : 𝟙 → Set) → P () → (u : 𝟙) → P u ;
-elim𝟙 P p u = p ;
