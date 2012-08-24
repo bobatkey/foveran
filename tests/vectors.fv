@@ -247,4 +247,49 @@ head2 : (A : Set) ->
         vector A (`succ n) -> A
 head2 A n v = elim-vecsucc A (\n v. A) (\n a xs. a) n v
 
+--------------------------------------------------------------------------------
+-- Brady-style vectors
+
+vector2:code : Set -> Nat -> IDesc Nat
+vector2:code A n =
+  eliminate n with _ «c,d» _.
+    generalise d then
+    case c with
+      { inl _. \_.      "K" Unit
+      ; inr _. \«n,eq». "Sg" A (\a. "IId" n)
+      }
+
+vector2 : Set -> Nat -> Set
+vector2 A = muI Nat (vector2:code A)
+
+vnil : (A : Set) -> vector2 A `zero
+vnil A = construct ()
+
+vcons : (A : Set) -> (n : Nat) -> A -> vector2 A n -> vector2 A (`succ n)
+vcons A n a xs = construct «a,xs»
+
+vector2:elim :
+  (A : Set) ->
+  (P : (n : Nat) -> vector2 A n -> Set 2) ->
+  (P `zero (vnil A)) ->
+  ((n : Nat) -> (a : A) -> (v : vector2 A n) -> P n v -> P (`succ n) (vcons A n a v)) ->
+  (n : Nat) -> (v : vector2 A n) -> P n v
+vector2:elim A P pnil pcons n v =
+  eliminate v with n d r.
+    generalise r then
+    generalise d then
+    eliminate n with _ «c,d» _.
+      generalise d then
+      case c with
+        { inl _. \eq. rewriteBy eq then \_ _. pnil
+        ; inr _. \«n,eq». rewriteBy eq then \«a,v» r. pcons n a v r
+        }
+
+vecappend : (A : Set) -> (n1 n2 : Nat) -> vector2 A n1 -> vector2 A n2 -> vector2 A (add n1 n2)
+vecappend A n1 n2 v1 v2 =
+  vector2:elim A (\n v. vector2 A (add n n2))
+    v2
+    (\n a v v'. vcons A (add n n2) a v')
+    n1 v1
+
 ;

@@ -61,35 +61,3 @@ allI I D A P p = elimID I (λD. (xs : semI[D, i. A i]) -> lift4 I D A P xs)
 
 – this is all the bits I need to do induction on indexed data types!
 – what about higher-Set universes? Do I need to beef up semI?
-
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
-
-caseNat :
-  (Φ : Nat -> Set 2) ->
-  (Φ zero) ->
-  ((n : Nat) -> Φ (succ n)) ->
-  (n : Nat) -> Φ n;
-caseNat Φ φzero φsucc =
-  induction NatDesc Φ
-    (λx p. case x for x. Φ (construct x) with
-             { inl u. φzero
-             ; inr n. φsucc n
-             });
-
-vectorDesc : Nat -> IDesc Nat;
-vectorDesc = caseNat (λn. IDesc Nat)
-                     (    “K” Unit)
-                     (λn. “K” Nat “×” “IId” n);
-
-vector : Nat -> Set;
-vector n = µI Nat vectorDesc n;
-
-vnil : vector zero;
-vnil = construct ⋄;
-
-vcons : (n : Nat) -> Nat -> vector n -> vector (succ n);
-vcons n a t = construct « a, t »;
-
