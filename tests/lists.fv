@@ -46,4 +46,14 @@ length A l =
       ; inr _. \_ «length_l, _». `succ length_l
       }
 
+append : (A : Set) -> List A -> List A -> List A
+append A l1 l2 =
+  eliminate l1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \_       _.      l2
+      ; inr _. \«a,_,_» «xs,_». `cons a xs
+      }
+
 ;
