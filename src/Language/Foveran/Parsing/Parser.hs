@@ -297,6 +297,8 @@ term00 =
     <|>
     unary Proj2 <$> token Tok.Snd <* commit <*> term00
     <|>
+    (\p (id,p') -> Annot (makeSpan p p') (RecurseOn id)) <$> token Tok.RecurseOn <*> tokenWithText Tok.Ident
+    <|>
     binaryPrefix MuI <$> token Tok.MuI <*> term00 <*> term00
     <|>
     (\(nm,p) -> Annot p (NamedConstructor nm [])) <$> tokenWithText Tok.ConstructorName

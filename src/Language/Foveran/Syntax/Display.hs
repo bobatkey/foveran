@@ -152,6 +152,7 @@ data TermCon tm
 
     | NamedConstructor Ident [tm]
     | CasesOn          Bool tm [(Ident, [Pattern], tm)]
+    | RecurseOn        Ident
 
     {- Group stuff -}
     | Group      Ident Abelian (Maybe tm)

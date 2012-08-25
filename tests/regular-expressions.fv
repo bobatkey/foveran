@@ -38,8 +38,8 @@ acceptsEmpty : regexp -> Bool;
 acceptsEmpty r = recursionOn r with {
   `eps. `true;
   `emp. `false;
-  `alt r1 r2. or r1_rec r2_rec;
-  `seq r1 r2. and r1_rec r2_rec;
+  `alt r1 r2. or (recurseOn r1) (recurseOn r2);
+  `seq r1 r2. and (recurseOn r1) (recurseOn r2);
   `star r. `true;
   `tok s. `false }
 
@@ -47,13 +47,13 @@ step : regexp -> symbol -> regexp;
 step r s = recursionOn r with
   { `eps. `emp
   ; `emp. `emp
-  ; `alt r1 r2. `alt r1_rec r2_rec
+  ; `alt r1 r2. `alt (recurseOn r1) (recurseOn r2)
   ; `seq r1 r2.
     casesOn acceptsEmpty r1 with
-      { `true.  `alt (`seq r1_rec r2) r2_rec
-      ; `false. `seq r1_rec r2
+      { `true.  `alt (`seq (recurseOn r1) r2) (recurseOn r2)
+      ; `false. `seq (recurseOn r1) r2
       }
-  ; `star r. `seq r_rec (`star r)
+  ; `star r. `seq (recurseOn r) (`star r)
   ; `tok s'.
     casesOn symbol-eq s s' with
       { `true. `eps; `false. `emp }
@@ -72,14 +72,14 @@ listInduction : (A : Set) ->
 listInduction A P pnil pcons l =
   recursionOn l with
     { `nil. pnil
-    ; `cons a l. pcons a l l_rec
+    ; `cons a l. pcons a l (recurseOn l)
     }
 
 --------------------------------------------------------------------------------
 match : List symbol -> regexp -> Bool;
 match l = recursionOn l with
   { `nil.      \re. acceptsEmpty re
-  ; `cons s l. \re. l_rec (step re s)
+  ; `cons s l. \re. recurseOn l (step re s)
   }
 
 --------------------------------------------------------------------------------

@@ -18,7 +18,7 @@ import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import qualified Data.Map as M -- for doing the clauses in CasesOn
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor, (<+>))
-import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..))
+import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..), Binding (..), bindingOfPattern)
 import           Language.Foveran.Syntax.Display (Pattern (..))
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.LocalContext
@@ -644,18 +644,18 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
               makeClausesMap clauses (M.insert ident (patterns,tm) m)
 
   let mkPattern []           []                   =
-          do return ([PatNull], [PatNull]) -- for the index equality proof
+          do return ([BindNull], [BindNull]) -- for the index equality proof
       mkPattern (True:args)  (PatVar nm:patterns) =
           do (argPats,recPats) <- mkPattern args patterns
-             return (PatVar nm:argPats, PatVar (nm <+> "_rec"):recPats)
+             return (BindVar nm:argPats, BindRecur nm:recPats)
       mkPattern (True:args)  (PatNull:patterns) =
           do (argPats,recPats) <- mkPattern args patterns
-             return (PatNull:argPats, PatNull:recPats)
+             return (BindNull:argPats, BindNull:recPats)
       mkPattern (True:args)  (PatTuple _:patterns) =
           do raiseError p (OtherError "pattern match for recursive arguments must be plain variables")
       mkPattern (False:args) (pat:patterns) =
           do (argPats,recPats) <- mkPattern args patterns
-             return (pat:argPats, recPats)
+             return (bindingOfPattern pat:argPats, recPats)
 
   let mkEqRef []    = Annot p (Bound 1)
       mkEqRef (_:l) = Annot p (Proj2 (mkEqRef l))
@@ -667,7 +667,7 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
              (argPats, recPats) <- mkPattern args patterns
              
              let bindings' =
-                     (if isRecursive then PatTuple recPats else PatNull):PatTuple argPats:bindings
+                     (if isRecursive then BindTuple recPats else BindNull):BindTuple argPats:bindings
 
              return ( Annot p $ Lam "d" $ -- the data
                       Annot p $ Lam "r" $ -- the possible recursive calls
@@ -680,12 +680,12 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
       doCases [(ident,args)] clausesMap discrimVar bindings =
           do doCase ident args clausesMap bindings
       doCases ((ident,args):idents) clausesMap discrimVar bindings =
-          do let bindings' = PatNull:bindings
+          do let bindings' = BindNull:bindings
              (thisCase,clausesMap')   <- doCase  ident args clausesMap bindings'
              (otherCases,clausesMap'') <- doCases idents clausesMap' (Annot p (Bound 0)) bindings'
              return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases, clausesMap'')
 
-  let basicBindings = [PatNull,PatNull,PatNull] -- the three things bound by the 'eliminate' construct
+  let basicBindings = [BindNull,BindNull,BindNull] -- the three things bound by the 'eliminate' construct
       discrimVar    = Annot p (Proj1 (Annot p (Bound 1)))
   clausesMap          <- makeClausesMap clauses M.empty
   (cases,clausesMap') <- doCases constructorInfo clausesMap discrimVar basicBindings

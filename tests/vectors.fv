@@ -5,7 +5,7 @@ data Nat : Set where
 add : Nat -> Nat -> Nat
 add n1 n2 = recursionOn n1 with
   { `zero.   n2
-  ; `succ n. `succ n_rec
+  ; `succ n. `succ (recurseOn n)
   }
 
 normalise add (`succ `zero) (`succ `zero)
@@ -13,14 +13,14 @@ normalise add (`succ `zero) (`succ `zero)
 add-zero : (n : Nat) -> n == add n `zero
 add-zero n = inductionOn n with
   { `zero. refl
-  ; `succ n. rewriteBy n_rec then refl
+  ; `succ n. rewriteBy (inductionHypothesisFor n) then refl
   }
 
 add-succ : (n1 n2 : Nat) -> add n1 (`succ n2) == `succ (add n1 n2) : Nat
 add-succ n1 n2 =
   inductionOn n1 with
     { `zero. refl
-    ; `succ n. rewriteBy n_rec then refl
+    ; `succ n. rewriteBy inductionHypothesisFor n then refl
     }
 
 symmetry : (n1 n2 : Nat) -> n1 == n2 -> n2 == n1
@@ -33,7 +33,7 @@ add-comm n1 n2 =
       rewriteBy add-zero n2 then
       refl
     ; `succ n.
-      rewriteBy symmetry (add n n2) (add n2 n) n_rec then
+      rewriteBy symmetry (add n n2) (add n2 n) (inductionHypothesisFor n) then
       rewriteBy add-succ n2 n then
       refl
     }
@@ -41,7 +41,7 @@ add-comm n1 n2 =
 add-assoc : (n1 n2 n3 : Nat) -> add n1 (add n2 n3) == add (add n1 n2) n3
 add-assoc n1 n2 n3 = inductionOn n1 with
   { `zero.   refl
-  ; `succ n. rewriteBy n_rec then refl
+  ; `succ n. rewriteBy (inductionHypothesisFor n) then refl
   }
 
 zero_ne_succ : (n : Nat) -> `zero : Nat == `succ n : Nat -> Empty
@@ -73,7 +73,7 @@ nat_eq_dec n1 =
       casesOn n2 with
         { `zero.    inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
         ; `succ n2.
-          case n1_rec n2 with
+          case recurseOn n1 n2 with
             { inl eq.  rewriteBy eq then inl refl
             ; inr neq. inr (\eq. neq (inj n1 n2 eq))
             }
@@ -93,7 +93,7 @@ append : (A : Set) ->
 append A n1 n2 v1 v2 =
   recursionOn v1 with
     { `nil. v2
-    ; `cons n a v. `cons (add n n2) a v_rec
+    ; `cons n a v. `cons (add n n2) a (recurseOn v)
     }
 
 reverse : (A : Set) ->
@@ -106,7 +106,7 @@ reverse A n v =
     ; `cons n a v.
       rewriteBy symmetry n (add n `zero) (add-zero n) then
       rewriteBy add-succ n `zero then
-      append A n (`succ `zero) v_rec (`cons `zero a `nil)
+      append A n (`succ `zero) (recurseOn v) (`cons `zero a `nil)
     }
 
 assume B : Set

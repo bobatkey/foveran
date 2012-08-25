@@ -5,7 +5,7 @@ data Type : Set where
 semType : Type -> Set -> Set
 semType T A = recursionOn T with
   { `base. A
-  ; `arr T1 T2. T1_rec -> T2_rec
+  ; `arr T1 T2. recurseOn T1 -> recurseOn T2
   }
 
 --------------------------------------------------------------------------------
@@ -15,8 +15,8 @@ data Context : Set where
 
 semContext : Context -> Set -> Set
 semContext C A = recursionOn C with
-  { `eps. Unit
-  ; `ext G T. G_rec × semType T A
+  { `eps.     Unit
+  ; `ext G T. recurseOn G × semType T A
   }
 
 --------------------------------------------------------------------------------

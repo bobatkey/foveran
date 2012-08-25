@@ -4,6 +4,8 @@ module Language.Foveran.Syntax.LocallyNameless
     ( TermPos
     , TermCon (..)
     , GlobalFlag (..)
+    , Binding (..)
+    , bindingOfPattern
     , Abelian (..)
     , toLocallyNamelessClosed
     , toLocallyNameless
@@ -26,6 +28,13 @@ type TermPos' p = AnnotRec p TermCon
 data GlobalFlag
     = IsGlobal
     | IsLocal
+    deriving Show
+
+data Binding
+    = BindVar   Ident
+    | BindTuple [Binding]
+    | BindNull
+    | BindRecur Ident
     deriving Show
 
 data TermCon tm
@@ -77,7 +86,7 @@ data TermCon tm
   | Eliminate  tm (Maybe (Ident, Ident, tm)) Ident Ident Ident tm
 
   | NamedConstructor Ident [tm]
-  | CasesOn          Bool tm [(Ident, [DS.Pattern], [DS.Pattern] -> tm)]
+  | CasesOn          Bool tm [(Ident, [DS.Pattern], [Binding] -> tm)]
     -- a suspended conversion to locally nameless, waiting for the additional variables to be bound
 
   | Group      Ident Abelian (Maybe tm)
@@ -96,55 +105,74 @@ data TermCon tm
 instance Show (TermPos' p) where
     show (Annot p t) = "(" ++ show t ++ ")"
 
+identOfPattern :: DS.Pattern -> Ident
 identOfPattern (DS.PatVar nm)  = nm
 identOfPattern (DS.PatTuple _) = "p" -- FIXME: concatenate all the names, or something
 identOfPattern DS.PatNull      = "__x"
 
-lookupVarInPattern :: Ident -> DS.Pattern -> FM TermCon a -> Maybe (FM TermCon a)
-lookupVarInPattern nm DS.PatNull      t =
+bindingOfPattern :: DS.Pattern -> Binding
+bindingOfPattern (DS.PatVar nm)         = BindVar nm
+bindingOfPattern (DS.PatTuple patterns) = BindTuple (map bindingOfPattern patterns)
+bindingOfPattern DS.PatNull             = BindNull
+
+--------------------------------------------------------------------------------
+data Var -- FIXME: not sure if this the best way of doing things
+    = VarNormal  Ident
+    | VarRecurse Ident
+    deriving Eq
+
+lookupVarInBinding :: Var -> Binding -> FM TermCon a -> Maybe (FM TermCon a)
+lookupVarInBinding v BindNull t =
     Nothing
-lookupVarInPattern nm (DS.PatVar nm') t
-    | nm == nm' = Just t
-    | otherwise = Nothing
-lookupVarInPattern nm (DS.PatTuple l) t =
-    lookupVarInTuplePattern l t
+lookupVarInBinding v (BindRecur nm) t
+    | v == VarRecurse nm = Just t
+    | otherwise          = Nothing
+lookupVarInBinding v (BindVar nm) t
+    | v == VarNormal nm  = Just t
+    | otherwise          = Nothing
+lookupVarInBinding v (BindTuple l) t =
+    lookupVarInTupleBinding l t
     where
-      lookupVarInTuplePattern []     t =
+      lookupVarInTupleBinding []     t =
           Nothing
-      lookupVarInTuplePattern [p]    t =
-          lookupVarInPattern nm p t
-      lookupVarInTuplePattern (p:ps) t =
-          lookupVarInPattern nm p (Layer $ Proj1 t)
+      lookupVarInTupleBinding [b]    t =
+          lookupVarInBinding v b t
+      lookupVarInTupleBinding (b:bs) t =
+          lookupVarInBinding v b (Layer $ Proj1 t)
           <|>
-          lookupVarInTuplePattern ps (Layer $ Proj2 t)
+          lookupVarInTupleBinding bs (Layer $ Proj2 t)
 
-lookupVar :: Ident -> [DS.Pattern] -> Int -> Maybe (FM TermCon a)
-lookupVar nm []     k = Nothing
-lookupVar nm (p:ps) k = lookupVarInPattern nm p (Layer $ Bound k) <|> lookupVar nm ps (k+1)
+lookupVar :: Var -> [Binding] -> Int -> Maybe (FM TermCon a)
+lookupVar v []     k = Nothing
+lookupVar v (b:bs) k =
+    lookupVarInBinding v b (Layer $ Bound k)
+    <|>
+    lookupVar v bs (k+1)
 
-toLN :: DS.TermCon ([DS.Pattern] -> a) -> [DS.Pattern] -> FM TermCon a
-toLN (DS.Var nm)          bv = case lookupVar nm bv 0 of
+--------------------------------------------------------------------------------
+toLN :: DS.TermCon ([Binding] -> a) -> [Binding] -> FM TermCon a
+toLN (DS.Var nm)          bv = case lookupVar (VarNormal nm) bv 0 of
                                  Nothing -> Layer $ Free nm IsGlobal
                                  Just t  -> t
 toLN (DS.Lam nms body)    bv = doBinders nms bv
     where
       doBinders []      bv = return $ body bv
-      doBinders (p:nms) bv = Layer $ Lam (identOfPattern p) (doBinders nms (p:bv))
+      doBinders (p:nms) bv = Layer $ Lam (identOfPattern p) (doBinders nms (bindingOfPattern p:bv))
 toLN (DS.App t ts)        bv = doApplications (return $ t bv) ts
     where doApplications tm []     = tm
           doApplications tm (t:ts) = doApplications (Layer $ App tm (return $ t bv)) ts
 toLN (DS.Set i)           bv = Layer $ Set i
 toLN (DS.Pi bs t)         bv = doArrows bs bv
     where doArrows []            bv = return $ t bv
-          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (return $ t1 bv) (doArrows bs (DS.PatNull:bv))
+          doArrows (([],t1):bs)  bv = Layer $ Pi Nothing (return $ t1 bv) (doArrows bs (BindNull:bv))
           doArrows ((nms,t1):bs) bv = doNames nms t1 bv (doArrows bs)
 
-          doNames  []       t1 bv k = k bv
-          doNames  (nm:nms) t1 bv k = Layer $ Pi (Just $ identOfPattern nm) (return $ t1 bv) (doNames nms t1 (nm:bv) k)
+          doNames  []     t1 bv k = k bv
+          doNames  (p:ps) t1 bv k = Layer $ Pi (Just $ identOfPattern p) (return $ t1 bv) (doNames ps t1 (bindingOfPattern p:bv) k)
 toLN (DS.Sigma nms t1 t2) bv = doBinders nms bv
     where doBinders []       bv = return   $ t2 bv
-          doBinders (nm:nms) bv = Layer $ Sigma (Just $ identOfPattern nm) (return $ t1 bv) (doBinders nms (nm:bv))
-toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ t2 (DS.PatNull:bv))
+          doBinders (nm:nms) bv = Layer $ Sigma (Just $ identOfPattern nm) (return $ t1 bv) (doBinders nms (bindingOfPattern nm:bv))
+toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ t2 (BindNull:bv))
 toLN (DS.Tuple tms)       bv = doTuple tms
     where doTuple []       = Layer $ UnitI
           doTuple [tm]     = Var $ tm bv
@@ -158,16 +186,16 @@ toLN (DS.Case t1 Nothing y t3 z t4) bv =
     Layer $ Case (return $ t1 bv)
                  Nothing
                  (identOfPattern y)
-                 (return $ t3 (y:bv))
+                 (return $ t3 (bindingOfPattern y:bv))
                  (identOfPattern z)
-                 (return $ t4 (z:bv))
+                 (return $ t4 (bindingOfPattern z:bv))
 toLN (DS.Case t1 (Just (x, t2)) y t3 z t4) bv =
     Layer $ Case (return $ t1 bv)
-                 (Just (x, return $ t2 (DS.PatVar x:bv)))
+                 (Just (x, return $ t2 (BindVar x:bv)))
                  (identOfPattern y)
-                 (return $ t3 (y:bv))
+                 (return $ t3 (bindingOfPattern y:bv))
                  (identOfPattern z)
-                 (return $ t4 (z:bv))
+                 (return $ t4 (bindingOfPattern z:bv))
 toLN DS.Unit              bv = Layer $ Unit Nothing
 toLN DS.UnitI             bv = Layer $ UnitI
 toLN DS.Empty             bv = Layer $ Empty
@@ -178,7 +206,7 @@ toLN (DS.Eq t1 t2)        bv = Layer $ Eq (return $ t1 bv) (return $ t2 bv)
 toLN DS.Refl              bv = Layer $ Refl
 toLN (DS.ElimEq t t1 t2) bv =
     Layer $ ElimEq (return $ t bv)
-                   ((\(x,y,t1) -> (x, y, return $ t1 (DS.PatVar y:DS.PatVar x:bv))) <$> t1)
+                   ((\(x,y,t1) -> (x, y, return $ t1 (BindVar y:BindVar x:bv))) <$> t1)
                    (return $ t2 bv)
 
 toLN DS.Desc              bv = Layer $ Desc
@@ -197,30 +225,30 @@ toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (return $ t bv)
 toLN (DS.IDesc_Sg t1 t2)  bv = Layer $ IDesc_Sg (return $ t1 bv) (return $ t2 bv)
 toLN (DS.IDesc_Pi t1 t2)  bv = Layer $ IDesc_Pi (return $ t1 bv) (return $ t2 bv)
 toLN (DS.IDesc_Bind t1 x t2) bv =
-    Layer $ IDesc_Bind (return $ t1 bv) (identOfPattern x) (return $ t2 (x:bv))
+    Layer $ IDesc_Bind (return $ t1 bv) (identOfPattern x) (return $ t2 (bindingOfPattern x:bv))
 toLN DS.IDesc_Elim        bv = Layer $ IDesc_Elim
 toLN (DS.SemI tD x tA)    bv =
-    Layer $ SemI (return $ tD bv) (identOfPattern x) (return $ tA (x:bv))
+    Layer $ SemI (return $ tD bv) (identOfPattern x) (return $ tA (bindingOfPattern x:bv))
 toLN (DS.MapI tD i1 tA i2 tB tf tx) bv =
     Layer $ MapI (return $ tD bv)
-                 (identOfPattern i1) (return $ tA (i1:bv))
-                 (identOfPattern i2) (return $ tB (i2:bv))
+                 (identOfPattern i1) (return $ tA (bindingOfPattern i1:bv))
+                 (identOfPattern i2) (return $ tB (bindingOfPattern i2:bv))
                  (return $ tf bv)
                  (return $ tx bv)
 toLN (DS.LiftI tD i tA i' a tP tx) bv =
     Layer $ LiftI (return $ tD bv)
-                  (identOfPattern i) (return $ tA (i:bv))
-                  (identOfPattern i') (identOfPattern a) (return $ tP (a:i':bv))
+                  (identOfPattern i) (return $ tA (bindingOfPattern i:bv))
+                  (identOfPattern i') (identOfPattern a) (return $ tP (bindingOfPattern a:bindingOfPattern i':bv))
                   (return $ tx bv)
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
 toLN DS.InductionI        bv = Layer $ InductionI
 toLN (DS.Eliminate t tP i x p tK) bv =
     Layer $ Eliminate (return $ t bv)
-                      ((\(x,y,t) -> (identOfPattern x, identOfPattern y, return $ t (y:x:bv))) <$> tP)
+                      ((\(x,y,t) -> (identOfPattern x, identOfPattern y, return $ t (bindingOfPattern y:bindingOfPattern x:bv))) <$> tP)
                       (identOfPattern i)
                       (identOfPattern x)
                       (identOfPattern p)
-                      (return $ tK (p:x:i:bv))
+                      (return $ tK (bindingOfPattern p:bindingOfPattern x:bindingOfPattern i:bv))
 
 toLN (DS.NamedConstructor nm tms) bv =
     Layer $ NamedConstructor nm (map (\t -> return (t bv)) tms)
@@ -228,7 +256,10 @@ toLN (DS.CasesOn isRecursive tm clauses) bv =
     Layer $ CasesOn isRecursive
                     (return $ tm bv)
                     (map (\(ident,patterns,tm) -> (ident,patterns,\bv' -> return $ tm (bv' ++ bv))) clauses)
-
+toLN (DS.RecurseOn nm) bv =
+    case lookupVar (VarRecurse nm) bv 0 of
+      Nothing -> Layer $ Free nm IsGlobal -- FIXME: should really throw an error
+      Just t  -> t
 
 toLN (DS.TypeAscrip t1 t2) bv = Layer $ TypeAscrip (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
@@ -244,7 +275,7 @@ toLN (DS.Hole nm tms)     bv = Layer $ Hole nm (map (\t -> return (t bv)) tms)
 toLocallyNamelessClosed :: AnnotRec a DS.TermCon -> AnnotRec a TermCon
 toLocallyNamelessClosed t = translateStar toLN t []
 
-toLocallyNameless :: AnnotRec a DS.TermCon -> [DS.Pattern] -> AnnotRec a TermCon
+toLocallyNameless :: AnnotRec a DS.TermCon -> [Binding] -> AnnotRec a TermCon
 toLocallyNameless t = translateStar toLN t
 
 {------------------------------------------------------------------------------}

@@ -12,8 +12,8 @@ toIDesc D A _ = recursionOn D with
   { `K1. "K" Unit
   ; `K0. "K" Empty
   ; `Id. "IId" ()
-  ; `Sum D1 D2. "Sg" (Unit + Unit) (\c. case c with { inl _. D1_rec; inr _. D2_rec })
-  ; `Times D1 D2. D1_rec “×” D2_rec
+  ; `Sum D1 D2. "Sg" (Unit + Unit) (\c. case c with { inl _. recurseOn D1; inr _. recurseOn D2 })
+  ; `Times D1 D2. recurseOn D1 “×” recurseOn D2
   ; `D. "K" A
   }
 
@@ -22,8 +22,8 @@ differentiate D = recursionOn D with
   { `K1.          `K0
   ; `K0.          `K0
   ; `Id.          `K1
-  ; `Times D1 D2. `Sum (`Times D1_rec D2) (`Times D1 D2_rec)
-  ; `Sum D1 D2.   `Sum D1_rec D2_rec
+  ; `Times D1 D2. `Sum (`Times (recurseOn D1) D2) (`Times D1 (recurseOn D2))
+  ; `Sum D1 D2.   `Sum (recurseOn D1) (recurseOn D2)
   ; `D.           `K0
   }
 

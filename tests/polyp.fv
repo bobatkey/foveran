@@ -18,8 +18,8 @@ elimCode : (P : Code -> Set 2) ->
 elimCode P Pparam Prec Ppair Psum Punit c = recursionOn c with
   { `param.      Pparam
   ; `rec.        Prec
-  ; `pair c1 c2. Ppair c1 c2 c1_rec c2_rec
-  ; `sum  c1 c2. Psum c1 c2 c1_rec c2_rec
+  ; `pair c1 c2. Ppair c1 c2 (recurseOn c1) (recurseOn c2)
+  ; `sum  c1 c2. Psum c1 c2 (recurseOn c1) (recurseOn c2)
   ; `u.          Punit
   }
 
@@ -27,8 +27,8 @@ toDesc : Code -> Set -> Unit -> IDesc Unit
 toDesc C A _ = recursionOn C with
   { `param. "K" A
   ; `rec.   "IId" ()
-  ; `pair c1 c2. c1_rec “×” c2_rec
-  ; `sum  c1 c2. "Sg" (Unit + Unit) (\c. case c with { inl _. c1_rec; inr _. c2_rec })
+  ; `pair c1 c2. recurseOn c1 “×” recurseOn c2
+  ; `sum  c1 c2. "Sg" (Unit + Unit) (\c. case c with { inl _. recurseOn c1; inr _. recurseOn c2 })
   ; `u.     "K" Unit
   }
 
@@ -46,12 +46,12 @@ mapC : (C : Code) ->
 mapC C A B f X = recursionOn C with
   { `param. f
   ; `rec.   \x. x
-  ; `pair c1 c2. \«a1,a2». «c1_rec a1, c2_rec a2»
+  ; `pair c1 c2. \«a1,a2». «recurseOn c1 a1, recurseOn c2 a2»
   ; `sum  c1 c2. \«c,a».
     generalise a then
     case c with
-      { inl _. \a. «inl (), c1_rec a»
-      ; inr _. \a. «inr (), c2_rec a»
+      { inl _. \a. «inl (), recurseOn c1 a»
+      ; inr _. \a. «inr (), recurseOn c2 a»
       }
   ; `u.     \x. x
   }

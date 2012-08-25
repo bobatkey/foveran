@@ -140,6 +140,7 @@ pprint (CasesOn isRecursive t clauses)      =
 
           doClause (ident, patterns, tm) =
               sep [ppIdent ident <+> ppPatterns patterns <> ".", nest 2 tm]
+pprint (RecurseOn nm) = paren 01 ("recurseOn" <+> ppIdent nm)
 
 pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"

@@ -81,6 +81,7 @@ data Token
     | Generalise
     | CasesOn
     | RecursionOn
+    | RecurseOn
 
     | Group
     | AbGroup
@@ -167,6 +168,7 @@ instance SyntaxHighlight Token where
     lexicalClass Generalise  = Keyword
     lexicalClass CasesOn     = Keyword
     lexicalClass RecursionOn = Keyword
+    lexicalClass RecurseOn   = Keyword
     lexicalClass Where       = Keyword
     lexicalClass In          = Keyword
     lexicalClass Underscore  = Punctuation
@@ -253,6 +255,7 @@ instance Show Token where
   show Generalise  = "generalise"
   show CasesOn     = "casesOn"
   show RecursionOn = "recursionOn"
+  show RecurseOn   = "recurseOn"
   show Normalise   = "normalise"
   show Where       = "where"
   show In          = "in"

@@ -13,19 +13,19 @@ map : (A B : Set) ->
       List B
 map A B f l = recursionOn l with
   { `nil.      `nil
-  ; `cons a l. `cons (f a) l_rec
+  ; `cons a l. `cons (f a) (recurseOn l)
   }
 
 length : (A : Set) -> List A -> Nat
 length A l = recursionOn l with
   { `nil.      `zero
-  ; `cons a l. `succ l_rec
+  ; `cons a l. `succ (recurseOn l)
   }
 
 append : (A : Set) -> List A -> List A -> List A
 append A l1 l2 = recursionOn l1 with
   { `nil. l2
-  ; `cons a l. `cons a l_rec
+  ; `cons a l. `cons a (recurseOn l)
   }
 
 symmetry : (A : Set) -> (a1 a2 : A) -> a1 == a2 -> a2 == a1
@@ -37,7 +37,7 @@ append-nil A l = inductionOn l with
   ; `cons a l.
     -- have inductionHypothesisFor l : append A l `nil == l and
     -- goalIs `cons a (append A l `nil) == `cons a l so
-    rewriteBy symmetry (List A) (append A l `nil) l l_rec then
+    rewriteBy symmetry (List A) (append A l `nil) l (inductionHypothesisFor l) then
     refl
   }
 
@@ -47,13 +47,13 @@ append-assoc :
   append A l1 (append A l2 l3) == append A (append A l1 l2) l3
 append-assoc A l1 l2 l3 = inductionOn l1 with
   { `nil.      refl
-  ; `cons a l. rewriteBy l_rec {- inductionHypothesisFor l -} then refl
+  ; `cons a l. rewriteBy inductionHypothesisFor l then refl
   }
 
 reverse-body : (A : Set) -> List A -> List A -> List A
 reverse-body A l = recursionOn l with
   { `nil.      \acc. acc
-  ; `cons a l. \acc. l_rec (`cons a acc)
+  ; `cons a l. \acc. recurseOn l (`cons a acc)
   }
 
 reverse : (A : Set) -> List A -> List A
@@ -62,7 +62,7 @@ reverse A l = reverse-body A l `nil
 slowreverse : (A : Set) -> List A -> List A
 slowreverse A l = recursionOn l with
   { `nil.      `nil
-  ; `cons a l. append A l_rec (`cons a `nil)
+  ; `cons a l. append A (recurseOn l) (`cons a `nil)
   }
 
 lem : (A : Set) -> (l1 l2 : List A) -> reverse-body A l1 l2 == append A (slowreverse A l1) l2
@@ -70,7 +70,7 @@ lem A l1 = inductionOn l1 with
   { `nil. \l2. refl
   ; `cons a l. \l2.
     rewriteBy append-assoc A (slowreverse A l) (`cons a `nil) l2 then
-    rewriteBy l_rec (`cons a l2) then
+    rewriteBy inductionHypothesisFor l (`cons a l2) then
     refl
   }
 
@@ -95,7 +95,7 @@ find A predicate l =
     { `nil. `nothing
     ; `cons a l. casesOn predicate a with
       { `true. `just a
-      ; `false. l_rec
+      ; `false. recurseOn l
       }
     }
 
@@ -104,8 +104,8 @@ filter A predicate l =
   recursionOn l with
     { `nil. `nil
     ; `cons a l. casesOn predicate a with
-      { `true.  `cons a l_rec
-      ; `false. l_rec
+      { `true.  `cons a (recurseOn l)
+      ; `false. recurseOn l
       }
     }
 
@@ -122,7 +122,7 @@ All : (A : Set) ->
       Set
 All A P l = recursionOn l with
   { `nil. Unit
-  ; `cons a l. P a × l_rec
+  ; `cons a l. P a × recurseOn l
   }
 
 informative-bool : (b : Bool) -> (`true : Bool == b) + (`false : Bool == b)
@@ -141,8 +141,13 @@ filter-lem A predicate l =
     { `nil. ()
     ; `cons a l.
       case informative-bool (predicate a) with
-        { inl isTrue. rewriteBy isTrue then rewriteBy isTrue then «`yes,l_rec»
-        ; inr isFalse. rewriteBy isFalse then l_rec
+        { inl isTrue.
+          rewriteBy isTrue then
+          rewriteBy isTrue then
+          «`yes,inductionHypothesisFor l»
+        ; inr isFalse.
+          rewriteBy isFalse then
+          inductionHypothesisFor l
         }
     }
 
