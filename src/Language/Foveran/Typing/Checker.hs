@@ -15,6 +15,7 @@ import           Control.Monad.Reader (ReaderT, runReaderT, ask, local)
 import           Control.Monad.State (StateT, runStateT, get, modify)
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
+import qualified Data.Map as M -- for doing the clauses in CasesOn
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
 import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..))
@@ -595,8 +596,12 @@ hasType (Annot p (CasesOn x clauses)) v = do
         VMuI vI vD vi -> getConstructorNames vI vD vi p
         _             -> raiseError p (OtherError "cannot do cases on non-inductive datatype")
 
-  -- For now, assume that the clauses are in the same order as the
-  -- constructors in the description...
+  let makeClausesMap [] m = return m
+      makeClausesMap ((ident,patterns,tm):clauses) m =
+          if M.member ident m then
+              raiseError p (OtherError $ "duplicate constructor names: " ++ show ident)
+          else
+              makeClausesMap clauses (M.insert ident (patterns,tm) m)
 
   -- add a null pattern at the end for the equality proof
   let mkPattern patterns = PatTuple (patterns ++ [PatNull])
@@ -609,24 +614,28 @@ hasType (Annot p (CasesOn x clauses)) v = do
           Annot p $ ElimEq (mkEqRef patterns) Nothing $
           tm (PatNull:mkPattern patterns:bindings)
 
-  let doCases []             []                     discrimVar bindings =
-          do return (Annot p $ ElimEmpty discrimVar Nothing)
-      doCases [ident]        [(ident',patterns,tm)] discrimVar bindings =
-          do unless (ident == ident') $ raiseError p (OtherError "incorrect constructor name")
-             return (doCase patterns tm bindings)
-      doCases (ident:idents) ((ident',patterns,tm):clauses) discrimVar bindings =
-          do unless (ident == ident') $ raiseError p (OtherError "incorrect constructor name")
+  let doCases [] clausesMap discrimVar bindings =
+          do return (Annot p $ ElimEmpty discrimVar Nothing, clausesMap)
+      doCases [ident] clausesMap discrimVar bindings =
+          do (patterns,tm) <- case M.lookup ident clausesMap of
+                                Nothing -> raiseError p (OtherError $ "constructor " ++ show ident ++ " not handled")
+                                Just x  -> return x
+             return (doCase patterns tm bindings, M.delete ident clausesMap)
+      doCases (ident:idents) clausesMap discrimVar bindings =
+          do (patterns,tm) <- case M.lookup ident clausesMap of
+                                Nothing -> raiseError p (OtherError $ "constructor " ++ show ident ++ " not handled")
+                                Just x  -> return x
              let bindings' = PatNull:bindings
              let thisCase  = doCase patterns tm bindings'
-             otherCases <- doCases idents clauses (Annot p (Bound 0)) bindings'
-             return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases)
-      doCases (ident:idents) []                     discrimVar bindings =
-          raiseError p (OtherError "Not all cases covered")
-      doCases []             _                      discrimVar bindings =
-          raiseError p (OtherError "Too many clauses")
+             (otherCases,clausesMap') <- doCases idents (M.delete ident clausesMap) (Annot p (Bound 0)) bindings'
+             return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases, clausesMap')
 
   let basicBindings = [PatNull,PatNull,PatNull] -- the three things bound by the 'eliminate' construct
-  cases <- doCases constructorNames clauses (Annot p (Proj1 (Annot p (Bound 1)))) basicBindings
+  clausesMap          <- makeClausesMap clauses M.empty
+  (cases,clausesMap') <- doCases constructorNames clausesMap (Annot p (Proj1 (Annot p (Bound 1)))) basicBindings
+
+  unless (M.size clausesMap' == 0) $ do
+    raiseError p (OtherError $ "extra cases supplied")
 
   let desugared =
           Annot p $ Eliminate x Nothing "i" "x" "r" $

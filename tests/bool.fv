@@ -13,8 +13,8 @@ data Maybe (A : Set) : Set where
 mapMaybe : (A B : Set) -> (A -> B) -> Maybe A -> Maybe B
 mapMaybe A B f x =
   casesOn x with
-    { `just a.  `just (f a)
-    ; `nothing. `nothing
+    { `nothing. `nothing
+    ; `just a.  `just (f a)
     }
 
 --------------------------------------------------------------------------------
