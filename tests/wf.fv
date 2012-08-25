@@ -14,12 +14,10 @@ symmetry n1 n2 eq = rewriteBy eq then refl
 
 lt : Nat -> Nat -> Set
 lt n1 n2 =
-  eliminate n2 with _ «c,d» _.
-    generalise d then
-    case c with
-      { inl _. \eq.     rewriteBy eq then Empty
-      ; inr _. \«n,eq». rewriteBy eq then n1 == n
-      }
+  casesOn n2 with
+    { `zero.   Empty
+    ; `succ n. n1 == n
+    }
 
 nat_lt_wf : wf Nat lt
 nat_lt_wf n =
