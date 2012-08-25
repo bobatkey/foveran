@@ -179,7 +179,7 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
       doc = ("data" <+>
              ppIdent (dataName d) <+>
              hsep [ "(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" | DataParameter _ nm t <- dataParameters d ] <+>
-             ":" <+> fromMaybe "" (fromDoc . ppAnnotTermLev 9 <$> dataIndexType d) <+> "->" <+> "Set" <+> "where")
+             ":" <> fromMaybe "" (fmap ((" " <>) . (<+> "->") . fromDoc . ppAnnotTermLev 9) (dataIndexType d)) <+> "Set" <+> "where")
             $$ nest 2 (doConstructors (dataConstructors d))
 
       doConstructors []     = "{ };"
