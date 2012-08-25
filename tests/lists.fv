@@ -56,4 +56,157 @@ append A l1 l2 =
       ; inr _. \«a,_,_» «xs,_». `cons a xs
       }
 
+symmetry : (A : Set) -> (a1 a2 : A) -> a1 == a2 -> a2 == a1
+symmetry A a1 a2 eq = rewriteBy eq then refl
+
+append-nil : (A : Set) -> (l : List A) -> append A l `nil == l
+append-nil A l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq       _.     rewriteBy eq then refl
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then rewriteBy symmetry (List A) (append A l `nil) l r then refl
+      }
+
+append-assoc :
+  (A : Set) ->
+  (l1 l2 l3 : List A) ->
+  append A l1 (append A l2 l3) == append A (append A l1 l2) l3
+append-assoc A l1 l2 l3 =
+  eliminate l1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq       _.     rewriteBy eq then refl
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then rewriteBy r then refl
+      }
+
+reverse-body : (A : Set) -> List A -> List A -> List A
+reverse-body A l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq       _.     rewriteBy eq then \acc. acc
+      ; inr _. \«a,l,eq» «f,_». rewriteBy eq then \acc. f (`cons a acc)
+      }
+
+reverse : (A : Set) -> List A -> List A
+reverse A l = reverse-body A l `nil
+
+slowreverse : (A : Set) -> List A -> List A
+slowreverse A l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then `nil
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then append A r (`cons a `nil)
+      }
+
+lem : (A : Set) -> (l1 l2 : List A) -> reverse-body A l1 l2 == append A (slowreverse A l1) l2
+lem A l1 =
+  eliminate l1 with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _.
+        rewriteBy eq then \_. refl
+      ; inr _. \«a,l,eq» «ih,_».
+        rewriteBy eq then \l2.
+        rewriteBy append-assoc A (slowreverse A l) (`cons a `nil) l2 then
+        rewriteBy ih (`cons a l2) then
+        refl
+      }
+
+reverses-agree : (A : Set) -> (l : List A) -> reverse A l == slowreverse A l
+reverses-agree A l =
+  rewriteBy symmetry (List A) (reverse-body A l `nil) (append A (slowreverse A l) `nil) (lem A l `nil) then 
+  rewriteBy symmetry (List A) (append A (slowreverse A l) `nil) (slowreverse A l) (append-nil A (slowreverse A l)) then
+  refl
+
+--------------------------------------------------------------------------------
+data Bool : Set where
+  `true  : Bool
+  `false : Bool
+
+data Maybe (A : Set) : Set where
+  `nothing : Maybe A
+  `just    : A -> Maybe A
+
+find : (A : Set) -> (predicate : A -> Bool) -> List A -> Maybe A
+find A predicate l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq       _.     rewriteBy eq then `nothing
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then
+        eliminate predicate a with _ «c,_» _.
+          case c with
+            { inl _. `just a
+            ; inr _. r
+            }
+      }
+
+filter : (A : Set) -> (predicate : A -> Bool) -> List A -> List A
+filter A predicate l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then `nil
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then
+        eliminate predicate a with _ «c,_» _.
+          case c with
+            { inl _. `cons a r
+            ; inr _. r
+            }
+      }
+
+--------------------------------------------------------------------------------
+data IsTrue : Bool -> Set where
+  `yes : IsTrue `true
+
+All : (A : Set) ->
+      (P : A -> Set) ->
+      List A ->
+      Set
+All A P l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. Unit
+      ; inr _. \«a,l,eq» «r,_». P a × r
+      }
+
+informative-bool : (b : Bool) -> (`true : Bool == b) + (`false : Bool == b)
+informative-bool b =
+  eliminate b with _ «c,d» _.
+    generalise d then
+    case c with
+      { inl _. \eq. rewriteBy eq then inl refl
+      ; inr _. \eq. rewriteBy eq then inr refl
+      }
+
+filter-lem : (A : Set) ->
+             (predicate : A -> Bool) ->
+             (l : List A) ->
+             All A (\a. IsTrue (predicate a)) (filter A predicate l)
+filter-lem A predicate l =
+  eliminate l with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then ()
+      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then
+        case informative-bool (predicate a) with
+          { inl isTrue.  rewriteBy isTrue then rewriteBy isTrue then «`yes,r»
+          ; inr isFalse. rewriteBy isFalse then r
+          }
+      }
+
+--------------------------------------------------------------------------------
 ;
