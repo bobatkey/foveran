@@ -72,6 +72,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "then" :==>            emit Then
     , "absurdBy" :==>        emit AbsurdBy
     , "generalise" :==>      emit Generalise
+    , "casesOn" :==>         emit CasesOn
     , "semI" :==>            emit SemI
     , "liftI" :==>           emit LiftI
     , "mapI" :==>            emit MapI

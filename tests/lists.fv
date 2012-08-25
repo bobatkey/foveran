@@ -143,11 +143,10 @@ find A predicate l =
     case c with
       { inl _. \eq       _.     rewriteBy eq then `nothing
       ; inr _. \«a,l,eq» «r,_». rewriteBy eq then
-        eliminate predicate a with _ «c,_» _.
-          case c with
-            { inl _. `just a
-            ; inr _. r
-            }
+        casesOn predicate a with
+          { `true.  `just a
+          ; `false. r
+          }
       }
 
 filter : (A : Set) -> (predicate : A -> Bool) -> List A -> List A
@@ -158,11 +157,10 @@ filter A predicate l =
     case c with
       { inl _. \eq _. rewriteBy eq then `nil
       ; inr _. \«a,l,eq» «r,_». rewriteBy eq then
-        eliminate predicate a with _ «c,_» _.
-          case c with
-            { inl _. `cons a r
-            ; inr _. r
-            }
+        casesOn predicate a with
+          { `true.  `cons a r
+          ; `false. r
+          }
       }
 
 --------------------------------------------------------------------------------
@@ -184,12 +182,10 @@ All A P l =
 
 informative-bool : (b : Bool) -> (`true : Bool == b) + (`false : Bool == b)
 informative-bool b =
-  eliminate b with _ «c,d» _.
-    generalise d then
-    case c with
-      { inl _. \eq. rewriteBy eq then inl refl
-      ; inr _. \eq. rewriteBy eq then inr refl
-      }
+  casesOn b with
+    { `true.  inl refl
+    ; `false. inr refl
+    }
 
 filter-lem : (A : Set) ->
              (predicate : A -> Bool) ->

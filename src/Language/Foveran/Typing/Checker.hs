@@ -18,6 +18,7 @@ import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import           Text.Position (Span)
 import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
 import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..))
+import           Language.Foveran.Syntax.Display (Pattern (..))
 import qualified Language.Foveran.Syntax.Checked as CS
 import           Language.Foveran.Typing.LocalContext
 import           Language.Foveran.Typing.DefinitionContext
@@ -136,6 +137,25 @@ makeTag vI vD vi nm p = do
                                                            return (Annot p $ Inr t)
       findTag _                                       = raiseError p (OtherError "Expected type is not a datatype in canonical form")
   findTag constrsDesc
+
+-- FIXME: merge this one and the previous one
+getConstructorNames :: Value
+                    -> Value
+                    -> Value
+                    -> Span
+                    -> TypingMonad ctxt [Ident]
+getConstructorNames vI vD vi p = do
+  constrsDesc <-
+      case vD $$ vi of
+        VIDesc_Sg constrsDesc _ ->
+            return constrsDesc
+        _ ->
+            raiseError p (OtherError "Not a datatype in canonical form")
+  let getNames VEmpty             = return []
+      getNames (VUnit (Just tag)) = return [tag]
+      getNames (VSum (VUnit (Just tag)) r) = (tag:) <$> getNames r
+      getNames _                  = raiseError p (OtherError "datatype not in canonical form")
+  getNames constrsDesc
 
 -- FIXME: do this in LocallyNameless
 makeConstructorArguments :: Span -> [TermPos] -> TermPos
@@ -567,6 +587,54 @@ hasType (Annot p (Generalise t1 t2)) v = do
   v' <- evalA (CS.generalise [tm1normalised] $ reifyType0 v)
   tm2 <- t2 `hasType` (forall "x" ty1 $ \x -> v' [x])
   return (In $ CS.App tm2 tm1)
+
+hasType (Annot p (CasesOn x clauses)) v = do
+  (ty,_) <- synthesiseTypeFor x
+  constructorNames <-
+      case ty of
+        VMuI vI vD vi -> getConstructorNames vI vD vi p
+        _             -> raiseError p (OtherError "cannot do cases on non-inductive datatype")
+
+  -- For now, assume that the clauses are in the same order as the
+  -- constructors in the description...
+
+  -- add a null pattern at the end for the equality proof
+  let mkPattern patterns = PatTuple (patterns ++ [PatNull])
+  let mkEqRef []    = Annot p (Bound 1)
+      mkEqRef (_:l) = Annot p (Proj2 (mkEqRef l))
+
+  let doCase patterns tm bindings =
+          Annot p $ Lam "d" $ -- the data
+          Annot p $ Lam "r" $ -- the possible recursive calls (hidden for now)
+          Annot p $ ElimEq (mkEqRef patterns) Nothing $
+          tm (PatNull:mkPattern patterns:bindings)
+
+  let doCases []             []                     discrimVar bindings =
+          do return (Annot p $ ElimEmpty discrimVar Nothing)
+      doCases [ident]        [(ident',patterns,tm)] discrimVar bindings =
+          do unless (ident == ident') $ raiseError p (OtherError "incorrect constructor name")
+             return (doCase patterns tm bindings)
+      doCases (ident:idents) ((ident',patterns,tm):clauses) discrimVar bindings =
+          do unless (ident == ident') $ raiseError p (OtherError "incorrect constructor name")
+             let bindings' = PatNull:bindings
+             let thisCase  = doCase patterns tm bindings'
+             otherCases <- doCases idents clauses (Annot p (Bound 0)) bindings'
+             return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases)
+      doCases (ident:idents) []                     discrimVar bindings =
+          raiseError p (OtherError "Not all cases covered")
+      doCases []             _                      discrimVar bindings =
+          raiseError p (OtherError "Too many clauses")
+
+  let basicBindings = [PatNull,PatNull,PatNull] -- the three things bound by the 'eliminate' construct
+  cases <- doCases constructorNames clauses (Annot p (Proj1 (Annot p (Bound 1)))) basicBindings
+
+  let desugared =
+          Annot p $ Eliminate x Nothing "i" "x" "r" $
+          Annot p $ Generalise (Annot p (Bound 0)) $
+          Annot p $ Generalise (Annot p (Proj2 (Annot p (Bound 1)))) $
+          cases
+
+  desugared `hasType` v
 
 {------------------------------}
 {- Built-in group operations -}

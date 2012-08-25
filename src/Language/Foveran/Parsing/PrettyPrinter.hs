@@ -129,6 +129,16 @@ pprint (Eliminate t (Just (iP,xP,tP)) i x p tK) =
 
 pprint (NamedConstructor nm [])  = paren 00 (ppIdent nm)
 pprint (NamedConstructor nm tms) = paren 01 (sep (ppIdent nm: map (nest 2 . down) tms))
+pprint (CasesOn t clauses)      =
+    "casesOn" <+> t <+> "with" $$ nest 2 (doClauses clauses)
+    where doClauses []             = "{" <+> "}"
+          doClauses (clause1:rest) = ("{" <+> doClause clause1) $$ doOtherClauses rest
+
+          doOtherClauses []       = "}"
+          doOtherClauses (c:rest) = (";" <+> doClause c) $$ doOtherClauses rest
+
+          doClause (ident, patterns, tm) =
+              sep [ppIdent ident <+> ppPatterns patterns <> ".", nest 2 tm]
 
 pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
 pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"

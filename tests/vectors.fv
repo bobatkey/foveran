@@ -90,30 +90,20 @@ nat_eq_dec n1 =
       { inl _. \eq _.
         rewriteBy eq then
         \n2.
-        eliminate n2 with _ «c,d» _.
-          generalise d then
-          case c with
-            { inl _. \eq.
-              rewriteBy eq then inl refl
-            ; inr _. \«n,eq».
-              rewriteBy eq then inr (zero_ne_succ n)
-            }
+        casesOn n2 with
+          { `zero.    inl refl
+          ; `succ n2. inr (zero_ne_succ n2)
+          }
       ; inr _. \«n1,eq» «r,_».
         rewriteBy eq then
         \n2.
-        eliminate n2 with _ «c,d» _.
-          generalise d then
-          case c with
-            { inl _. \eq.
-              rewriteBy eq then
-              inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
-            ; inr _. \«n2,eq».
-              rewriteBy eq then
-              case r n2 with
-                { inl eq.  rewriteBy eq then inl refl
-                ; inr neq. inr (\eq. neq (inj n1 n2 eq))
-                }
+        casesOn n2 with
+          { `zero.    inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
+          ; `succ n2. case r n2 with
+            { inl eq.  rewriteBy eq then inl refl
+            ; inr neq. inr (\eq. neq (inj n1 n2 eq))
             }
+          }
       }
 
 --------------------------------------------------------------------------------
@@ -252,12 +242,10 @@ head2 A n v = elim-vecsucc A (\n v. A) (\n a xs. a) n v
 
 vector2:code : Set -> Nat -> IDesc Nat
 vector2:code A n =
-  eliminate n with _ «c,d» _.
-    generalise d then
-    case c with
-      { inl _. \_.      "K" Unit
-      ; inr _. \«n,eq». "Sg" A (\a. "IId" n)
-      }
+  casesOn n with
+    { `zero.   "K" Unit
+    ; `succ n. "Sg" A (\_. "IId" n)
+    }
 
 vector2 : Set -> Nat -> Set
 vector2 A = muI Nat (vector2:code A)
@@ -278,12 +266,10 @@ vector2:elim A P pnil pcons n v =
   eliminate v with n d r.
     generalise r then
     generalise d then
-    eliminate n with _ «c,d» _.
-      generalise d then
-      case c with
-        { inl _. \eq. rewriteBy eq then \_ _. pnil
-        ; inr _. \«n,eq». rewriteBy eq then \«a,v» r. pcons n a v r
-        }
+    casesOn n with
+      { `zero.   \_     _. pnil
+      ; `succ n. \«a,v» r. pcons n a v r
+      }
 
 vecappend : (A : Set) -> (n1 n2 : Nat) -> vector2 A n1 -> vector2 A n2 -> vector2 A (add n1 n2)
 vecappend A n1 n2 v1 v2 =

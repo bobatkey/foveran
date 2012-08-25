@@ -153,6 +153,17 @@ iconstructor =
           (\(nm,p) ts -> Annot (makeSpan p p) (ConsEnd nm ts)) <$> tokenWithText Tok.Ident <*> many term00
 
 --------------------------------------------------------------------------------
+clauses :: Parser Tok.Token [(Ident,[Pattern],TermPos)]
+clauses =
+  pure [] <|> ((:) <$> clause <*> many (token Tok.Semicolon *> clause))
+
+clause :: Parser Tok.Token (Ident,[Pattern],TermPos)
+clause = (,,) <$> (fst <$> tokenWithText Tok.ConstructorName)
+              <*> patternList
+              <*  token Tok.FullStop
+              <*> term
+
+--------------------------------------------------------------------------------
 term :: Parser Tok.Token TermPos
 term = term10
 
@@ -357,6 +368,15 @@ term00 =
       <*> pattern
       <*  token Tok.FullStop
       <*> term10
+    <|>
+    -- FIXME: probably the FIXME above applies to this too
+    delimited <$> token Tok.CasesOn
+              <*  commit
+              <*> (CasesOn <$> term10
+                           <*  token Tok.With
+                           <*  token Tok.LBrace
+                           <*> clauses)
+              <*> token Tok.RBrace
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)
                        Just (l,p') -> Annot (makeSpan p p') (Set l)) <$> token Tok.Set <*> optional number

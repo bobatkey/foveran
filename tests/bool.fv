@@ -1,0 +1,26 @@
+data Bool : Set where
+  `true  : Bool
+  `false : Bool
+
+not : Bool -> Bool
+not b = casesOn b with { `true. `false; `false. `true }
+
+--------------------------------------------------------------------------------
+data Maybe (A : Set) : Set where
+  `just    : A -> Maybe A
+  `nothing : Maybe A
+
+mapMaybe : (A B : Set) -> (A -> B) -> Maybe A -> Maybe B
+mapMaybe A B f x =
+  casesOn x with
+    { `just a.  `just (f a)
+    ; `nothing. `nothing
+    }
+
+--------------------------------------------------------------------------------
+data Emp : Set where
+
+Empty:elim : (A : Set) -> Emp -> A
+Empty:elim A e = casesOn e with { }
+
+;
