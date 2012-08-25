@@ -15,48 +15,22 @@ elimCode : (P : Code -> Set 2) ->
            ((c1 c2 : Code) -> P c1 -> P c2 -> P (`sum c1 c2)) ->
            P `u ->
            (c : Code) -> P c
-elimCode P Pparam Prec Ppair Psum Punit c =
-  eliminate c with _ «c,d» p.
-    generalise p then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then Pparam
-      ; inr c.
-        case c with
-          { inl _. \eq _. rewriteBy eq then Prec
-          ; inr c.
-            case c with
-              { inl _. \«c1, c2, eq» «d1, d2, _». rewriteBy eq then Ppair c1 c2 d1 d2
-              ; inr c.
-                case c with
-                  { inl _. \«c1, c2, eq» «d1, d2, _». rewriteBy eq then Psum c1 c2 d1 d2
-                  ; inr c. \eq _. rewriteBy eq then Punit
-                  }
-              }
-          }
-      }
+elimCode P Pparam Prec Ppair Psum Punit c = recursionOn c with
+  { `param.      Pparam
+  ; `rec.        Prec
+  ; `pair c1 c2. Ppair c1 c2 c1_rec c2_rec
+  ; `sum  c1 c2. Psum c1 c2 c1_rec c2_rec
+  ; `u.          Punit
+  }
 
 toDesc : Code -> Set -> Unit -> IDesc Unit
-toDesc C A _ =
-  elimCode (λ_. IDesc Unit)
-    (“K” A)
-    (“IId” ())
-    (λC1 C2 D1 D2. D1 “×” D2)
-    (λC1 c2 D1 D2. “Σ” (Unit + Unit) (λc. case c for c. IDesc Unit with { inl _. D1; inr _. D2 }))
-    (“K” Unit)
-    C
-
-{-
--- What I want to be able to write:
-toDesc2 : Code -> Set -> Unit -> IDesc Unit
-toDesc2 C A _ =
-  eliminate C with
-    param.      “K” A
-    rec.        “IId” ()
-    pair C1 C2. recurse C1 “×” recurse C2
-    sum C1 C2.  “Σ” (Unit + Unit) (λc. case c with { inl _. recurse C1; inr _. recurse C2 })
-    unit.       “K” ()
--}
+toDesc C A _ = recursionOn C with
+  { `param. "K" A
+  ; `rec.   "IId" ()
+  ; `pair c1 c2. c1_rec “×” c2_rec
+  ; `sum  c1 c2. "Sg" (Unit + Unit) (\c. case c with { inl _. c1_rec; inr _. c2_rec })
+  ; `u.     "K" Unit
+  }
 
 reify : (C : Code) ->
         (A : Set) ->
@@ -69,19 +43,18 @@ mapC : (C : Code) ->
        (X : Unit -> Set 2) ->
        semI[toDesc C A (), u. X u] ->
        semI[toDesc C B (), u. X u]
-mapC C A B f X =
-  elimCode (λC. semI[toDesc C A (), u. X u] -> semI[toDesc C B (), u. X u])
-    f
-    (λx. x)
-    (λC1 C2 f1 f2 «a1,a2». «f1 a1, f2 a2»)
-    (λC1 C2 f1 f2 «c,a».
-      generalise a then
-      case c with
-        { inl _. λa. «inl (), f1 a»
-        ; inr _. λa. «inr (), f2 a»
-        })
-    (λx. x)
-    C
+mapC C A B f X = recursionOn C with
+  { `param. f
+  ; `rec.   \x. x
+  ; `pair c1 c2. \«a1,a2». «c1_rec a1, c2_rec a2»
+  ; `sum  c1 c2. \«c,a».
+    generalise a then
+    case c with
+      { inl _. \a. «inl (), c1_rec a»
+      ; inr _. \a. «inr (), c2_rec a»
+      }
+  ; `u.     \x. x
+  }
 
 drop : (I : Set) ->
        (D : I -> IDesc I) ->

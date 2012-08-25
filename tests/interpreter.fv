@@ -3,20 +3,10 @@ data Type : Set where
   `arr  : Type -> Type -> Type
 
 semType : Type -> Set -> Set
-semType T A =
-  eliminate T with _ «constructor,arguments» p.
-    generalise p then
-    generalise arguments then
-    case constructor with
-      { inl _. λ_           _.           A
-      ; inr _. λ«t1, t2, _» «S1, S2, _». S1 -> S2
-      }
-
--- semType : Type -> Set -> Set
--- semType T A = 
---   by_structural_recursion_on T with
---     `base.      A
---     `arr T1 T2. (recurseOn T1) -> (recurseOn T2)
+semType T A = recursionOn T with
+  { `base. A
+  ; `arr T1 T2. T1_rec -> T2_rec
+  }
 
 --------------------------------------------------------------------------------
 data Context : Set where
@@ -24,14 +14,10 @@ data Context : Set where
   `ext : Context -> Type -> Context
 
 semContext : Context -> Set -> Set
-semContext C A =
-  eliminate C with _ «constructor,arguments» p.
-    generalise p then
-    generalise arguments then
-    case constructor with
-      { inl _. λ_         _.       Unit
-      ; inr _. λ«G, T, _» «GS, _». GS × semType T A
-      }
+semContext C A = recursionOn C with
+  { `eps. Unit
+  ; `ext G T. G_rec × semType T A
+  }
 
 --------------------------------------------------------------------------------
 eq1 : (A B : Set) ->

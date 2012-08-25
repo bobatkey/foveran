@@ -17,7 +17,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import qualified Data.Map as M -- for doing the clauses in CasesOn
 import           Text.Position (Span)
-import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor)
+import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..), freshFor, (<+>))
 import           Language.Foveran.Syntax.LocallyNameless (TermPos, TermCon (..), close, GlobalFlag (..))
 import           Language.Foveran.Syntax.Display (Pattern (..))
 import qualified Language.Foveran.Syntax.Checked as CS
@@ -117,6 +117,7 @@ runTypingMonad :: TypingMonad ctxt a
 runTypingMonad c context holeContext localContext =
     runReaderT (runStateT (runReaderT c context) holeContext) localContext
 
+--------------------------------------------------------------------------------
 makeTag :: Value
         -> Value
         -> Value
@@ -124,32 +125,70 @@ makeTag :: Value
         -> Span
         -> TypingMonad ctxt TermPos
 makeTag vI vD vi nm p = do
-  constrsDesc <-
-      case vD $$ vi of
-        VIDesc_Sg constrsDesc _ ->
-            return constrsDesc
-        _ ->
-            raiseError p (OtherError "Expected type is not a datatype in canonical form")
-  let findTag VEmpty = raiseError p (OtherError "Datatype has no constructors")
-      findTag (VUnit (Just tag))          | tag == nm = return (Annot p $ UnitI)
-      findTag (VUnit _)                               = raiseError p (OtherError "constructor name not found")
-      findTag (VSum (VUnit (Just tag)) _) | tag == nm = return (Annot p $ Inl $ Annot p $ UnitI)
-      findTag (VSum _ x)                              = do t <- findTag x
-                                                           return (Annot p $ Inr t)
-      findTag _                                       = raiseError p (OtherError "Expected type is not a datatype in canonical form")
-  findTag constrsDesc
+  let findTag [] = raiseError p (OtherError "Datatype has no constructors")
+      findTag [(ident,_)]
+          | ident == nm = return (Annot p $ UnitI)
+          | otherwise   = raiseError p (OtherError "constructor not found")
+      findTag ((ident,_):constrs)
+          | ident == nm = return (Annot p $ Inl $ Annot p $ UnitI)
+          | otherwise   = do t <- findTag constrs
+                             return (Annot p $ Inr t)
+  constrs <- getDatatypeInfo vI vD vi p
+  findTag constrs
 
--- FIXME: merge this one and the previous one
+type DatatypeInfo = [(Ident, [Bool])]
+
+getDatatypeInfo :: Value
+                -> Value
+                -> Value
+                -> Span
+                -> TypingMonad ctxt DatatypeInfo
+getDatatypeInfo vI vD vi p = do
+  (constrsDesc, argsDesc) <-
+      case vD $$ vi of
+        VIDesc_Sg constrsDesc argsDesc ->
+            return (constrsDesc,argsDesc)
+        _ ->
+            raiseError p (OtherError "Not a datatype in canonical form")
+
+  -- FIXME: going to have to do this on the reified normal form, so
+  -- that we can look under the lambda. Otherwise, we'll have to just
+  -- simulate what reify does. Interestingly, using 'undefined' will
+  -- usually work, because the standard 'data' declarations never
+  -- produce descriptions that switch on the value of sigmas after the
+  -- first one
+  let analyseDesc (VIDesc_Pair _ rest) =
+          (True:)  <$> analyseDesc rest
+      analyseDesc (VIDesc_Sg _ f) =
+          (False:) <$> analyseDesc (f $$ undefined {- FIXME -})
+      analyseDesc (VIDesc_K (VEq _ _ _ _)) =
+          return []
+      analyseDesc _ =
+          raiseError p (OtherError "Datatype not in canonical form")
+
+  let extractConstructors VEmpty _ = 
+          do return []
+      extractConstructors (VUnit (Just tag)) k =
+          do args <- analyseDesc (argsDesc $$ k VUnitI)
+             return [(tag, args)]
+      extractConstructors (VSum (VUnit (Just tag)) rest) k =
+          do here  <- analyseDesc (argsDesc $$ k (VInl VUnitI))
+             there <- extractConstructors rest (k . VInr)
+             return ((tag,here):there)
+
+  extractConstructors constrsDesc id
+
+{-
 getConstructorNames :: Value
                     -> Value
                     -> Value
                     -> Span
                     -> TypingMonad ctxt [Ident]
 getConstructorNames vI vD vi p = do
-  constrsDesc <-
+  (constrsDesc, argsDesc) <-
       case vD $$ vi of
-        VIDesc_Sg constrsDesc _ ->
-            return constrsDesc
+        VIDesc_Sg constrsDesc argsDesc ->
+            return (constrsDesc,argsDesc)
         _ ->
             raiseError p (OtherError "Not a datatype in canonical form")
   let getNames VEmpty             = return []
@@ -157,10 +196,11 @@ getConstructorNames vI vD vi p = do
       getNames (VSum (VUnit (Just tag)) r) = (tag:) <$> getNames r
       getNames _                  = raiseError p (OtherError "datatype not in canonical form")
   getNames constrsDesc
+-}
 
 -- FIXME: do this in LocallyNameless
 makeConstructorArguments :: Span -> [TermPos] -> TermPos
-makeConstructorArguments p [] = Annot p $ Refl
+makeConstructorArguments p []     = Annot p $ Refl
 makeConstructorArguments p (t:ts) = Annot p $ Pair t (makeConstructorArguments p ts)
 
 
@@ -589,12 +629,12 @@ hasType (Annot p (Generalise t1 t2)) v = do
   tm2 <- t2 `hasType` (forall "x" ty1 $ \x -> v' [x])
   return (In $ CS.App tm2 tm1)
 
-hasType (Annot p (CasesOn x clauses)) v = do
+hasType (Annot p (CasesOn isRecursive x clauses)) v = do
   (ty,_) <- synthesiseTypeFor x
-  constructorNames <-
+  constructorInfo <-
       case ty of
-        VMuI vI vD vi -> getConstructorNames vI vD vi p
-        _             -> raiseError p (OtherError "cannot do cases on non-inductive datatype")
+        VMuI vI vD vi -> getDatatypeInfo vI vD vi p
+        _ -> raiseError p (OtherError "cannot do cases on non-inductive datatype")
 
   let makeClausesMap [] m = return m
       makeClausesMap ((ident,patterns,tm):clauses) m =
@@ -603,36 +643,52 @@ hasType (Annot p (CasesOn x clauses)) v = do
           else
               makeClausesMap clauses (M.insert ident (patterns,tm) m)
 
-  -- add a null pattern at the end for the equality proof
-  let mkPattern patterns = PatTuple (patterns ++ [PatNull])
+  let mkPattern []           []                   =
+          do return ([PatNull], [PatNull]) -- for the index equality proof
+      mkPattern (True:args)  (PatVar nm:patterns) =
+          do (argPats,recPats) <- mkPattern args patterns
+             return (PatVar nm:argPats, PatVar (nm <+> "_rec"):recPats)
+      mkPattern (True:args)  (PatNull:patterns) =
+          do (argPats,recPats) <- mkPattern args patterns
+             return (PatNull:argPats, PatNull:recPats)
+      mkPattern (True:args)  (PatTuple _:patterns) =
+          do raiseError p (OtherError "pattern match for recursive arguments must be plain variables")
+      mkPattern (False:args) (pat:patterns) =
+          do (argPats,recPats) <- mkPattern args patterns
+             return (pat:argPats, recPats)
+
   let mkEqRef []    = Annot p (Bound 1)
       mkEqRef (_:l) = Annot p (Proj2 (mkEqRef l))
 
-  let doCase patterns tm bindings =
-          Annot p $ Lam "d" $ -- the data
-          Annot p $ Lam "r" $ -- the possible recursive calls (hidden for now)
-          Annot p $ ElimEq (mkEqRef patterns) Nothing $
-          tm (PatNull:mkPattern patterns:bindings)
+  let doCase ident args clausesMap bindings =
+          do (patterns,tm) <- case M.lookup ident clausesMap of
+                                Nothing -> raiseError p (OtherError $ "constructor " ++ show ident ++ " not handled")
+                                Just x  -> return x
+             (argPats, recPats) <- mkPattern args patterns
+             
+             let bindings' =
+                     (if isRecursive then PatTuple recPats else PatNull):PatTuple argPats:bindings
+
+             return ( Annot p $ Lam "d" $ -- the data
+                      Annot p $ Lam "r" $ -- the possible recursive calls
+                      Annot p $ ElimEq (mkEqRef patterns) Nothing $
+                      tm bindings'
+                    , M.delete ident clausesMap)
 
   let doCases [] clausesMap discrimVar bindings =
           do return (Annot p $ ElimEmpty discrimVar Nothing, clausesMap)
-      doCases [ident] clausesMap discrimVar bindings =
-          do (patterns,tm) <- case M.lookup ident clausesMap of
-                                Nothing -> raiseError p (OtherError $ "constructor " ++ show ident ++ " not handled")
-                                Just x  -> return x
-             return (doCase patterns tm bindings, M.delete ident clausesMap)
-      doCases (ident:idents) clausesMap discrimVar bindings =
-          do (patterns,tm) <- case M.lookup ident clausesMap of
-                                Nothing -> raiseError p (OtherError $ "constructor " ++ show ident ++ " not handled")
-                                Just x  -> return x
-             let bindings' = PatNull:bindings
-             let thisCase  = doCase patterns tm bindings'
-             (otherCases,clausesMap') <- doCases idents (M.delete ident clausesMap) (Annot p (Bound 0)) bindings'
-             return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases, clausesMap')
+      doCases [(ident,args)] clausesMap discrimVar bindings =
+          do doCase ident args clausesMap bindings
+      doCases ((ident,args):idents) clausesMap discrimVar bindings =
+          do let bindings' = PatNull:bindings
+             (thisCase,clausesMap')   <- doCase  ident args clausesMap bindings'
+             (otherCases,clausesMap'') <- doCases idents clausesMap' (Annot p (Bound 0)) bindings'
+             return (Annot p $ Case discrimVar Nothing "u" thisCase "u" otherCases, clausesMap'')
 
   let basicBindings = [PatNull,PatNull,PatNull] -- the three things bound by the 'eliminate' construct
+      discrimVar    = Annot p (Proj1 (Annot p (Bound 1)))
   clausesMap          <- makeClausesMap clauses M.empty
-  (cases,clausesMap') <- doCases constructorNames clausesMap (Annot p (Proj1 (Annot p (Bound 1)))) basicBindings
+  (cases,clausesMap') <- doCases constructorInfo clausesMap discrimVar basicBindings
 
   unless (M.size clausesMap' == 0) $ do
     raiseError p (OtherError $ "extra cases supplied")

@@ -151,7 +151,7 @@ data TermCon tm
     | Eliminate  tm (Maybe (Pattern, Pattern, tm)) Pattern Pattern Pattern tm
 
     | NamedConstructor Ident [tm]
-    | CasesOn          tm [(Ident, [Pattern], tm)]
+    | CasesOn          Bool tm [(Ident, [Pattern], tm)]
 
     {- Group stuff -}
     | Group      Ident Abelian (Maybe tm)

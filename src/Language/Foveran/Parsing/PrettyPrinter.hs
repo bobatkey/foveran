@@ -129,8 +129,9 @@ pprint (Eliminate t (Just (iP,xP,tP)) i x p tK) =
 
 pprint (NamedConstructor nm [])  = paren 00 (ppIdent nm)
 pprint (NamedConstructor nm tms) = paren 01 (sep (ppIdent nm: map (nest 2 . down) tms))
-pprint (CasesOn t clauses)      =
-    "casesOn" <+> t <+> "with" $$ nest 2 (doClauses clauses)
+pprint (CasesOn isRecursive t clauses)      =
+    (if isRecursive then "recursionOn" else "casesOn")
+    <+> t <+> "with" $$ nest 2 (doClauses clauses)
     where doClauses []             = "{" <+> "}"
           doClauses (clause1:rest) = ("{" <+> doClause clause1) $$ doOtherClauses rest
 

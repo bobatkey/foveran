@@ -77,7 +77,7 @@ data TermCon tm
   | Eliminate  tm (Maybe (Ident, Ident, tm)) Ident Ident Ident tm
 
   | NamedConstructor Ident [tm]
-  | CasesOn    tm [(Ident, [DS.Pattern], [DS.Pattern] -> tm)]
+  | CasesOn          Bool tm [(Ident, [DS.Pattern], [DS.Pattern] -> tm)]
     -- a suspended conversion to locally nameless, waiting for the additional variables to be bound
 
   | Group      Ident Abelian (Maybe tm)
@@ -224,8 +224,9 @@ toLN (DS.Eliminate t tP i x p tK) bv =
 
 toLN (DS.NamedConstructor nm tms) bv =
     Layer $ NamedConstructor nm (map (\t -> return (t bv)) tms)
-toLN (DS.CasesOn tm clauses) bv =
-    Layer $ CasesOn (return $ tm bv)
+toLN (DS.CasesOn isRecursive tm clauses) bv =
+    Layer $ CasesOn isRecursive
+                    (return $ tm bv)
                     (map (\(ident,patterns,tm) -> (ident,patterns,\bv' -> return $ tm (bv' ++ bv))) clauses)
 
 
@@ -313,8 +314,10 @@ close' fnm (Eliminate t tP i x p tK) =
               <*> traverse (\(i,x,tP) -> (i,x,) <$> binder (binder tP)) tP
               <*> pure i <*> pure x <*> pure p <*> binder (binder (binder tK))
 close' fnm (NamedConstructor nm tms) = NamedConstructor nm <$> sequenceA tms
-close' fnm (CasesOn tm clauses) =
-    CasesOn <$> tm <*> sequenceA (map (\(ident,patterns,tm) i -> (ident,patterns,\bv' -> tm bv' (i + length bv'))) clauses)
+close' fnm (CasesOn isRecursive tm clauses) =
+    CasesOn <$> pure isRecursive
+            <*> tm
+            <*> sequenceA (map (\(ident,patterns,tm) i -> (ident,patterns,\bv' -> tm bv' (i + length bv'))) clauses)
 
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms

@@ -8,57 +8,24 @@ data DiffDesc : Set where
   `D     : DiffDesc
 
 toIDesc : DiffDesc -> Set -> Unit -> IDesc Unit
-toIDesc D A _ =
-  eliminate D with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then "K" Unit
-      ; inr c.
-        case c with
-          { inl _. \eq _. rewriteBy eq then "K" Empty
-          ; inr c.
-            case c with
-              { inl _. \eq _. rewriteBy eq then "IId" ()
-              ; inr c.
-                case c with
-                  { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then
-                    "Sg" (Unit + Unit) (\c. case c with { inl _. rD1; inr _. rD2 })
-                  ; inr c. 
-                    case c with
-                      { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then rD1 “×” rD2
-                      ; inr _. \eq _. rewriteBy eq then "K" A
-                      }
-                  }
-              }
-          }
-      }
+toIDesc D A _ = recursionOn D with
+  { `K1. "K" Unit
+  ; `K0. "K" Empty
+  ; `Id. "IId" ()
+  ; `Sum D1 D2. "Sg" (Unit + Unit) (\c. case c with { inl _. D1_rec; inr _. D2_rec })
+  ; `Times D1 D2. D1_rec “×” D2_rec
+  ; `D. "K" A
+  }
 
 differentiate : DiffDesc -> DiffDesc
-differentiate D =
-  eliminate D with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then `K0
-      ; inr c.
-        case c with
-          { inl _. \eq _. rewriteBy eq then `K0
-          ; inr c.
-            case c with
-              { inl _. \eq _. rewriteBy eq then `K1
-              ; inr c.
-                 case c with
-                   { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then `Sum (`Times rD1 D2) (`Times D1 rD2)
-                   ; inr c. 
-                     case c with
-                       { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then `Sum rD1 rD2
-                       ; inr _. \eq _. rewriteBy eq then `K0
-                       }
-                   }
-              }
-          }
-      }
+differentiate D = recursionOn D with
+  { `K1.          `K0
+  ; `K0.          `K0
+  ; `Id.          `K1
+  ; `Times D1 D2. `Sum (`Times D1_rec D2) (`Times D1 D2_rec)
+  ; `Sum D1 D2.   `Sum D1_rec D2_rec
+  ; `D.           `K0
+  }
 
 listD : DiffDesc
 listD = `Sum `K1 (`Times `D `Id)

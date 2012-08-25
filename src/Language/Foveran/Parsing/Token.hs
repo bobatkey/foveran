@@ -80,6 +80,7 @@ data Token
 
     | Generalise
     | CasesOn
+    | RecursionOn
 
     | Group
     | AbGroup
@@ -165,6 +166,7 @@ instance SyntaxHighlight Token where
     lexicalClass RewriteBy   = Keyword
     lexicalClass Generalise  = Keyword
     lexicalClass CasesOn     = Keyword
+    lexicalClass RecursionOn = Keyword
     lexicalClass Where       = Keyword
     lexicalClass In          = Keyword
     lexicalClass Underscore  = Punctuation
@@ -250,6 +252,7 @@ instance Show Token where
   show RewriteBy   = "rewriteBy"
   show Generalise  = "generalise"
   show CasesOn     = "casesOn"
+  show RecursionOn = "recursionOn"
   show Normalise   = "normalise"
   show Where       = "where"
   show In          = "in"

@@ -1,20 +1,12 @@
-bool : Set;
-bool = Unit + Unit;
+data Bool : Set where
+  `true  : Bool
+  `false : Bool
 
-true : bool;
-true = inl ⋄;
+or : Bool -> Bool -> Bool;
+or b1 b2 = casesOn b1 with { `true. `true; `false. b2 }
 
-false : bool;
-false = inr ⋄;
-
-or : bool -> bool -> bool;
-or b1 = case b1 with
-          { inl u. \b2. true
-          ; inr u. \b2. b2
-          };
-
-and : bool -> bool -> bool;
-and b1 = case b1 with { inl u. \b2. b2; inr u. \b2. false };
+and : Bool -> Bool -> Bool;
+and b1 b2 = casesOn b1 with { `true. b2; `false. `false }
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 symbol : Set;
@@ -26,11 +18,11 @@ a = inl ();
 b : symbol;
 b = inr ();
 
-symbol-eq : symbol -> symbol -> bool;
+symbol-eq : symbol -> symbol -> Bool;
 symbol-eq s1 s2 =
   case s1 with
-    { inl u. case s2 with { inl u. true; inr u. false }
-    ; inr u. case s2 with { inl u. false; inr u. true }
+    { inl u. case s2 with { inl u. `true; inr u. `false }
+    ; inr u. case s2 with { inl u. `false; inr u. `true }
     };
 
 --------------------------------------------------------------------------------
@@ -42,67 +34,30 @@ data regexp : Set where
   `star : regexp -> regexp
   `tok  : symbol -> regexp
 
-regexpInduction :
-  (P : regexp -> Set 2) ->
-  (P `eps) ->
-  (P `emp) ->
-  ((r1 r2 : regexp) -> P r1 -> P r2 -> P (`alt r1 r2)) ->
-  ((r1 r2 : regexp) -> P r1 -> P r2 -> P (`seq r1 r2)) ->
-  ((r : regexp) -> P r -> P (`star r)) ->
-  ((s : symbol) -> P (`tok s)) ->
-  (r : regexp) -> P r
-regexpInduction P peps pemp palt pseq pstar ptok r =
-  eliminate r with _ «c,d» rec.
-    generalise rec then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then peps
-      ; inr c.
-        case c with
-          { inl _. \eq _. rewriteBy eq then pemp
-          ; inr c. 
-            case c with
-              { inl _. \«r1,r2,eq» «p1,p2,_». rewriteBy eq then palt r1 r2 p1 p2
-              ; inr c.
-                case c with
-                  { inl _. \«r1,r2,eq» «p1,p2,_». rewriteBy eq then pseq r1 r2 p1 p2
-                  ; inr c .
-                    case c with
-                      { inl _. \«r,eq» «p,_». rewriteBy eq then pstar r p
-                      ; inr _. \«s,eq» _. rewriteBy eq then ptok s
-                      }
-                  }
-              }
-          }
-      };
-
-acceptsEmpty : regexp -> bool;
-acceptsEmpty =
-  regexpInduction (\r. bool)
-                  (true)
-                  (false)
-                  (\r1 r2 accEmpty1 accEmpty2. or  accEmpty1 accEmpty2)
-                  (\r1 r2 accEmpty1 accEmpty2. and accEmpty1 accEmpty2)
-                  (\r accEmpty. true)
-                  (\s. false);
+acceptsEmpty : regexp -> Bool;
+acceptsEmpty r = recursionOn r with {
+  `eps. `true;
+  `emp. `false;
+  `alt r1 r2. or r1_rec r2_rec;
+  `seq r1 r2. and r1_rec r2_rec;
+  `star r. `true;
+  `tok s. `false }
 
 step : regexp -> symbol -> regexp;
-step r s =
-  regexpInduction (\r. regexp)
-                  `emp
-                  `emp
-                  (\r1 r2 step1 step2. `alt step1 step2)
-                  (\r1 r2 step1 step2.
-                      case acceptsEmpty r1 with
-                        { inl u. `alt (`seq step1 r2) step2
-			; inr u. `seq step1 r2
-                        })
-                  (\r step. `seq step (`star r))
-                  (\s'. case symbol-eq s s' with
-                           { inl u. `eps
-                           ; inr u. `emp
-                           })
-                  r;
+step r s = recursionOn r with
+  { `eps. `emp
+  ; `emp. `emp
+  ; `alt r1 r2. `alt r1_rec r2_rec
+  ; `seq r1 r2.
+    casesOn acceptsEmpty r1 with
+      { `true.  `alt (`seq r1_rec r2) r2_rec
+      ; `false. `seq r1_rec r2
+      }
+  ; `star r. `seq r_rec (`star r)
+  ; `tok s'.
+    casesOn symbol-eq s s' with
+      { `true. `eps; `false. `emp }
+  }
 
 --------------------------------------------------------------------------------
 data List (A : Set) : Set where
@@ -115,20 +70,17 @@ listInduction : (A : Set) ->
                 ((a : A) -> (l : List A) -> P l -> P (`cons a l)) ->
                 (l : List A) -> P l;
 listInduction A P pnil pcons l =
-  eliminate l with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then pnil
-      ; inr _. \«a,l,eq» «r,_». rewriteBy eq then pcons a l r
-      }
+  recursionOn l with
+    { `nil. pnil
+    ; `cons a l. pcons a l l_rec
+    }
 
 --------------------------------------------------------------------------------
-match : List symbol -> regexp -> bool;
-match =
-  listInduction symbol (\l. regexp -> bool)
-    (\r. acceptsEmpty r)
-    (\a rest f r. f (step r a));
+match : List symbol -> regexp -> Bool;
+match l = recursionOn l with
+  { `nil.      \re. acceptsEmpty re
+  ; `cons s l. \re. l_rec (step re s)
+  }
 
 --------------------------------------------------------------------------------
 test : regexp;
@@ -140,8 +92,8 @@ input1 = `cons a (`cons b (`cons a `nil));
 input2 : List symbol;
 input2 = `cons a (`cons b `nil);
 
-test1 : match input1 test == true;
+test1 : match input1 test == `true : Bool;
 test1 = refl;
 
-test2 : match input2 test == false;
+test2 : match input2 test == `false : Bool;
 test2 = refl;

@@ -372,10 +372,19 @@ term00 =
     -- FIXME: probably the FIXME above applies to this too
     delimited <$> token Tok.CasesOn
               <*  commit
-              <*> (CasesOn <$> term10
-                           <*  token Tok.With
-                           <*  token Tok.LBrace
-                           <*> clauses)
+              <*> (CasesOn False <$> term10
+                                 <*  token Tok.With
+                                 <*  token Tok.LBrace
+                                 <*> clauses)
+              <*> token Tok.RBrace
+    <|>
+    -- FIXME: probably the FIXME above applies to this too
+    delimited <$> token Tok.RecursionOn
+              <*  commit
+              <*> (CasesOn True <$> term10
+                                <*  token Tok.With
+                                <*  token Tok.LBrace
+                                <*> clauses)
               <*> token Tok.RBrace
     <|>
     (\p x -> case x of Nothing     -> Annot p (Set 0)

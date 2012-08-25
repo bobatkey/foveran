@@ -3,66 +3,46 @@ data Nat : Set where
   `succ : Nat -> Nat
 
 add : Nat -> Nat -> Nat
-add n1 n2 =
-  eliminate n1 with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _. n2
-      ; inr _. \«n,eq» «r,_». `succ r
-      }
+add n1 n2 = recursionOn n1 with
+  { `zero.   n2
+  ; `succ n. `succ n_rec
+  }
 
 normalise add (`succ `zero) (`succ `zero)
 
 add-zero : (n : Nat) -> n == add n `zero
-add-zero n =
-  eliminate n with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq     _.     rewriteBy eq then refl
-      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
-      }
+add-zero n = inductionOn n with
+  { `zero. refl
+  ; `succ n. rewriteBy n_rec then refl
+  }
 
 add-succ : (n1 n2 : Nat) -> add n1 (`succ n2) == `succ (add n1 n2) : Nat
 add-succ n1 n2 =
-  eliminate n1 with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _. rewriteBy eq then refl
-      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
-      }
+  inductionOn n1 with
+    { `zero. refl
+    ; `succ n. rewriteBy n_rec then refl
+    }
 
 symmetry : (n1 n2 : Nat) -> n1 == n2 -> n2 == n1
 symmetry n1 n2 eq = rewriteBy eq then refl
 
 add-comm : (n1 n2 : Nat) -> add n1 n2 == add n2 n1
 add-comm n1 n2 =
-  eliminate n1 with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq     _.
-        rewriteBy eq then
-        rewriteBy add-zero n2 then
-        refl
-      ; inr _. \«n,eq» «r,_».
-        rewriteBy eq then
-        rewriteBy symmetry (add n n2) (add n2 n) r then
-        rewriteBy add-succ n2 n then
-        refl
-      }
+  inductionOn n1 with
+    { `zero.
+      rewriteBy add-zero n2 then
+      refl
+    ; `succ n.
+      rewriteBy symmetry (add n n2) (add n2 n) n_rec then
+      rewriteBy add-succ n2 n then
+      refl
+    }
 
 add-assoc : (n1 n2 n3 : Nat) -> add n1 (add n2 n3) == add (add n1 n2) n3
-add-assoc n1 n2 n3 =
-  eliminate n1 with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _.         rewriteBy eq then refl
-      ; inr _. \«n,eq» «r,_». rewriteBy eq then rewriteBy r then refl
-      }
+add-assoc n1 n2 n3 = inductionOn n1 with
+  { `zero.   refl
+  ; `succ n. rewriteBy n_rec then refl
+  }
 
 zero_ne_succ : (n : Nat) -> `zero : Nat == `succ n : Nat -> Empty
 zero_ne_succ n eq =
@@ -83,28 +63,22 @@ inj n1 n2 eq =
 
 nat_eq_dec : (n1 n2 : Nat) -> (n1 == n2) + (n1 == n2 -> Empty)
 nat_eq_dec n1 =
-  eliminate n1 with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq _.
-        rewriteBy eq then
-        \n2.
-        casesOn n2 with
-          { `zero.    inl refl
-          ; `succ n2. inr (zero_ne_succ n2)
-          }
-      ; inr _. \«n1,eq» «r,_».
-        rewriteBy eq then
-        \n2.
-        casesOn n2 with
-          { `zero.    inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
-          ; `succ n2. case r n2 with
+  recursionOn n1 with
+    { `zero. \n2.
+      casesOn n2 with
+        { `zero.    inl refl
+        ; `succ n2. inr (zero_ne_succ n2)
+        }
+    ; `succ n1. \n2.
+      casesOn n2 with
+        { `zero.    inr (\eq. zero_ne_succ n1 (rewriteBy eq then refl))
+        ; `succ n2.
+          case n1_rec n2 with
             { inl eq.  rewriteBy eq then inl refl
             ; inr neq. inr (\eq. neq (inj n1 n2 eq))
             }
-          }
-      }
+        }
+    }
 
 --------------------------------------------------------------------------------
 data vector (A : Set) : Nat -> Set where
@@ -117,31 +91,23 @@ append : (A : Set) ->
          vector A n2 ->
          vector A (add n1 n2)
 append A n1 n2 v1 v2 =
-  eliminate v1 with n «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq         _.     rewriteBy eq then v2
-      ; inr _. \«n,a,v,eq» «r,_». rewriteBy eq then `cons (add n n2) a r
-      }
+  recursionOn v1 with
+    { `nil. v2
+    ; `cons n a v. `cons (add n n2) a v_rec
+    }
 
 reverse : (A : Set) ->
           (n : Nat) ->
           vector A n ->
           vector A n
 reverse A n v =
-  eliminate v with n «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq         _.
-        rewriteBy eq then `nil
-      ; inr _. \«n,a,v,eq» «r,_».
-        rewriteBy eq then
-        rewriteBy symmetry n (add n `zero) (add-zero n) then
-        rewriteBy add-succ n `zero then
-        append A n (`succ `zero) r (`cons `zero a `nil)
-      }
+  recursionOn v with
+    { `nil. `nil
+    ; `cons n a v.
+      rewriteBy symmetry n (add n `zero) (add-zero n) then
+      rewriteBy add-succ n `zero then
+      append A n (`succ `zero) v_rec (`cons `zero a `nil)
+    }
 
 assume B : Set
 assume x : B
