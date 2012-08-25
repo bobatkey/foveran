@@ -7,6 +7,7 @@ module Language.Foveran.Parsing
     ( parseFile
     , lexFile
     , ppInputError
+    , ppDeclarations
     )
     where
 
@@ -33,6 +34,7 @@ import           Language.Foveran.Syntax.Display (Declaration)
 import           Language.Foveran.Parsing.Token
 import           Language.Foveran.Parsing.LexicalSpec
 import           Language.Foveran.Parsing.Parser
+import           Language.Foveran.Parsing.PrettyPrinter
 
 --------------------------------------------------------------------------------
 data InputError

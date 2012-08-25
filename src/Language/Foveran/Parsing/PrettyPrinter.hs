@@ -6,11 +6,14 @@ module Language.Foveran.Parsing.PrettyPrinter
     , ppPlain
     , ppIDataDecl
     , ppIdent
+    , ppDeclarations
     )
     where
 
 import           Data.String
+import           Data.List (intersperse)
 import           Data.Functor ((<$>))
+import           Data.Monoid (mempty)
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (foldAnnot, Rec, foldRec, AnnotRec (..))
 import           Text.PrettyPrintPrec
@@ -116,7 +119,7 @@ pprint (LiftI tD x tA i a tP tx) =
 pprint (MuI t1 t2)         = paren 01 ("muI" <+> sep [down t1, down t2])
 pprint InductionI          = "inductionI"
 pprint (Eliminate t Nothing i x p tK) =
-    "eliminate" <+> t <+> "with" <+> ppPattern i <+> ppPattern x <+> ppPattern p $$
+    "eliminate" <+> t <+> "with" <+> ppPattern i <+> ppPattern x <+> ppPattern p <> "." $$
     nest 2 tK
 pprint (Eliminate t (Just (iP,xP,tP)) i x p tK) =
     "eliminate" <+> t <+>
@@ -151,6 +154,13 @@ ppPlain :: Rec TermCon -> PP.Doc
 ppPlain t = foldRec pprint t `atPrecedenceLevel` 10
 
 --------------------------------------------------------------------------------
+ppDefinition :: Definition -> PP.Doc
+ppDefinition (Definition _ nm1 ty nm2 tm) =
+    (sep [ppIdent nm1 <+> ":", nest 2 (foldAnnot pprint ty <> ";")]
+     $$
+     sep [ppIdent nm2 <+> "=", nest 2 (foldAnnot pprint tm <> ";")]) `atPrecedenceLevel` 10
+
+--------------------------------------------------------------------------------
 ppIDataDecl :: IDataDecl -> PP.Doc
 ppIDataDecl d = doc `atPrecedenceLevel` 10
     where
@@ -168,3 +178,14 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
       doBits (Annot p (ConsPi nm t xs)) = ("(" <> ppIdent nm <+> ":" <+> fromDoc (ppAnnotTerm t) <> ")" <+> "->") : doBits xs
       doBits (Annot p (ConsArr t xs))   = (fromDoc (ppAnnotTermLev 9 t) <+> "->") : doBits xs
       doBits (Annot p (ConsEnd nm ts))  = [ppIdent nm <+> sep (map (fromDoc . ppAnnotTermLev 0) ts)]
+
+--------------------------------------------------------------------------------
+ppDecl :: Declaration -> PP.Doc
+ppDecl (AssumptionDecl _)   = mempty
+ppDecl (DefinitionDecl def) = ppDefinition def
+ppDecl (DatatypeDecl _)     = mempty
+ppDecl (IDataDecl decl)     = ppIDataDecl decl
+ppDecl (Normalise _)        = mempty
+
+ppDeclarations :: [Declaration] -> PP.Doc
+ppDeclarations = PP.vcat . intersperse "" . map ppDecl

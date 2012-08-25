@@ -14,6 +14,7 @@ import qualified Language.Foveran.Util.Emacs as E
 data Action
     = GenerateHtml FilePath (Maybe FilePath)
     | TypeCheck    FilePath
+    | PrettyPrint  FilePath
     | GenerateEmacsMode
 
 parseArgs :: IO Action
@@ -22,11 +23,13 @@ parseArgs = getArgs >>= parse
       parse [ "emacs" ]           = return $ GenerateEmacsMode
       parse [ "html", fnm ]       = return $ GenerateHtml fnm Nothing
       parse [ "html", fnm, ofnm ] = return $ GenerateHtml fnm (Just ofnm)
+      parse [ "pretty", fnm ]     = return $ PrettyPrint fnm
       parse [ fnm ]               = return $ TypeCheck fnm
       parse _ = do
         hPutStrLn stderr "Usage: "
         hPutStrLn stderr "  foveran <filename>.fv"
         hPutStrLn stderr "  foveran html <filename>.fv [<filename>.html]"
+        hPutStrLn stderr "  foveran pretty <filename>.fv"
         hPutStrLn stderr "  foveran emacs"
         exitFailure
 
@@ -46,4 +49,13 @@ main = do
                     exitFailure
              Right decls ->
                  do T.checkDeclarations decls
+                    exitSuccess
+    PrettyPrint filename ->
+        do readResult <- P.parseFile filename
+           case readResult of
+             Left err -> 
+                 do hPutStrLn stderr $ render (P.ppInputError err)
+                    exitFailure
+             Right decls ->
+                 do putStrLn $ render (P.ppDeclarations decls)
                     exitSuccess
