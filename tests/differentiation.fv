@@ -1,3 +1,71 @@
+-- descriptions of differentiable datatypes
+data DiffDesc : Set where
+  `K1    : DiffDesc
+  `K0    : DiffDesc
+  `Id    : DiffDesc
+  `Sum   : DiffDesc -> DiffDesc -> DiffDesc
+  `Times : DiffDesc -> DiffDesc -> DiffDesc
+  `D     : DiffDesc
+
+toIDesc : DiffDesc -> Set -> Unit -> IDesc Unit
+toIDesc D A _ =
+  eliminate D with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then "K" Unit
+      ; inr c.
+        case c with
+          { inl _. \eq _. rewriteBy eq then "K" Empty
+          ; inr c.
+            case c with
+              { inl _. \eq _. rewriteBy eq then "IId" ()
+              ; inr c.
+                case c with
+                  { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then
+                    "Sg" (Unit + Unit) (\c. case c with { inl _. rD1; inr _. rD2 })
+                  ; inr c. 
+                    case c with
+                      { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then rD1 “×” rD2
+                      ; inr _. \eq _. rewriteBy eq then "K" A
+                      }
+                  }
+              }
+          }
+      }
+
+differentiate : DiffDesc -> DiffDesc
+differentiate D =
+  eliminate D with _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq _. rewriteBy eq then `K0
+      ; inr c.
+        case c with
+          { inl _. \eq _. rewriteBy eq then `K0
+          ; inr c.
+            case c with
+              { inl _. \eq _. rewriteBy eq then `K1
+              ; inr c.
+                 case c with
+                   { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then `Sum (`Times rD1 D2) (`Times D1 rD2)
+                   ; inr c. 
+                     case c with
+                       { inl _. \«D1,D2,eq» «rD1,rD2,_». rewriteBy eq then `Sum rD1 rD2
+                       ; inr _. \eq _. rewriteBy eq then `K0
+                       }
+                   }
+              }
+          }
+      }
+
+listD : DiffDesc
+listD = `Sum `K1 (`Times `D `Id)
+
+normalise differentiate listD
+
+--------------------------------------------------------------------------------
 map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
 map F α β f = elimD (\F. sem F α → sem F β)
                     (\A x. x)
