@@ -178,26 +178,6 @@ getDatatypeInfo vI vD vi p = do
 
   extractConstructors constrsDesc id
 
-{-
-getConstructorNames :: Value
-                    -> Value
-                    -> Value
-                    -> Span
-                    -> TypingMonad ctxt [Ident]
-getConstructorNames vI vD vi p = do
-  (constrsDesc, argsDesc) <-
-      case vD $$ vi of
-        VIDesc_Sg constrsDesc argsDesc ->
-            return (constrsDesc,argsDesc)
-        _ ->
-            raiseError p (OtherError "Not a datatype in canonical form")
-  let getNames VEmpty             = return []
-      getNames (VUnit (Just tag)) = return [tag]
-      getNames (VSum (VUnit (Just tag)) r) = (tag:) <$> getNames r
-      getNames _                  = raiseError p (OtherError "datatype not in canonical form")
-  getNames constrsDesc
--}
-
 -- FIXME: do this in LocallyNameless
 makeConstructorArguments :: Span -> [TermPos] -> TermPos
 makeConstructorArguments p []     = Annot p $ Refl
