@@ -125,11 +125,15 @@ All A P l = recursionOn l with
   ; `cons a l. P a × recurseOn l
   }
 
-informative-bool : (b : Bool) -> (`true : Bool == b) + (`false : Bool == b)
+data Either (A : Set) (B : Set) : Set where
+  `left  : A -> Either A B
+  `right : B -> Either A B
+
+informative-bool : (b : Bool) -> Either (`true : Bool == b) (`false : Bool == b)
 informative-bool b =
   casesOn b with
-    { `true.  inl refl
-    ; `false. inr refl
+    { `true.  `left refl
+    ; `false. `right refl
     }
 
 filter-lem : (A : Set) ->
@@ -140,12 +144,12 @@ filter-lem A predicate l =
   inductionOn l with
     { `nil. ()
     ; `cons a l.
-      case informative-bool (predicate a) with
-        { inl isTrue.
+      casesOn informative-bool (predicate a) with
+        { `left isTrue.
           rewriteBy isTrue then
           rewriteBy isTrue then
           «`yes,inductionHypothesisFor l»
-        ; inr isFalse.
+        ; `right isFalse.
           rewriteBy isFalse then
           inductionHypothesisFor l
         }
