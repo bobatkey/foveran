@@ -143,6 +143,7 @@ iconstructor =
             <$> token Tok.LParen
             <*> identifier
             <*  token Tok.Colon
+            <*  commit
             <*> term10
             <*  token Tok.RParen
             <*  token Tok.Arrow
@@ -281,15 +282,13 @@ term01 =
       <*  token Tok.Then
       <*> term10
     <|>
-    (\(nm,p) ts -> case ts of [] -> Annot p (NamedConstructor nm [])
-                              ts -> Annot (makeSpan p (last ts)) (NamedConstructor nm ts))
-      <$> tokenWithText Tok.ConstructorName
-      <*> some term00
-    <|>
     -- function application
     -- left associative
     (\t ts -> case ts of [] -> t
-                         ts -> Annot (makeSpan t (last ts)) (App t ts)) <$> term00 <*> many term00
+                         ts -> Annot (makeSpan t (last ts)) (case t of Annot p (NamedConstructor id _) -> NamedConstructor id ts
+                                                                       _ -> App t ts))
+      <$> term00
+      <*> many term00
 
 term00 :: Parser Tok.Token TermPos
 term00 =
