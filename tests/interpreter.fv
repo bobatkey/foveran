@@ -42,7 +42,7 @@ data Index : Context × Type -> Set where
 lookup : (A : Set) -> (G : Context) -> (T : Type) -> Index «G,T» -> semContext G A -> semType T A
 lookup A G T v =
   eliminate v for «G,T» v. semContext G A -> semType T A
-  with «G,T» «constructor,arguments» p.
+  then «G,T» «constructor,arguments» p.
     generalise p then
     generalise arguments then
     case constructor with
@@ -88,7 +88,7 @@ eval : (A : Set) ->
        semType T A
 eval A G T tm =
   eliminate tm for «G,T» tm. semContext G A -> semType T A
-  with «G,T» «constructor,arguments» p.
+  then «G,T» «constructor,arguments» p.
     generalise p then
     generalise arguments then
     case constructor with
