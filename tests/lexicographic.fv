@@ -1,67 +1,50 @@
 -- lexicographic induction principle on pairs of natural numbers
-{-
-sem : Desc → Set → Set ;
-sem = elimD (λx. Set → Set)
-            (λA X. A)
-            (λX. X)
-            (λF G semF semG X. semF X × semG X)
-            (λF G semF semG X. semF X + semG X);
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
 
-lift : (D : Desc) →
-       (α : Set) →
-       (Φ : α → Set 2) →
-       sem D α → Set 2 ;
-lift D α Φ = elimD (\D. sem D α → Set 2)
-                   (\A x. Unit)
-                   (\x. Φ x)
-                   (\F G f g x. f (fst x) × g (snd x))
-                   (\F G f g x. case x for d. Set 2 with
-                                   { inl y. f y
-                                   ; inr z. g z
-                                   })
-                   D;
--}
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+lexicographic :
+  (P : Nat -> Nat -> Set 2) ->
+  (P `zero `zero) ->
+  ((n : Nat) -> P `zero n -> P `zero (`succ n)) ->
+  ((n : Nat) -> ((m : Nat) -> P n m) -> P (`succ n) `zero) ->
+  ((n : Nat) -> ((m : Nat) -> P n m) -> (m : Nat) -> P (`succ n) m -> P (`succ n) (`succ m)) ->
+  (n m : Nat) -> P n m;
+lexicographic P p1 p2 p3 p4 n =
+  inductionOn n with
+    { `zero. \m.
+      inductionOn m with
+        { `zero.   p1
+        ; `succ m. p2 m (inductionHypothesisFor m)
+        }
+    ; `succ n. \m.
+      inductionOn m with
+        { `zero.   p3 n (inductionHypothesisFor n)
+        ; `succ m. p4 n (inductionHypothesisFor n) m (inductionHypothesisFor m)
+        }
+    }
 
-natInduction : (Φ : Nat → Set 2) →
-               (Φ zero) →
-               ((n : Nat) → Φ n → Φ (succ n)) →
-               (n : Nat) → Φ n;
-natInduction Φ φzero φsucc =
-   induction NatDesc Φ
-             (λx. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
-                     { inl u. λu'. φzero
-                     ; inr n. λφn. φsucc n φn
-                     });
+-- and in general:
 
-lexicographic : (Φ : Nat → Nat → Set 2) →
-                (Φ zero zero) →
-                ((n : Nat) → Φ zero n → Φ zero (succ n)) →
-                ((n : Nat) → ((m : Nat) → Φ n m) → Φ (succ n) zero) →
-                ((n : Nat) → ((m : Nat) → Φ n m) → (m : Nat) → Φ (succ n) m → Φ (succ n) (succ m)) →
-                (n m : Nat) → Φ n m;
-lexicographic Φ φ₁ φ₂ φ₃ φ₄ =
-  natInduction (λn. (m : Nat) → Φ n m)
-               (natInduction (Φ zero) φ₁ φ₂)
-               (λn φn. natInduction (Φ (succ n)) (φ₃ n φn) (φ₄ n φn));
-
-– and in general:
-
-lex : (D₁ D₂ : Desc) →
-      (Φ : µ D₁ → µ D₂ → Set 2) →
-      (k : (x : sem D₁ (µ D₁)) →
-           (y : sem D₂ (µ D₂)) →
-           lift D₁ (µ D₁) (λx. (y : µ D₂) → Φ x y) x →
-           lift D₂ (µ D₂) (λy. Φ (construct x) y) y →
-           Φ (construct x) (construct y)) →
-      (x : µ D₁) → (y : µ D₂) → Φ x y;
-lex D₁ D₂ Φ k =
-  induction D₁ (λx. (y : µ D₂) → Φ x y)
-            (λx φx. induction D₂ (Φ (construct x))
-                              (λy φy. k x y φx φy));
+lex :
+  (I1 I2 : Set) ->
+  (D1 : I1 -> IDesc I1) ->
+  (D2 : I2 -> IDesc I2) ->
+  (P : (i1 : I1) -> muI I1 D1 i1 -> (i2 : I2) -> muI I2 D2 i2 -> Set 2) ->
+  (k : (i1 : I1) -> (i2 : I2) ->
+       (x : semI[D1 i1, i1. muI I1 D1 i1]) ->
+       (y : semI[D2 i2, i2. muI I2 D2 i2]) ->
+       liftI[D1 i1, i1. muI I1 D1 i1, i1 x. (i2 : I2) -> (y : muI I2 D2 i2) -> P i1 x i2 y, x] ->
+       liftI[D2 i2, i2. muI I2 D2 i2, i2 y. P i1 (construct x) i2 y, y] ->
+       P i1 (construct x) i2 (construct y)) ->
+   (i1 : I1) -> (x : muI I1 D1 i1) ->
+   (i2 : I2) -> (y : muI I2 D2 i2) ->
+   P i1 x i2 y
+lex I1 I2 D1 D2 P k i1 x =
+  eliminate x with i1 x ih_x.
+    \i2 y.
+    eliminate y with i2 y ih_y.
+      k i1 i2 x y ih_x ih_y
 
 --assume induction : (D : Desc) →
 --                   (P : µ D → Set 2) →
@@ -76,6 +59,7 @@ lex D₁ D₂ Φ k =
 – 4. H : The function “lift D (µ D) : (µ D → Set 2) → sem D (µ D) → Set 2”
 – 5. induct : (A → Set 2) → ((x : B) → H P x → P (c x)) → (x : A) → P x
 
+{-
 inductor : Set → Set 3;
 inductor A = (B : Set) ×
              (c : B → A) ×
@@ -119,6 +103,6 @@ lexico-inductor A AI B BI =
                   (fst p)
                   (snd p)
   »»»;
+-}
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– complete induction
+;

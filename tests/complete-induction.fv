@@ -17,6 +17,9 @@ natInduction Φ φ0 φS =
 deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
 deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
 
+deconstruct''' : (I : Set) -> (D : I -> IDesc I) -> (i : I) -> muI I D i -> semI[D i, i. muI I D i]
+deconstruct''' I D i x = eliminate x with i x p. x
+
 destructNat : (Φ : Nat → Set 2) → Φ zero → ((n : Nat) → Φ (succ n)) → (n : Nat) → Φ n;
 destructNat Φ z s = natInduction Φ z (λn p. s n);
 

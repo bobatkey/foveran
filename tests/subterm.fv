@@ -66,13 +66,13 @@ leqInduction P φzero φsucc n₁ n₂ =
                              P (fst p) (snd p) (construct «b, z») with
              { inl u. λz u.
                  elimEq z
-                    for n' eq. P n' (snd p) (construct «inl (), eq»)
+                    – for n' eq. P n' (snd p) (construct «inl (), eq»)
                    with (φzero (snd p))
              ; inr u. λz φ.
                  elimEq fst (snd (snd (snd z)))
-                    for n₁ eq₁. P n₁ (snd p) (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), eq₁, snd (snd (snd (snd z)))»)
+                    – for n₁ eq₁. P n₁ (snd p) (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), eq₁, snd (snd (snd (snd z)))»)
                    with (elimEq snd (snd (snd (snd z)))
-                            for n₂ eq₂. P (succ (fst z)) n₂ (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), refl, eq₂»)
+                            – for n₂ eq₂. P (succ (fst z)) n₂ (construct «inr (), fst z, fst (snd z), fst (snd (snd z)), refl, eq₂»)
                            with (φsucc (fst z) (fst (snd z)) (fst (snd (snd z))) (fst φ)))
              } (snd x))
     «n₁, n₂»;
