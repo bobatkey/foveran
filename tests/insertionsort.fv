@@ -50,9 +50,8 @@ OList:Desc «l,u» =
 - explicit mentioning of the index variable. Doesn't generate equalities...
 
 data[noeq] OList : Bounds -> Set where
-  lu.
-  `nil  : BTLe Nat l u -> OList lu
-  `cons : (n : Nat) -> OList «`el n,u» -> BTLe Nat Le l (`el n) -> OList lu
+  `nil  : «l,u». OList [BTLe Nat Le l u]
+  `cons : «l,u». (n : Nat) -> OList «`el n,u» -> OList [BTLe Nat Le l (`el n)]
 
 -}
 
