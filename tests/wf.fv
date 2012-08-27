@@ -15,19 +15,13 @@ symmetry n1 n2 eq = rewriteBy eq then refl
 lt : Nat -> Nat -> Set
 lt n1 n2 =
   casesOn n2 with
-    { `zero.   Empty
-    ; `succ n. n1 == n
-    }
+    `zero.   Empty
+    `succ n. n1 == n
 
 nat_lt_wf : wf Nat lt
-nat_lt_wf n =
-  eliminate n with _ «c,d» r.
-    generalise r then
-    generalise d then
-    case c with
-      { inl _. \eq     _    . rewriteBy eq then `step `zero     (\n' e. absurdBy e)
-      ; inr _. \«n,eq» «r,_». rewriteBy eq then `step (`succ n) (\n' e. rewriteBy symmetry n' n e then r)
-      }
+nat_lt_wf n = recursionOn n with
+  `zero.   `step `zero (\n' e. absurdBy e)
+  `succ n. `step (`succ n) (\n' e. rewriteBy symmetry n' n e then recurseOn n)
 
 – how to do proper lessthan relation?
 

@@ -3,10 +3,10 @@ data Bool : Set where
   `false : Bool
 
 or : Bool -> Bool -> Bool;
-or b1 b2 = casesOn b1 with { `true. `true; `false. b2 }
+or b1 b2 = casesOn b1 with `true. `true; `false. b2
 
 and : Bool -> Bool -> Bool;
-and b1 b2 = casesOn b1 with { `true. b2; `false. `false }
+and b1 b2 = casesOn b1 with `true. b2; `false. `false
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 symbol : Set;
@@ -21,9 +21,8 @@ b = inr ();
 symbol-eq : symbol -> symbol -> Bool;
 symbol-eq s1 s2 =
   case s1 with
-    { inl u. case s2 with { inl u. `true; inr u. `false }
-    ; inr u. case s2 with { inl u. `false; inr u. `true }
-    };
+    inl u. case s2 with { inl u. `true; inr u. `false }
+    inr u. case s2 with { inl u. `false; inr u. `true }
 
 --------------------------------------------------------------------------------
 data regexp : Set where
@@ -35,52 +34,37 @@ data regexp : Set where
   `tok  : symbol -> regexp
 
 acceptsEmpty : regexp -> Bool;
-acceptsEmpty r = recursionOn r with {
-  `eps. `true;
-  `emp. `false;
-  `alt r1 r2. or (recurseOn r1) (recurseOn r2);
-  `seq r1 r2. and (recurseOn r1) (recurseOn r2);
-  `star r. `true;
-  `tok s. `false }
+acceptsEmpty r = recursionOn r with
+  `eps. `true
+  `emp. `false
+  `alt r1 r2. or (recurseOn r1) (recurseOn r2)
+  `seq r1 r2. and (recurseOn r1) (recurseOn r2)
+  `star r. `true
+  `tok s. `false
 
 step : regexp -> symbol -> regexp;
 step r s = recursionOn r with
-  { `eps. `emp
-  ; `emp. `emp
-  ; `alt r1 r2. `alt (recurseOn r1) (recurseOn r2)
-  ; `seq r1 r2.
+  `eps. `emp
+  `emp. `emp
+  `alt r1 r2. `alt (recurseOn r1) (recurseOn r2)
+  `seq r1 r2.
     casesOn acceptsEmpty r1 with
-      { `true.  `alt (`seq (recurseOn r1) r2) (recurseOn r2)
-      ; `false. `seq (recurseOn r1) r2
-      }
-  ; `star r. `seq (recurseOn r) (`star r)
-  ; `tok s'.
+      `true.  `alt (`seq (recurseOn r1) r2) (recurseOn r2)
+      `false. `seq (recurseOn r1) r2
+  `star r. `seq (recurseOn r) (`star r)
+  `tok s'.
     casesOn symbol-eq s s' with
-      { `true. `eps; `false. `emp }
-  }
+      `true. `eps; `false. `emp
 
 --------------------------------------------------------------------------------
 data List (A : Set) : Set where
   `nil  : List A
   `cons : A -> List A -> List A
 
-listInduction : (A : Set) ->
-                (P : List A -> Set 2) ->
-                (P `nil) ->
-                ((a : A) -> (l : List A) -> P l -> P (`cons a l)) ->
-                (l : List A) -> P l;
-listInduction A P pnil pcons l =
-  recursionOn l with
-    { `nil. pnil
-    ; `cons a l. pcons a l (recurseOn l)
-    }
-
---------------------------------------------------------------------------------
 match : List symbol -> regexp -> Bool;
 match l = recursionOn l with
-  { `nil.      \re. acceptsEmpty re
-  ; `cons s l. \re. recurseOn l (step re s)
-  }
+  `nil.      \re. acceptsEmpty re
+  `cons s l. \re. recurseOn l (step re s)
 
 --------------------------------------------------------------------------------
 test : regexp;

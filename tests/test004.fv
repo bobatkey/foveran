@@ -4,7 +4,7 @@ data Nat : Set where
 
 add : Nat -> Nat -> Nat
 add n1 n2 =
-  eliminate n1 with _ «c,d» p.
+  eliminate n1 then _ «c,d» p.
     generalise p then
     generalise d then
     case c with

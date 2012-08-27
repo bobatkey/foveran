@@ -15,7 +15,7 @@ trans :
   a₂ ≡ a₃ →
   a₁ ≡ a₃;
 trans α a₁ a₂ a₃ eq₁ eq₂ =
-  elimEq eq₂ for a p. a₁ ≡ a with eq₁;
+  elimEq eq₂ for a p. a₁ ≡ a then eq₁;
 
 symm :
   (α : Set) →
@@ -23,7 +23,7 @@ symm :
   a₁ ≡ a₂ →
   a₂ ≡ a₁;
 symm α a₁ a₂ eq =
-  elimEq eq for a p. a ≡ a₁ with refl;
+  elimEq eq for a p. a ≡ a₁ then refl;
 
 assume A : Set;
 assume a : A;
@@ -37,14 +37,14 @@ r α a = refl;
 
 assume p : a ≡ a;
 
-normalise elimEq p for a' p'. p' ≡ r A a with refl;
+normalise elimEq p for a' p'. p' ≡ r A a then refl;
 
 uip : (α : Set) ->
       (a : α) ->
       (p : a ≡ a) ->
       p ≡ r α a;
 uip α a p =
-  elimEq p for b q. q ≡ r α a with refl;
+  elimEq p for b q. q ≡ r α a then refl;
 
 
 assume eq : (α β : Set) → α → β → Set;

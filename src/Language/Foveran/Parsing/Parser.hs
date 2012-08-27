@@ -264,7 +264,7 @@ term01 =
       (token Tok.ElimEq <|> token Tok.RewriteBy)
       <*> term10
       <*> optional ((\a x t -> (a,x,t)) <$ token Tok.For <*> identifier <*> identifier <* token Tok.FullStop <*> term10)
-      <*  (token Tok.With <|> token Tok.Then)
+      <*  token Tok.Then
       <*> term10
     <|>
     (\p x t1 t2 -> Annot (makeSpan p t2) (IDesc_Bind t1 x t2))
@@ -364,7 +364,7 @@ term00 =
       <$> token Tok.Eliminate
       <*> term10
       <*> optional ((,,) <$ token Tok.For <*> pattern <*> pattern <* token Tok.FullStop <*> term10)
-      <*  token Tok.With
+      <*  token Tok.Then
       <*> pattern
       <*> pattern
       <*> pattern

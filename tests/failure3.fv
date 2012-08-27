@@ -3,7 +3,7 @@ data Emp : Set where
 
 Emp:elim : (P : Emp -> Set) -> (e : Emp) -> P e
 Emp:elim P e =
-  eliminate e with _ «constructor,arguments» _.
+  eliminate e then _ «constructor,arguments» _.
     absurdBy constructor
     
 ;

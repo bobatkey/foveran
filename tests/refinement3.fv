@@ -147,7 +147,7 @@ refinementSet I J D R = µI J (refinement:code I J D R)
 deconstruct : (I : Set) ->
               (D : I -> IDesc I) ->
               (i : I) -> µI I D i -> semI[D i, i. µI I D i]
-deconstruct I D i x = eliminate x with i x _. x
+deconstruct I D i x = eliminate x then i x _. x
 
 symm : (A : Set) ->
        (a₁ a₂ : A) ->
@@ -325,7 +325,7 @@ cata : (I : Set) ->
        (A : algebra I D) ->
        (i : I) -> µI I D i -> fst A i
 cata I D A i x =
-  eliminate x with
+  eliminate x then
     i x p. snd A i (drop I (D i) (µI I D) (fst A) x p)
 {-
   inductionI I D
@@ -482,7 +482,7 @@ vector2:elim :
   (v : vector2 A n) ->
   P n v
 vector2:elim A P pnil pcons n v =
-  eliminate v with
+  eliminate v then
     n «constructor, arguments» p.
       generalise p then
       generalise arguments then
@@ -517,7 +517,7 @@ recompute : (I : Set) ->
             (x : algRefinementSet I D A «i,a») ->
             cata I D A i (forgetAlg I D A i a x) == a
 recompute I D A i a x =
-  eliminate x with
+  eliminate x then
     «i,a» ««x,eq»,rest» p.
       rewriteBy eq then
       generalise p then
@@ -779,7 +779,7 @@ decorate :
   (x : µI I D i) ->
   refinementSet I ((i : I) × fst A i) D (algRefinement I D A) «i, cata I D A i x»
 decorate I D A i x =
-  eliminate x with
+  eliminate x then
     i x p. construct « « mapI' I (D i) (µI I D) (fst A) (cata I D A) x, refl »
                      , helper2 I D A i x p
                      »

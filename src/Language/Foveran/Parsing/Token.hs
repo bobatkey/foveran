@@ -186,7 +186,7 @@ instance Layout Token where
     lbrace = LBrace
     rbrace = RBrace
     semicolon = Semicolon
-    blockOpener = S.fromList [Where]
+    blockOpener = S.fromList [Where,With]
 
 instance Show Token where
   show Assume = "assume"

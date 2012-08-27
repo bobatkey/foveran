@@ -9,7 +9,7 @@ Nat:elim :
   (n : Nat) ->
   P n
 Nat:elim P pzero psucc n =
-  eliminate n with _ «c,d» p.
+  eliminate n then _ «c,d» p.
     generalise p then
     generalise d then
     case c with
@@ -19,7 +19,7 @@ Nat:elim P pzero psucc n =
 
 add3 : Nat -> Nat -> Nat
 add3 n1 n2 =
-  eliminate n1 with _ «c,d» p.
+  eliminate n1 then _ «c,d» p.
     generalise p then
     generalise d then
     case c with
@@ -193,7 +193,7 @@ Vector:elim :
   (xs : Vector A n) ->
   P n xs
 Vector:elim A P prf_nil prf_cons n xs =
-  eliminate xs with
+  eliminate xs then
     n «constructor, arguments» p.
       generalise p then
       generalise arguments then
@@ -207,7 +207,7 @@ data Emp : Set where
 
 Emp:elim : (P : Emp -> Set) -> (e : Emp) -> P e
 Emp:elim P e =
-  eliminate e with
+  eliminate e then
     _ «constructor, arguments» p.
       absurdBy constructor
 

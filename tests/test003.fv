@@ -5,7 +5,7 @@ data Nat : Set where
   `succ : Nat -> Nat
 
 add : Nat -> Nat -> Nat
-add m = eliminate m with _ «c,d» p.
+add m = eliminate m then _ «c,d» p.
   generalise p then
   generalise d then
   case c with

@@ -83,7 +83,7 @@ icata : (I : Set) ->
         ((i : I) -> semI[D i, i. A i] -> A i) ->
         (i : I) -> µI I D i -> A i
 icata I D A k i x =
-  eliminate x with i x p. k i (drop I D A i x p)
+  eliminate x then i x p. k i (drop I D A i x p)
 
 – generic map for all codes
 map : (C : Code) ->

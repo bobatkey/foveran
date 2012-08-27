@@ -5,7 +5,7 @@ data Nat : Set :=
 
 succ≢zero : (n : Nat) → succ n ≡ zero → Empty;
 succ≢zero n eq =
-  elimEq eq for n p. induction NatDesc (λn. Set) (λx p. case x for x. Set with { inl u. Empty; inr n. Unit }) n with ();
+  elimEq eq for n p. induction NatDesc (λn. Set) (λx p. case x for x. Set with { inl u. Empty; inr n. Unit }) n then ();
 
 – This used to fail due to a bug in the reflect part of 'velimeq'
 normalise succ≢zero;
