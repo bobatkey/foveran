@@ -11,4 +11,8 @@ data X (a : A) (b : B) : Set where
 cons : (a : A) -> (b : B) -> C a -> D b -> X a b
 cons a b c d = construct «(), c, d, refl»
 
+test : (a : A) -> (b : B) -> (c : C a) -> (d : D b) ->
+  `cons c d : X a b == cons a b c d
+test a b c d = refl
+
 ;
