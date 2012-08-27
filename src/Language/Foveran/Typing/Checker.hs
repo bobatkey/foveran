@@ -175,6 +175,8 @@ getDatatypeInfo vI vD vi p = do
           do here  <- analyseDesc (argsDesc $$ k (VInl VUnitI))
              there <- extractConstructors rest (k . VInr)
              return ((tag,here):there)
+      extractConstructors _ _ =
+          raiseError p (OtherError "Datatype not in canonical form")
 
   extractConstructors constrsDesc id
 
