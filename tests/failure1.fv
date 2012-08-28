@@ -1,11 +1,10 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
 
-succ≢zero : (n : Nat) → succ n ≡ zero → Empty;
-succ≢zero n eq =
-  elimEq eq for n p. induction NatDesc (λn. Set) (λx p. case x for x. Set with { inl u. Empty; inr n. Unit }) n then ();
+succ_ne_zero : (n : Nat) -> `succ n : Nat == `zero : Nat -> Empty;
+succ_ne_zero n eq =
+  elimEq eq for n p. eliminate n for _ _. Set then _ «c,_» _. case c with {inl _. Empty; inr _. Unit} then ()
 
 – This used to fail due to a bug in the reflect part of 'velimeq'
-normalise succ≢zero;
+normalise succ_ne_zero;
