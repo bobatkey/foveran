@@ -627,6 +627,10 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
 
   let mkPattern []           []                   =
           do return ([BindNull], [BindNull]) -- for the index equality proof
+      mkPattern []           patterns             =
+          raiseError p (OtherError "too many patterns")
+      mkPattern args         []                   =
+          raiseError p (OtherError "not enough patterns")
       mkPattern (True:args)  (PatVar nm:patterns) =
           do (argPats,recPats) <- mkPattern args patterns
              return (BindVar nm:argPats, BindRecur nm:recPats)
