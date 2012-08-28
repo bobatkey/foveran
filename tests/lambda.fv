@@ -1,109 +1,69 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
 
-natInduction : (Φ : Nat → Set 2) →
-               (Φ zero) →
-               ((n : Nat) → Φ n → Φ (succ n)) →
-               (n : Nat) → Φ n;
-natInduction Φ φ0 φS =
-  induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
-                    { inl u. \u'. φ0
-                    ; inr n. \φn. φS n φn
-                    });
+lt : Nat -> Nat -> Set;
+lt n1 = recursionOn n1 with
+  `zero.    \n2. casesOn n2 with `zero. Empty; `succ n2. Unit
+  `succ n1. \n2. casesOn n2 with `zero. Empty; `succ n2. recurseOn n1 n2
 
-deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
-deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
+data Term : Set where
+  `var  : Nat -> Term
+  `app  : Term -> Term -> Term
+  `lam  : Term -> Term
 
--- FIXME: just define this in terms of induction (and automaticaly generate it from the data decl above)
-caseNat : (A : Set 1) → A → (Nat → A) → Nat → A ;
-caseNat A a f n = case deconstruct'' NatDesc n for x. A with
-                    { inl u. a
-                    ; inr n. f n
-                    };
-
--- this should be auto-generated from the data decl
-caseNat2 : (A : Set 1) → A → (Nat → A) → Nat → A ;
-caseNat2 A a f = induction NatDesc (\x. A)
-                           (\x p. case x for x. A with
-                                     { inl u. a
-                                     ; inr n. f n
-                                     });
-
-lt : Nat → Nat → Set;
-lt = natInduction (λx. Nat → Set)
-                  (λy. caseNat Set Empty (λy. Unit) y)
-                  (λx f y. caseNat Set Empty f y);
-
-data Term : Set :=
-  | var  : Nat
-  | app  : Term Term
-  | lam  : Term
-  ;
-
-termInduction : (Φ : Term → Set 2) →
-                ((n : Nat) → Φ (var n)) →
-                ((t₁ t₂ : Term) → Φ t₁ → Φ t₂ → Φ (app t₁ t₂)) →
-                ((t : Term) → Φ t → Φ (lam t)) →
-                (t : Term) → Φ t ;
-termInduction Φ φvar φapp φlam =
-  induction TermDesc Φ
-    (λx. case x for x. lift TermDesc Term Φ x → Φ (construct x) with
-            { inl n. λu. φvar n
-            ; inr x. case x for x. lift TermDesc Term Φ (inr x) → Φ (construct (inr x)) with
-                        { inl t₁t₂. λφt₁t₂. φapp (fst t₁t₂) (snd t₁t₂) (fst φt₁t₂) (snd φt₁t₂)
-                        ; inr t. λφt. φlam t φt
-                        }
-            });
-
-goodTerm : Term → Nat → Set ;
-goodTerm =
-  termInduction (λt. Nat → Set)
-    (λk n. lt k n)
-    (λt₁ t₂ p₁ p₂ n. p₁ n × p₂ n)
-    (λt p n. p (succ n));
+goodTerm : Term -> Nat -> Set ;
+goodTerm t = recursionOn t with
+  `var k. \n. lt k n
+  `app t1 t2. \n. recurseOn t1 n × recurseOn t2 n
+  `lam t. \n. recurseOn t (`succ n)
 
 -- just specify the good ones by a \hat{F}-algebra into some universe?
 
-wsTerm : Nat → Set;
+wsTerm : Nat -> Set;
 wsTerm n = (t : Term) × goodTerm t n;
 
-wsVar : (n k : Nat) → lt k n → wsTerm n;
-wsVar n k p = « var k, p » ;
+wsVar : (n k : Nat) -> lt k n -> wsTerm n;
+wsVar n k p = « `var k, p » ;
 
-wsApp : (n : Nat) → wsTerm n → wsTerm n → wsTerm n;
-wsApp n t₁ t₂ = «app (fst t₁) (fst t₂), «snd t₁, snd t₂»»;
+wsApp : (n : Nat) -> wsTerm n -> wsTerm n -> wsTerm n;
+wsApp n t1 t2 = «`app (fst t1) (fst t2), «snd t1, snd t2»»;
 
-wsLam : (n : Nat) → wsTerm (succ n) → wsTerm n;
-wsLam n t = «lam (fst t), snd t»;
+wsLam : (n : Nat) -> wsTerm (`succ n) -> wsTerm n;
+wsLam n t = «`lam (fst t), snd t»;
 
-wsTermInduction : (Φ : (n : Nat) → wsTerm n → Set 2) →
-                  ((n k : Nat) → (p : lt k n) → Φ n (wsVar n k p)) →
-                  ((n : Nat) → (t₁ t₂ : wsTerm n) → Φ n t₁ → Φ n t₂ → Φ n (wsApp n t₁ t₂)) →
-                  ((n : Nat) → (t : wsTerm (succ n)) → Φ (succ n) t → Φ n (wsLam n t)) →
-                  (n : Nat) → (t : wsTerm n) → Φ n t;
-wsTermInduction Φ φvar φapp φlam n t =
-  termInduction (λt. (n : Nat) → (p : goodTerm t n) → Φ n «t, p»)
-    (λk n p. φvar n k p)
-    (λt₁ t₂ p₁ p₂ n p. φapp n «t₁, fst p» «t₂, snd p» (p₁ n (fst p)) (p₂ n (snd p)))
-    (λt p n g. φlam n «t,g» (p (succ n) g))
-    (fst t)
-    n
-    (snd t);
+
+wsTermInduction :
+  (P : (n : Nat) -> wsTerm n -> Set 2) ->
+  ((n k : Nat) -> (p : lt k n) -> P n (wsVar n k p)) ->
+  ((n : Nat) -> (t1 t2 : wsTerm n) -> P n t1 -> P n t2 -> P n (wsApp n t1 t2)) ->
+  ((n : Nat) -> (t : wsTerm (`succ n)) -> P (`succ n) t -> P n (wsLam n t)) ->
+  (n : Nat) -> (t : wsTerm n) -> P n t;
+wsTermInduction P pvar papp plam n «t,gt» =
+  generalise gt then
+  generalise n then
+  inductionOn t with
+    `var k.
+      \n p.
+      pvar n k p
+    `app t1 t2.
+      \n «p1,p2».
+      papp n «t1,p1» «t2,p2» (inductionHypothesisFor t1 n p1) (inductionHypothesisFor t2 n p2)
+    `lam t.
+      \n p.
+      plam n «t,p» (inductionHypothesisFor t (`succ n) p)
 
 -- what is the F that describes this inductive type?
 
-F : (Nat → Set) → (Nat → Set) ;
+F : (Nat -> Set) -> (Nat -> Set) ;
 F X n =   ((k : Nat) × lt k n)
         + X n × X n
-        + X (succ n);
+        + X (`succ n);
 
 -- is it possible to auto-generate this from the goodTerm thing above?
 -- Or autogenerate both of them?
 
-constr : (n : Nat) → F wsTerm n → wsTerm n;
+constr : (n : Nat) -> F wsTerm n -> wsTerm n;
 constr n x = case x for x. wsTerm n with
                { inl p. wsVar n (fst p) (snd p)
                ; inr x. case x for x. wsTerm n with
@@ -111,23 +71,3 @@ constr n x = case x for x. wsTerm n with
                            ; inr p. wsLam n p
                            }
                };
-
-{------------------------------------------------------------------------------}
-
-relAlg : Desc → Set → Set 2;
-relAlg D A = (x : sem D (µ D)) → lift D (µ D) (\x. A → Set) x → A → Set;
-
--- Doing the above generally
-goodOnes : (D : Desc) →
-           (A : Set) →
-           relAlg D A →
-           µ D →
-           A →
-           Set;
-goodOnes D A k = induction D (\x. A → Set) k;
-
-wf : (D : Desc) → (A : Set) → relAlg D A → A → Set ;
-wf D A k a = (x : µ D) × goodOnes D A k x a;
-
-{- constructWF : (D : Desc) → (A : Set) →
-   -}           
