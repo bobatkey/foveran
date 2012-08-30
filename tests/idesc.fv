@@ -1,27 +1,3 @@
-toI : Desc -> IDesc Unit;
-toI = elimD (λx. IDesc Unit)
-            (λA. “K” A)
-            (“IId” ⋄)
-	    (λD₁ D₂ ID₁ ID₂. ID₁ “×” ID₂)
-            (λD₁ D₂ ID₁ ID₂. “Σ” (Unit + Unit) (λb. case b for d. IDesc Unit with
-                                                      { inl u. ID₁
-				  	              ; inr u. ID₂
-					              }));
-
-lift2 : (D : Desc) ->
-        (A : Set) ->
-        sem D A ->
-        IDesc A;
-lift2 D A = elimD (λD. sem D A -> IDesc A)
-                  (λA' x. “K” Unit)
-                  (λx. “IId” x)
-                  (λD₁ D₂ f g x. f (fst x) “×” g (snd x))
- 		  (λD₁ D₂ f g x. case x for d. IDesc A with
-		                    { inl y. f y
-		 		    ; inr z. g z
-				    })
-                  D;
-
 lift3 : (I : Set) ->
         (D : IDesc I) ->
         (A : I -> Set) ->
@@ -53,11 +29,11 @@ allI : (I  : Set) ->
        lift4 I D A P xs;
 allI I D A P p = elimID I (λD. (xs : semI[D, i. A i]) -> lift4 I D A P xs)
                         (λx xs. p x xs)
-                        (λA xs. ⋄)
+                        (λA xs. ())
                         (λD₁ D₂ all₁ all₂ x. «all₁ (fst x), all₂ (snd x)»)
                         (λB D all x. all (fst x) (snd x))
                         (λB D all x. λb. all b (x b))
                         D;
 
-– this is all the bits I need to do induction on indexed data types!
-– what about higher-Set universes? Do I need to beef up semI?
+-- this is all the bits I need to do induction on indexed data types!
+-- what about higher-Set universes? Do I need to beef up semI?
