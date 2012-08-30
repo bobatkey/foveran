@@ -1,90 +1,102 @@
 --------------------------------------------------------------------------------
--- These two should be built-in (in some sense)
-{-
-sem : Desc → Set → Set ;
-sem d = elimD (\x. Set → Set)
-              (\A X. A)
-              (\X. X)
-              (\d1 d2 F G X. F X × G X)
-              (\d1 d2 F G X. F X + G X)
-              d ;
--}
+drop : (I : Set) ->
+       (D : I -> IDesc I) ->
+       (A : I -> Set) ->
+       (i : I) ->
+       (x : semI[D i, i. muI I D i]) ->
+       liftI[D i, i. muI I D i, i x. A i, x] ->
+       semI[D i, i. A i]
+drop I D A i =
+  elimID I
+    (λD'. (x : semI[D', i. muI I D i]) ->
+          liftI[D', i. muI I D i, i x. A i, x] ->
+          semI[D', i. A i])
+    (λi x a. a)
+    (λX x u. x)
+    (λD1 D2 drop1 drop2 x a.
+      «drop1 (fst x) (fst a), drop2 (snd x) (snd a)»)
+    (λX D drop x a. «fst x, drop (fst x) (snd x) a»)
+    (λX D drop f a. λx. drop x (f x) (a x))
+    (D i);
 
-map : (F : Desc) → (α β : Set) → (α → β) → sem F α → sem F β ;
-map F α β f = elimD (\F. sem F α → sem F β)
-                    (\A x. x)
-                    (\x. f x)
-                    (\d1 d2 g h p. «g (fst p), h (snd p)»)
-	            (\d1 d2 g h s. case s for x. sem (d1 “+” d2) β with
-                                      { inl x. inl (g x)
-	   			      ; inr x. inr (h x)
-				      })
-                    F ;
+cata : (I : Set) ->
+       (D : I -> IDesc I) ->
+       (A : I -> Set) ->
+       ((i : I) -> semI[D i, i. A i] -> A i) ->
+       (i : I) -> muI I D i -> A i;
+cata I D A k i x =
+  eliminate x then i x φ. k i (drop I D A i x φ)
 
 --------------------------------------------------------------------------------
-
 comonad : Set 1;
-comonad = (W      : Set → Set) ×
-          (counit : (α : Set) → W α → α) ×
-          (cojoin : (α : Set) → W α → W (W α)) ×
-          (map    : (α β : Set) → (α → β) → W α → W β) ×
-          Unit ;
+comonad =
+  (W      : Set -> Set) ×
+  (counit : (A : Set) -> W A -> A) ×
+  (cojoin : (A : Set) -> W A -> W (W A)) ×
+  (map    : (A B : Set) -> (A -> B) -> W A -> W B) ×
+  Unit ;
 
-F : comonad → Set → Set ;
+F : comonad -> Set -> Set ;
 F W = fst W ;
 
-counit : (W : comonad) → (A : Set) → F W A → A ;
+counit : (W : comonad) -> (A : Set) -> F W A -> A ;
 counit W = fst (snd W) ;
 
-cojoin : (W : comonad) → (A : Set) → F W A → F W (F W A) ;
+cojoin : (W : comonad) -> (A : Set) -> F W A -> F W (F W A) ;
 cojoin W = fst (snd (snd W)) ;
 
-comonadMap : (W : comonad) → (α β : Set) → (α → β) → F W α → F W β ;
+comonadMap : (W : comonad) -> (A B : Set) -> (A -> B) -> F W A -> F W B ;
 comonadMap W = fst (snd (snd (snd W))) ;
 
 --------------------------------------------------------------------------------
-distributiveLaw : comonad → Desc → Set 1;
-distributiveLaw W D = (α : Set) → sem D (F W α) → F W (sem D α) ;
+distributiveLaw : comonad -> IDesc Unit -> Set 1;
+distributiveLaw W D = (A : Set) -> semI[D, _. F W A] -> F W semI[D, _. A] ;
 
 -- recursion combinator using a comonad with a distributive law
-foldW : (W : comonad) → (D : Desc) →
-        (d : distributiveLaw W D) →
-        (α : Set) →
-        (sem D (F W α) → α) →
-        µ D →
-        α  ;
-foldW W D d α k x =
-  counit W α (fold D (F W α)
-                   (\x. comonadMap W (sem D (F W α)) α k (d (F W α) (map D (F W α) (F W (F W α)) (cojoin W α) x))) x) ;
+foldW : (W : comonad) ->
+        (D : IDesc Unit) ->
+        (d : distributiveLaw W D) ->
+        (A : Set) ->
+        (semI[D, _. F W A] -> A) ->
+        muI Unit (\_. D) () ->
+        A
+foldW W D d A k x =
+  counit W A
+    (cata Unit (\_. D) (\_. F W A)
+      (\_ x. comonadMap W (semI[D, _. F W A]) A k (d (F W A) mapI[D, _. F W A, _. F W (F W A), \_. cojoin W A, x]))
+      () x)
 
 --------------------------------------------------------------------------------
 -- “context” comonad
-C : Set → Set → Set ;
+C : Set -> Set -> Set ;
 C E A = E × A ;
 
-counitC : (E A : Set) → C E A → A ;
-counitC E A p = snd p ;
+counitC : (E A : Set) -> C E A -> A ;
+counitC E A «_,a» = a
 
-cobindC : (E A : Set) → C E A → C E (C E A) ;
-cobindC E A p = « fst p, « fst p, snd p » » ;
+cobindC : (E A : Set) -> C E A -> C E (C E A) ;
+cobindC E A «e,a» = « e, e, a »
 
-mapC : (E A B : Set) → (A → B) → C E A → C E B ;
-mapC E A B f p = « fst p, f (snd p) » ;
+mapC : (E A B : Set) -> (A -> B) -> C E A -> C E B ;
+mapC E A B f «e,a» = « e, f a »
 
-Ccomonad : Set → comonad ;
-Ccomonad E = « C E, « counitC E, « cobindC E, « mapC E, () »»»» ;
+Ccomonad : Set -> comonad ;
+Ccomonad E = « C E, counitC E, cobindC E, mapC E, () » ;
 
-distC : (E : Set) → (D : Desc) → (sem D E → E) → distributiveLaw (Ccomonad E) D ;
-distC E D k A x = « k (map D (E × A) E (\x. fst x) x), map D (E × A) A (\x. snd x) x » ;
+distC : (E : Set) -> (D : IDesc Unit) -> (semI[D, _. E] -> E) -> distributiveLaw (Ccomonad E) D ;
+distC E D k A x =
+  « k mapI[D, _. E × A, _. E, \_ x. fst x, x]
+  , mapI[D, _. E × A, _. A, \_ x. snd x, x] »
 
 --------------------------------------------------------------------------------
 -- primitive recursion, derived from the general comonadic recursion
 -- with the environment comonad.
 
-primrec : (D : Desc) →
-          (A : Set) →
-          (sem D (µ D × A) → A) →
-          µ D →
-          A ;
-primrec D = foldW (Ccomonad (µ D)) D (distC (µ D) D (construct D)) ;
+primrec : (D : Unit -> IDesc Unit) ->
+          (A : Set) ->
+          (semI[D (), _. muI Unit D () × A] -> A) ->
+          muI Unit D () ->
+          A
+primrec D = foldW (Ccomonad (muI Unit D ())) (D ()) (distC (muI Unit D ()) (D ()) (\x. construct x))
 
+;

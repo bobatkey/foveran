@@ -1,51 +1,18 @@
-{-
-sem : Desc → Set → Set ;
-sem = elimD (λx. Set → Set)
-            (λA X. A)
-            (λX. X)
-            (λF G semF semG X. semF X × semG X)
-            (λF G semF semG X. semF X + semG X);
-
-lift : (D : Desc) →
-       (α : Set) →
-       (Φ : α → Set 2) →
-       sem D α → Set 2 ;
-lift D α Φ = elimD (\D. sem D α → Set 2)
-                   (\A x. Unit)
-                   (\x. Φ x)
-                   (\F G f g x. f (fst x) × g (snd x))
-                   (\F G f g x. case x for d. Set 2 with
-                                   { inl y. f y
-                                   ; inr z. g z
-                                   })
-                   D;
--}
--- lift D (µ D) (W P) : sem D (µ D) → Set
--- (x : sem D (µ D)) → lift D (µ D) (W P) x → P (construct D x)
--- 
-
-comonad : Set → Set 1;
-comonad A = (W      : (A → Set) → (A → Set)) ×
-            (counit : (P : A → Set) → (a : A) → W P a → P a) ×
-            (cojoin : (P : A → Set) → (a : A) → W P a → W (W P) a) ×
-            (map    : (P Q : A → Set) → (a : A) → W P a → W Q a) ×
+comonad : Set -> Set 1;
+comonad A = (W      : (A -> Set) -> (A -> Set)) ×
+            (counit : (P : A -> Set) -> (a : A) -> W P a -> P a) ×
+            (cojoin : (P : A -> Set) -> (a : A) -> W P a -> W (W P) a) ×
+            (map    : (P Q : A -> Set) -> (a : A) -> W P a -> W Q a) ×
             Unit ;
 
-F : (A : Set) → comonad A → (A → Set) → (A → Set) ;
+F : (A : Set) -> comonad A -> (A -> Set) -> (A -> Set) ;
 F A W = fst W ;
 
-counit : (A : Set) → (W : comonad A) → (P : A → Set) → (a : A) → F A W P a → P a ;
+counit : (A : Set) -> (W : comonad A) -> (P : A -> Set) -> (a : A) -> F A W P a -> P a ;
 counit A W = fst (snd W) ;
 
-cojoin : (A : Set) → (W : comonad A) → (P : A → Set) → (a : A) → F A W P a → F A W (F A W P) a ;
+cojoin : (A : Set) -> (W : comonad A) -> (P : A -> Set) -> (a : A) -> F A W P a -> F A W (F A W P) a ;
 cojoin A W = fst (snd (snd W)) ;
 
-coMap : (A : Set) → (W : comonad A) → (P Q : A → Set) → (a : A) → F A W P a → F A W Q a ;
+coMap : (A : Set) -> (W : comonad A) -> (P Q : A -> Set) -> (a : A) -> F A W P a -> F A W Q a ;
 coMap A W = fst (snd (snd (snd W))) ;
-
-------------------------------------------------------------------------------
-
-{-
-distributiveLaw : (A : Set) → comonad A → Desc → Set 1;
-distributiveLaw A W D = (P : A → Set) → 
--}
