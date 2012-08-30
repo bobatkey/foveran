@@ -82,7 +82,6 @@ data TermCon tm
   | LiftI      tm Ident tm Ident Ident tm tm
   | MapI       tm Ident tm Ident tm tm tm
   | MuI        tm tm
-  | InductionI
   | Eliminate  tm (Maybe (Ident, Ident, tm)) Ident Ident Ident tm
 
   | NamedConstructor Ident [tm]
@@ -241,7 +240,6 @@ toLN (DS.LiftI tD i tA i' a tP tx) bv =
                   (identOfPattern i') (identOfPattern a) (return $ tP (bindingOfPattern a:bindingOfPattern i':bv))
                   (return $ tx bv)
 toLN (DS.MuI t1 t2)       bv = Layer $ MuI (return $ t1 bv) (return $ t2 bv)
-toLN DS.InductionI        bv = Layer $ InductionI
 toLN (DS.Eliminate t tP i x p tK) bv =
     Layer $ Eliminate (return $ t bv)
                       ((\(x,y,t) -> (identOfPattern x, identOfPattern y, return $ t (bindingOfPattern y:bindingOfPattern x:bv))) <$> tP)
@@ -339,7 +337,6 @@ close' fnm (MapI tD i1 tA i2 tB tf tx) =
 close' fnm (MuI t1 t2)      = MuI <$> t1 <*> t2
 close' fnm (LiftI tD i tA i' a tP tx) =
     LiftI <$> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
-close' fnm InductionI       = pure InductionI
 close' fnm (Eliminate t tP i x p tK) =
     Eliminate <$> t
               <*> traverse (\(i,x,tP) -> (i,x,) <$> binder (binder tP)) tP

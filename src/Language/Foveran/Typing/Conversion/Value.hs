@@ -29,7 +29,6 @@ module Language.Foveran.Typing.Conversion.Value
     , vinduction
     , vliftI
     , vmuI
-    , vinductionI
     , veliminate
 
     , vgroup
@@ -449,30 +448,6 @@ vallI = VLam "I" $ \vI ->
            VLam "x" $ \x ->
            VLam "b" $ \b -> all $$ b $$ (x $$ b))
           vD $$ xs
-
-vinductionI :: Value -- ^ The index type (@I : Set@)
-            -> Value -- ^ The description (@D : IDesc I@)
-            -> Value -- ^ The predicate (@P : (i : I) -> MuI D i -> Set@)
-            -> Value -- ^ The body (@k : (i : I) -> semI[D i, i. MuI D i] -> liftI[D i, i. MuI D i, i x. P i x] -> P i (construct x)@)
-            -> Value -- ^ The index (@i : I@)
-            -> Value -- ^ The target (@x : MuI D i@)
-            -> Value -- ^ The result (@P i x@)
-vinductionI vI vD vP vk = loop
-    where
-      loop vi (VConstruct _ x) =
-          vk $$ vi $$ x $$ (vallI $$ vI $$ (vD $$ vi) $$ vmuI vI vD $$ vP $$ (VLam "i" $ \i -> VLam "x" $ \x -> loop i x) $$ x)
-      loop vi (VNeutral n) =
-          reflect (vP $$ vi $$ VNeutral n)
-                  (pure (In InductionI)
-                   `tmApp` reify (VSet 0) vI
-                   `tmApp` reify (vI .->. VIDesc vI) vD
-                   `tmApp` reify (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) vP
-                   `tmApp` reify (forall "i" vI $ \i ->
-                                  forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
-                                  (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
-                                  vP $$ i $$ VConstruct Nothing x) vk
-                   `tmApp` reify vI vi
-                   `tmApp` n)
 
 veliminate :: Value -- ^ The index type (@I : Set@)
            -> Value -- ^ The description (@D : I -> IDesc I@)

@@ -91,7 +91,6 @@ data TermCon tm
     | SemI       tm tm (Irrelevant Ident) tm
     | MapI       tm tm (Irrelevant Ident) tm (Irrelevant Ident) tm tm tm
     | LiftI      tm tm (Irrelevant Ident) tm (Irrelevant Ident) (Irrelevant Ident) tm tm
-    | InductionI
     | Eliminate  tm tm tm tm
                  (Irrelevant Ident) (Irrelevant Ident) tm
                  (Irrelevant Ident) (Irrelevant Ident) (Irrelevant Ident) tm
@@ -167,7 +166,6 @@ traverseSyn (MapI tI tD i1 tA i2 tB tf tx) =
 traverseSyn (LiftI tI tD i tA i' a tP tx) =
     LiftI <$> tI <*> tD <*> pure i <*> binder tA <*> pure i' <*> pure a <*> binder (binder tP) <*> tx
 traverseSyn (MuI t1 t2)      = MuI <$> t1 <*> t2
-traverseSyn InductionI       = pure InductionI
 traverseSyn (Eliminate tI tD ti t i1 x1 tP i2 x2 p2 tK) =
     Eliminate <$> tI <*> tD <*> ti <*> t
               <*> pure i1 <*> pure x1 <*> binder (binder tP)
@@ -308,7 +306,6 @@ toDisplay (LiftI _ tD ix tA ii ia tP tx) =
           i = fromIrrelevant ii
           a = fromIrrelevant ia
 toDisplay (MuI t1 t2)             = DS.MuI <$> t1 <*> t2
-toDisplay InductionI              = pure DS.InductionI
 toDisplay (Eliminate _ _ _ t ii1 ix1 tP ii2 ix2 ip2 tK) =
     do (i1', (x1', tP')) <- bind i1 (bind x1 tP)
        (i2', (x2', (p2', tK'))) <- bind i2 (bind x2 (bind p2 tK))
@@ -452,8 +449,6 @@ cmp compareLevel (In (LiftI tI  tD  _ tA  _ _ tP  tx))
       cmp compareLevel tA tA' &&
       cmp compareLevel tP tP' &&
       cmp compareLevel tx tx'
-cmp compareLevel (In InductionI)       (In InductionI)
-    = True
 cmp compareLevel (In (Eliminate tI  tD  ti  tx  _ _ tP  _ _ _ tK))
                  (In (Eliminate tI' tD' ti' tx' _ _ tP' _ _ _ tK'))
     = all id [ cmp (==) tI tI'

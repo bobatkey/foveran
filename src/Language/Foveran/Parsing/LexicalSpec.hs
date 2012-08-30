@@ -61,7 +61,6 @@ lexicalSpec = $([|compileLexicalSpecification
     , "“Π”" .|. "\"Pi\"" :==> emit Quote_Pi
     , "elimID" :==>          emit IDesc_Elim
     , "µI" .|. "muI" :==>    emit MuI
-    , "inductionI" :==>      emit InductionI
     , "≡" .|. "==" :==>     emit Eq
     , "refl" :==>            emit Refl
     , "rewriteBy" :==>       emit RewriteBy

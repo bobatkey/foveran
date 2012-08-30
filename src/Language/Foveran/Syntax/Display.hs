@@ -147,7 +147,6 @@ data TermCon tm
     | MapI       tm Pattern tm Pattern tm tm tm
     | LiftI      tm Pattern tm Pattern Pattern tm tm
     | MuI        tm tm
-    | InductionI
     | Eliminate  tm (Maybe (Pattern, Pattern, tm)) Pattern Pattern Pattern tm
 
     | NamedConstructor Ident [tm]

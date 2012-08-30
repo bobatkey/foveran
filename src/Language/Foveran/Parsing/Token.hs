@@ -76,7 +76,6 @@ data Token
     | MapI
     | LiftI
     | MuI
-    | InductionI
 
     | Generalise
     | CasesOn
@@ -160,7 +159,6 @@ instance SyntaxHighlight Token where
     lexicalClass MapI        = Keyword
     lexicalClass LiftI       = Keyword
     lexicalClass MuI         = Type
-    lexicalClass InductionI  = Keyword
     lexicalClass Eq          = Operator
     lexicalClass Refl        = Constructor
     lexicalClass ElimEq      = Keyword
@@ -247,8 +245,7 @@ instance Show Token where
   show MapI        = "mapI"
   show LiftI       = "liftI"
   show MuI         = "µI"
-  show InductionI  = "inductionI"
-  show Eq          = "≡"
+  show Eq          = "=="
   show Refl        = "refl"
   show ElimEq      = "elimEq"
   show RewriteBy   = "rewriteBy"

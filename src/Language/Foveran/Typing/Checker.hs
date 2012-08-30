@@ -889,19 +889,6 @@ synthesiseTypeFor (Annot p IDesc_Elim) = do
            (forall "D" (VIDesc i) $ \d -> p $$ d)
          , In $ CS.IDesc_Elim)
 
-synthesiseTypeFor (Annot p InductionI) = do
-  return ( forall "I" (VSet 0) $ \vI ->
-           forall "D" (vI .->. VIDesc vI) $ \vD ->
-           forall "P" (forall "i" vI $ \i -> (vmuI vI vD $$ i) .->. VSet 2) $ \vP ->
-           forall "k" (forall "i" vI $ \i ->
-                       forall "x" (vsemI vI (vD $$ i) "i" (vmuI vI vD $$)) $ \x ->
-                       (vliftI vI (vD $$ i) "i" (vmuI vI vD $$) "i" "a" (\i a -> vP $$ i $$ a) x) .->.
-                       (vP $$ i $$ VConstruct Nothing x)) $ \k ->
-           forall "i" vI $ \i ->
-           forall "x" (vmuI vI vD $$ i) $ \x ->
-           vP $$ i $$ x
-         , In $ CS.InductionI)
-
 synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
   (ty,tm) <- synthesiseTypeFor t
   (vI, vDesc, vi) <-

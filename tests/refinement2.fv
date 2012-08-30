@@ -127,14 +127,12 @@ forget : (D : Desc) →
          (A : Set) →
          (r : refinement D A) →
          (a : A) →
-         µI A (apply-refinement D A r) a →
+         muI A (apply-refinement D A r) a →
          µ D;
-forget D A r =
-  inductionI A (apply-refinement D A r)
-             (λa x. µ D)
-             (λa x φ.
-                construct (recons A D (λi. µI A (apply-refinement D A r) i)
-                                  (snd (r a) (fst x)) (snd x) φ));
+forget D A r a x =
+  eliminate x then a x φ.
+  construct (recons A D (λi. muI A (apply-refinement D A r) i)
+                                  (snd (r a) (fst x)) (snd x) φ);
 
 – lift D A (λa. B) x → D B
 – such that D ! x = D ! (f a), where ! : {A : Set} → A → 1
@@ -217,9 +215,9 @@ finElim : (Φ : (n : Nat) → fin n → Set 2) →
           ((n : Nat) → Φ (succ n) (fz n)) →
           ((n : Nat) → (x : fin n) → Φ n x → Φ (succ n) (fs n x)) →
           (n : Nat) → (x : fin n) → Φ n x;
-finElim Φ φz φs =
-  inductionI Nat finDesc Φ
-    (caseNat (λn. (x : semI[finDesc n, n. fin n]) → liftI[finDesc n, n. fin n, n f. Φ n f, x] → Φ n (construct x))
+finElim Φ φz φs n x =
+  eliminate x then n y r.
+  caseNat (λn. (x : semI[finDesc n, n. fin n]) → liftI[finDesc n, n. fin n, n f. Φ n f, x] → Φ n (construct x))
        (λ«x,_» φ. absurdBy x)
        (λn x. case fst x for y. (z : semI[lift2 NatDesc Nat (snd (fin-refinement (succ n)) y), n. fin n]) →
                                 liftI[finDesc (succ n), n. fin n, n f. Φ n f, «y,z»] →
@@ -227,7 +225,7 @@ finElim Φ φz φs =
                 { inl u. λu' u''. φz n
                 ; inr u. λz p. φs n z p
                 }
-                (snd x)));
+                (snd x)) n y r
 
 ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 – From lists to vectors, using pattern matching on the index to determine
@@ -255,13 +253,13 @@ vec-elim : (A : Set) →
            (Φ zero (vec-nil A)) →
            ((n : Nat) → (a : A) → (v : Vec A n) → Φ n v → Φ (succ n) (vec-cons A n a v)) →
            (n : Nat) → (v : Vec A n) → Φ n v;
-vec-elim A Φ φnil φcons =
-  inductionI Nat (VecDesc A) Φ
-    (caseNat (λn. (v : semI[VecDesc A n, n. Vec A n]) ->
-                  liftI[VecDesc A n, n. Vec A n, n v. Φ n v, v] →
-                  Φ n (construct v))
+vec-elim A Φ φnil φcons n v =
+  eliminate v then n v r.
+  caseNat (λn. (v : semI[VecDesc A n, n. Vec A n]) ->
+                    liftI[VecDesc A n, n. Vec A n, n v. Φ n v, v] →
+                    Φ n (construct v))
        (λv φ. φnil)
-       (λn v φ. φcons n (fst v) (snd (snd v)) (snd φ)));
+       (λn v φ. φcons n (fst v) (snd (snd v)) (snd φ)) n v r
 
 vec-to-list : (A : Set) →
               (n : Nat) → Vec A n → List A;
@@ -299,11 +297,8 @@ list-elim : (A : Set) →
             (Φ (nil2 A)) →
             ((a : A) → (l : List2 A) → Φ l → Φ (cons2 A a l)) →
             (l : List2 A) → Φ l;
-list-elim A Φ φnil φcons = 
-  inductionI
-    Unit (List2Desc A)
-    (λi. Φ)
-    (λi x.
+list-elim A Φ φnil φcons l = 
+  eliminate l then i x r.
       case fst x
         for y. (z : semI[lift2 NatDesc Unit (snd (list-refinement A ⋄) y), u. List2 A]) ->
                liftI[List2Desc A i, u. List2 A, i l. Φ l, «y, z»] →
@@ -311,8 +306,7 @@ list-elim A Φ φnil φcons =
         { inl u. λz u. φnil
         ; inr a. λl φ. φcons a l φ
         }
-        (snd x))
-    ⋄;
+        (snd x) r
 
 – length:
 list-to-nat : (A : Set) → List2 A → Nat;

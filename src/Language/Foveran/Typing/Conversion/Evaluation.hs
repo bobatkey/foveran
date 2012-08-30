@@ -136,13 +136,6 @@ eval (MapI tI tD i1 tA i2 tB tf tx) =
     vmapI <$> tI <*> tD <*> pure (fromIrrelevant i1) <*> binder tA <*> pure (fromIrrelevant i2) <*> binder tB <*> tf <*> tx
 eval (LiftI tI tD x tA i a tP tx) =
     vliftI <$> tI <*> tD <*> pure (fromIrrelevant x) <*> binder tA <*> pure (fromIrrelevant i) <*> pure (fromIrrelevant a) <*> binder (binder tP) <*> tx
-eval InductionI         = pure (VLam "I" $ \vI ->
-                                VLam "D" $ \vD ->
-                                VLam "P" $ \vP ->
-                                VLam "k" $ \vk ->
-                                VLam "i" $ \vi ->
-                                VLam "x" $ \vx ->
-                                vinductionI vI vD vP vk vi vx)
 eval (Eliminate tyI tD ti t i1 x1 tP i2 x2 p2 tK) =
     veliminate <$> tyI <*> tD <*> ti <*> t
                <*> pure (fromIrrelevant i1) <*> pure (fromIrrelevant x1) <*> binder (binder tP)

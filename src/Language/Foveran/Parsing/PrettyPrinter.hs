@@ -117,7 +117,6 @@ pprint (LiftI tD x tA i a tP tx) =
                                                       , tx ]
                                 , "]" ]
 pprint (MuI t1 t2)         = paren 01 ("muI" <+> sep [down t1, down t2])
-pprint InductionI          = "inductionI"
 pprint (Eliminate t Nothing i x p tK) =
     "eliminate" <+> t <+> "then" <+> ppPattern i <+> ppPattern x <+> ppPattern p <> "." $$
     nest 2 tK
