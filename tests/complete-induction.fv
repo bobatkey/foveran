@@ -1,254 +1,238 @@
-data Nat : Set :=
-  | zero :
-  | succ : Nat
-  ;
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
 
-natInduction : (Φ : Nat → Set 2) →
-               (Φ zero) →
-               ((n : Nat) → Φ n → Φ (succ n)) →
-               (n : Nat) → Φ n;
-natInduction Φ φ0 φS =
-  induction NatDesc Φ
-            (\x. case x for x. lift NatDesc Nat Φ x → Φ (construct x) with
-                    { inl u. \u'. φ0
-                    ; inr n. \φn. φS n φn
-                    });
+lt : Nat -> Nat -> Set
+lt n1 = recursionOn n1 with
+  `zero.    \n2. casesOn n2 with `zero. Empty; `succ n2. Unit
+  `succ n1. \n2. casesOn n2 with `zero. Empty; `succ n2. recurseOn n1 n2
 
-deconstruct'' : (F : Desc) → µ F → sem F (µ F) ;
-deconstruct'' F = induction F (\x. sem F (µ F)) (\x p. x);
+ltZero : (n : Nat) -> lt n `zero -> Empty
+ltZero n = casesOn n with
+  `zero.   \lt. lt
+  `succ n. \lt. lt
 
-deconstruct''' : (I : Set) -> (D : I -> IDesc I) -> (i : I) -> muI I D i -> semI[D i, i. muI I D i]
-deconstruct''' I D i x = eliminate x with i x p. x
+ltSucc : (n : Nat) -> lt n (`succ n)
+ltSucc n = inductionOn n with
+  `zero. ()
+  `succ n. inductionHypothesisFor n
 
-destructNat : (Φ : Nat → Set 2) → Φ zero → ((n : Nat) → Φ (succ n)) → (n : Nat) → Φ n;
-destructNat Φ z s = natInduction Φ z (λn p. s n);
+lt_le_trans : (a b c : Nat) -> lt a b -> lt b (`succ c) -> lt a c
+lt_le_trans a = inductionOn a with
+  `zero. \b c. casesOn b with
+    `zero. \lt_zero_zero _. absurdBy lt_zero_zero
+    `succ b. \lt_zero_Sb. casesOn c with
+      `zero. \lt_b_zero. absurdBy (ltZero b lt_b_zero)
+      `succ c. \_. ()
+  `succ a. \b c. casesOn b with
+    `zero. \lt_a_zero _. absurdBy lt_a_zero
+    `succ b. \lt_a_b. casesOn c with
+      `zero. \lt_b_zero. absurdBy (ltZero b lt_b_zero)
+      `succ c. inductionHypothesisFor a b c lt_a_b
 
-caseNat : (A : Set 1) → A → (Nat → A) → Nat → A ;
-caseNat A a f n = case deconstruct'' NatDesc n for x. A with
-                    { inl u. a
-                    ; inr n. f n
-                    };
+complete-nat-induction-helper :
+  (P : Nat -> Set 2) ->
+  ((n : Nat) -> ((m : Nat) -> lt m n -> P m) -> P n) ->
+  (n : Nat) ->
+  (m : Nat) ->
+  lt m n ->
+  P m
+complete-nat-induction-helper P k n = inductionOn n with
+  `zero.   \m p. absurdBy ltZero m p
+  `succ n. \m p. k m (\o p'. recurseOn n o (lt_le_trans o m n p' p))
 
-lt : Nat → Nat → Set;
-lt = natInduction (λx. Nat → Set)
-                  (λy. caseNat Set Empty (λy. Unit) y)
-                  (λx f y. caseNat Set Empty f y);
+complete-nat-induction :
+  (P : Nat -> Set 2) ->
+  ((n : Nat) -> ((m : Nat) -> lt m n -> P m) -> P n) ->
+  (n : Nat) -> P n
+complete-nat-induction P k n =
+  complete-nat-induction-helper P k (`succ n) n (ltSucc n)
 
-one : Nat ;
-one = succ zero;
+--------------------------------------------------------------------------------
+-- Datatype generic complete-induction, using a "memoisation table" approach
 
-two : Nat ;
-two = succ one;
+all :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (X : I -> Set) ->
+  (P : (i : I) -> X i -> Set 2) ->
+  (p : (i : I) -> (x : X i) -> P i x) ->
+  (xs : semI[D, i. X i]) ->
+  liftI[D, i. X i, i x. P i x, xs]
+all I D X P p =
+  elimID I (\D. (xs : semI[D, i. X i]) -> liftI[D, i. X i, i x. P i x, xs])
+    (\i x. p i x)
+    (\A a. ())
+    (\D1 D2 rD1 rD2 «xs1,xs2». «rD1 xs1, rD2 xs2»)
+    (\A D rD «a,xs». rD a xs)
+    (\A D rD f a. rD a (f a))
+    D
 
-three : Nat ;
-three = succ two;
+swizzle :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (X : I -> Set) ->
+  (x : semI[D, i. X i]) ->
+  (p : liftI[D, i. X i, i x. Set, x]) ->
+  Set
+swizzle I D X =
+  elimID I (\D. (x : semI[D, i. X i]) -> (p : liftI[D, i. X i, i x. Set, x]) -> Set)
+    (\i x S. S)
+    (\A x u. Unit)
+    (\D1 D2 rD1 rD2 «x1,x2» «p1,p2». rD1 x1 p1 × rD2 x2 p2)
+    (\A D rD «a,xs» p. rD a xs p)
+    (\A D rD f p. (a : A) -> rD a (f a) (p a))
+    D
 
-ltZero : (n : Nat) → lt n zero → Empty;
-ltZero = destructNat (λn. lt n zero → Empty)
-                     (λx. x)
-                     (λn x. x);
+-- this is one way of defining the carrier for complete induction. The
+-- other way would be to define an inductive family that describes the
+-- same data.
+ciRec :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (i : I) ->
+  muI I D i ->
+  Set
+ciRec I D P i x =
+  eliminate x then i x r.
+  P i (construct x) × swizzle I (D i) (muI I D) x r
 
-{-
-ltOne : (Φ : Nat → Set 2) → Φ zero → (n : Nat) → lt n one → Φ n;
-ltOne Φ z = natInduction (λn → lt n one → Φ n)
-                         (λp → z)
-                         (λn p₁ p₂ → elimEmpty (Φ (succ n)) (ltZero n p₂));
+step :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (i : I) ->
+  (x : semI[D i, i. muI I D i]) ->
+  liftI[D i, i. muI I D i, i x. ciRec I D P i x, x] ->
+  swizzle I (D i) (muI I D) x (all I (D i) (muI I D) (\_ _. Set) (ciRec I D P) x)
+step I D P i =
+  elimID I
+    (\D'.
+      (x : semI[D', i. muI I D i]) ->
+      liftI[D', i. muI I D i, i x. ciRec I D P i x, x] ->
+      swizzle I D' (muI I D) x (all I D' (muI I D) (\_ _. Set) (ciRec I D P) x))
+    (\i x p. p)
+    (\A x _. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «p1,p2». «rD1 x1 p1,rD2 x2 p2»)
+    (\A D rD «a,x» p. rD a x p)
+    (\A D rD f p a. rD a (f a) (p a))
+    (D i)
+
+-- FIXME: prove that this is the inverse to ‘step’.
+unstep :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (i : I) ->
+  (x : semI[D i, i. muI I D i]) ->
+  swizzle I (D i) (muI I D) x (all I (D i) (muI I D) (\_ _. Set) (ciRec I D P) x) ->
+  liftI[D i, i. muI I D i, i x. ciRec I D P i x, x]
+unstep I D P i =
+  elimID I
+    (\D'.
+      (x : semI[D', i. muI I D i]) ->
+      swizzle I D' (muI I D) x (all I D' (muI I D) (\_ _. Set) (ciRec I D P) x) ->
+      liftI[D', i. muI I D i, i x. ciRec I D P i x, x])
+    (\i x p. p)
+    (\A x _. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «p1,p2». «rD1 x1 p1,rD2 x2 p2»)
+    (\A D rD «a,x» p. rD a x p)
+    (\A D rD f p a. rD a (f a) (p a))
+    (D i)
+
+project1 : (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (i : I) ->
+  (x : muI I D i) -> ciRec I D P i x -> P i x
+project1 I D P i x =
+  eliminate x then _ _ _. \«p,_». p
+
+project2 : (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  ciRec I D P i x ->
+  liftI[D i, i. muI I D i, i x. ciRec I D P i x, eliminate x then _ x _. x]
+project2 I D P i x =
+  eliminate x then i x _. \«_,p». unstep I D P i x p
+
+completeInduction :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set) ->
+  (k : (i : I) -> (x : semI[D i, i. muI I D i]) -> liftI[D i, i. muI I D i, i x. ciRec I D P i x, x] -> P i (construct x)) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  P i x
+completeInduction I D P k i x =
+  project1 I D P i x (eliminate x then i x p. «k i x p, step I D P i x p»)
+
+--------------------------------------------------------------------------------
+-- fibonacci function, as an example of complete induction
+add : Nat -> Nat -> Nat
+add n1 n2 = recursionOn n1 with `zero. n2; `succ n1. `succ (recurseOn n1)
+
+mul : Nat -> Nat -> Nat
+mul n1 n2 = recursionOn n1 with `zero. `zero; `succ n1. add n2 (recurseOn n1)
+
+fibonacci : Nat -> Nat
+fibonacci = completeInduction Unit Nat:code (\_ _. Nat)
+  (\_ «c,d».
+    generalise d then
+    case c with
+      inl _. \eq _. `succ `zero
+      inr _. \«n,eq». casesOn n with
+        `zero. \_. `succ `zero
+        `succ n2. \««r_n1, p», _».
+          generalise p then
+          casesOn n2 with
+            `zero. \««r_n2,_»,_».    add r_n1 r_n2
+            `succ _. \««r_n2,_», _». add r_n1 r_n2
+  )
+  ()
+
+-- version using the projection functions...
+{- Old comment:
+-- this seems unneccesarily difficult. I think this is because the next
+-- step of the recursion is hidden in the definition of ciRec, and needs
+-- a case analysis to extract it. If the complete induction principle was
+-- defined as having lift F (µ F) (λx. P x × ciRec F P x) as the
+-- induction hypothesis, then it might be easier
 -}
+fibonacci2 : Nat -> Nat
+fibonacci2 = completeInduction Unit Nat:code (\_ _. Nat)
+  (\_ «c,d».
+    generalise d then
+        case c with
+      inl _. \eq _. `succ `zero
+      inr _. \«n,eq». \«p,_».
+        generalise project2 Unit Nat:code (\_ _. Nat) () n p then
+        casesOn n with
+        `zero. \_. `succ `zero
+        `succ n2. \«p',_». add (project1 Unit Nat:code (\_ _. Nat) () n p) (project1 Unit Nat:code (\_ _. Nat) () n2 p')
+  )
+  ()
 
-{-
-lt_succ : (a b c : Nat) → lt a b → lt b c → lt a c;
-lt_succ = natInduction
-             (λa → (b c : Nat) → lt a b → lt b c → lt a c)
-             ()
-             ();
--}
 
-assume lt_le_trans : (a b c : Nat) → lt a b → lt b (succ c) → lt a c;
-
-lt_succ : (n : Nat) → lt n (succ n);
-lt_succ = natInduction (\n. lt n (succ n)) () (\n p. p);
-
-completeNatInduction : (Φ : Nat → Set 2) →
-		       ((n : Nat) → ((m : Nat) → lt m n → Φ m) → Φ n) →
-                       (n : Nat) → Φ n;
-completeNatInduction Φ k n =
-  natInduction
-    (λn. (m : Nat) → lt m n → Φ m)
-    (λm p. elimEmpty ltZero m p)
-    (λn p₁ m p₂. k m (λo p₃. p₁ o (lt_le_trans o m n p₃ p₂)))
-    (succ n)
-    n
-    (lt_succ n);
-
--- and what have we learned? bugger all.
--- can we do this generically for all F : Desc?
--- how to describe what the generic version of sub-term is?
-
-out : (F : Desc) → µ F → sem F (µ F) ;
-out F = induction F (\x. sem F (µ F)) (\x p. x);
-
-all : (D : Desc) →
-      (X : Set) →
-      (P : X → Set 2) →
-      (p : (x : X) → P x) →
-      (xs : sem D X) →
-      lift D X P xs ;
-all D X P p = elimD (\D. (xs : sem D X) → lift D X P xs)
-                    (\A x. ())
-                    (\x. p x)
-                    (\F G f g x. «f (fst x), g (snd x)»)
-                    (\F G f g x. case x for d. lift (F “+” G) X P d with
-                                    { inl y. f y
-                                    ; inr z. g z
-                                    }) 
-                   D;
-
-swizzle : (F : Desc) →
-          (X : Set) →
-          (x : sem F X) →
-          (p : lift F X (λx. Set) x) →
-          Set ;
-swizzle F X = elimD (λF'. (x : sem F' X) → lift F' X (λx. Set) x → Set)
-                    (λA x u. Unit)
-                    (λx S. S)
-                    (λG H g h x p. g (fst x) (fst p) × h (snd x) (snd p))
-                    (λG H g h x. case x for x. lift (G “+” H) X (λx. Set) x → Set with
-                                    { inl x₁. g x₁
-                                    ; inr x₂. h x₂
-                                    })
-                    F;
-
-– this is one way of defining the carrier for complete induction. The
-– other way would be to define an inductive family that describes the
-– same data.
-ciRec : (F : Desc) → (µ F → Set) → µ F → Set ;
-ciRec F P = induction F (λx. Set) (λx p. P (construct x) × swizzle F (µ F) x p);
-
-step : (F : Desc) →
-       (P : µ F → Set) →
-       (x : sem F (µ F)) →
-       lift F (µ F) (λx. ciRec F P x) x →
-       swizzle F (µ F) x (all F (µ F) (λx. Set) (λx. ciRec F P x) x) ;
-step F P =
-  elimD (λF'. (x : sem F' (µ F)) →
-               lift F' (µ F) (λx. ciRec F P x) x →
-               swizzle F' (µ F) x (all F' (µ F) (λx. Set) (λx. ciRec F P x) x))
-        (λA x u. ⋄)
-        (λx p. p)
-        (λG H g h x p. « g (fst x) (fst p), h (snd x) (snd p) »)
-        (λG H g h x. case x for x. lift (G “+” H) (µ F) (λx. ciRec F P x) x →
-                                    swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx. Set) (λx. ciRec F P x) x) with
-                        { inl x₁. g x₁
-                        ; inr x₂. h x₂
-                        })
-        F;
-
-unstep : (F : Desc) →
-         (P : µ F → Set) →
-         (x : sem F (µ F)) →
-         swizzle F (µ F) x (all F (µ F) (λx. Set) (λx. ciRec F P x) x) →
-         lift F (µ F) (λx. ciRec F P x) x ;
-unstep F P =
-  elimD (λF'. (x : sem F' (µ F)) →
-               swizzle F' (µ F) x (all F' (µ F) (λx. Set) (λx. ciRec F P x) x) →
-               lift F' (µ F) (λx. ciRec F P x) x)
-        (λA x u. ⋄)
-        (λx p. p)
-        (λG H g h x p. « g (fst x) (fst p), h (snd x) (snd p) »)
-        (λG H g h x. case x for x. swizzle (G “+” H) (µ F) x (all (G “+” H) (µ F) (λx. Set) (λx. ciRec F P x) x) →
-                                    lift (G “+” H) (µ F) (λx. ciRec F P x) x with
-                        { inl x₁. g x₁
-                        ; inr x₂. h x₂
-                        })
-        F;
-
-– FIXME: prove that this is the inverse to ‘step’.
-
-genericCase : (D : Desc) → (P : µ D → Set 2) → ((x : sem D (µ D)) → P (construct x)) → (x : µ D) → P x ;
-genericCase D P k = induction D P (λx p. k x);
-
-project₁ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → P x;
-project₁ F P = genericCase F (λx. ciRec F P x → P x) (λx p. fst p);
-
-– to make the fibonacci example below easier, why not write a second
-– projection function that extracts lift F (µ F) (λx → ciRec F P x) (deconstruct x) 
-project₂ : (F : Desc) → (P : µ F → Set) → (x : µ F) → ciRec F P x → lift F (µ F) (λx. ciRec F P x) (deconstruct'' F x);
-project₂ F P = genericCase F (λx. ciRec F P x → lift F (µ F) (λx. ciRec F P x) (deconstruct'' F x))
-                           (λx p. unstep F P x (snd p));
-
-completeInduction : (F : Desc) →
-                    (P : µ F → Set) →
-                    ((x : sem F (µ F)) → lift F (µ F) (λx. ciRec F P x) x → P (construct x)) →
-                    (x : µ F) →
-                    P x;
-completeInduction F P f x = project₁ F P x
-                                     (induction F (λx. ciRec F P x)
-                                                (λx p. «f x p, step F P x p»)
-                                                x);
-
-caseNat2 : (A : Nat → Set 2) → (A zero) → ((n : Nat) → A (succ n)) → (n : Nat) → A n;
-caseNat2 A a f = induction NatDesc A
-                           (λx p. case x for x. A (construct x) with
-                                     { inl u. a
-                                     ; inr n. f n
-                                     });
-
-add : Nat → Nat → Nat;
-add n₁ n₂ = natInduction (λx. Nat) n₂ (λx. succ) n₁;
-
-mul : Nat → Nat → Nat;
-mul n₁ n₂ = natInduction (λx. Nat) zero (λn. add n₂) n₁;
-
-– this seems unneccesarily difficult. I think this is because the next
-– step of the recursion is hidden in the definition of ciRec, and needs
-– a case analysis to extract it. If the complete induction principle was
-– defined as having lift F (µ F) (λx → P x × ciRec F P x) as the
-– induction hypothesis, then it might be easier
-
-– or we could use project to extract the current level.
-fibonacci : Nat → Nat;
-fibonacci = completeInduction NatDesc (λx. Nat)
-                              (λx. case x for x. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) x → Nat with
-                                      { inl u. λd. succ zero
-                                      ; inr n. caseNat2
-                                                  (λx. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) (inr x) → Nat)
-                                                  (λp. fst p)
-                                                  (λn p.
-                                                     caseNat2 (λx. lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) (inr x) → Nat)
-                                                              (λq. add (fst p) (fst q))
-                                                              (λn q. add (fst p) (fst q))
-                                                              n (snd p))
-                                                  n
-                                      });
-
-– another version using the projection functions, which seems easier (modulo problems with explicit annotations)
-P : sem NatDesc Nat → Set 2;
-P n = lift NatDesc Nat (λx. ciRec NatDesc (λx. Nat) x) n → Nat;
-
-fibonacci2 : Nat → Nat;
-fibonacci2 = completeInduction NatDesc (λx. Nat)
-                               (λx. case x for x. P x with
-			               { inl u. λd. succ zero
-                                       ; inr n. λp.
-                                           caseNat2 (λx. P (deconstruct'' NatDesc x))
-                                             (λq. succ zero)
-                                             (λn' p'. add (project₁ NatDesc (λx. Nat) n p) (project₁ NatDesc (λx. Nat) n' p'))
-                                             n
-                                             (project₂ NatDesc (λx. Nat) n p)
-                                       });
+two : Nat
+two = `succ (`succ `zero)
 
 four : Nat;
 four = mul two two;
 
 five : Nat;
-five = succ four;
+five = `succ four;
 
 eight : Nat;
 eight = mul four two;
 
-test : (P : Nat → Set) → P eight → P (fibonacci five);
-test P x = x;
+test : fibonacci five == eight
+test = refl
 
-test2 : (P : Nat → Set) → P eight → P (fibonacci2 five);
-test2 P x = x;
+test2 : fibonacci2 five == eight
+test2 = refl
 
+;
