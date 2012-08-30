@@ -12,17 +12,14 @@ lexicographic :
   (n m : Nat) -> P n m;
 lexicographic P p1 p2 p3 p4 n =
   inductionOn n with
-    { `zero. \m.
+    `zero. \m.
       inductionOn m with
-        { `zero.   p1
-        ; `succ m. p2 m (inductionHypothesisFor m)
-        }
-    ; `succ n. \m.
+        `zero.   p1
+        `succ m. p2 m (inductionHypothesisFor m)
+    `succ n. \m.
       inductionOn m with
-        { `zero.   p3 n (inductionHypothesisFor n)
-        ; `succ m. p4 n (inductionHypothesisFor n) m (inductionHypothesisFor m)
-        }
-    }
+        `zero.   p3 n (inductionHypothesisFor n)
+        `succ m. p4 n (inductionHypothesisFor n) m (inductionHypothesisFor m)
 
 -- and in general:
 
@@ -41,68 +38,9 @@ lex :
    (i2 : I2) -> (y : muI I2 D2 i2) ->
    P i1 x i2 y
 lex I1 I2 D1 D2 P k i1 x =
-  eliminate x with i1 x ih_x.
-    \i2 y.
-    eliminate y with i2 y ih_y.
-      k i1 i2 x y ih_x ih_y
-
---assume induction : (D : Desc) →
---                   (P : µ D → Set 2) →
---                   (k : (x : sem D (µ D)) → lift D (µ D) P x → P (construct D x)) →
---                   (x : µ D) →
---                   P x;
-
-– components:
-– 1. A : The type “µ D”
-– 2. B : The type sem “D (µ D)”
-– 3. c : The function “construct : sem D (µ D) → µ D”
-– 4. H : The function “lift D (µ D) : (µ D → Set 2) → sem D (µ D) → Set 2”
-– 5. induct : (A → Set 2) → ((x : B) → H P x → P (c x)) → (x : A) → P x
-
-{-
-inductor : Set → Set 3;
-inductor A = (B : Set) ×
-             (c : B → A) ×
-             (H : (A → Set 2) → B → Set 2) ×
-             ((Φ : A → Set 2) → ((x : B) → H Φ x → Φ (c x)) → (x : A) → Φ x);
-
-subCarrier : (A : Set) → inductor A → Set;
-subCarrier A I = fst I;
-
-cons : (A : Set) → (I : inductor A) → subCarrier A I → A;
-cons A I = fst (snd I);
-
-indHyp : (A : Set) → (I : inductor A ) → (A → Set 2) → subCarrier A I → Set 2;
-indHyp A I = fst (snd (snd I));
-
-induct : (A : Set) →
-         (I : inductor A) →
-         (Φ : A → Set 2) →
-         ((x : subCarrier A I) → indHyp A I Φ x → Φ (cons A I x)) →
-         (x : A) → Φ x;
-induct A I = snd (snd (snd I));
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– every description's µ has an inductor:
-desc-inductor : (D : Desc) → inductor (µ D);
-desc-inductor D = « sem D (µ D), « λx. construct x, « lift D (µ D), induction D »»»;
-
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-– combination by lexicographic induction
-lexico-inductor : (A : Set) → (AI : inductor A) →
-                  (B : Set) → (BI : inductor B) →
-                  inductor (A × B);
-lexico-inductor A AI B BI =
-  « subCarrier A AI × subCarrier B BI,
-  « λp. «cons A AI (fst p), cons B BI (snd p)»,
-  « λΦ p.   indHyp A AI (λa. (b : B) → Φ «a,b») (fst p)
-          × indHyp B BI (λb. Φ «cons A AI (fst p), b») (snd p),
-  λΦ k p. induct A AI (λa. (b : B) → Φ «a,b»)
-                  (λa φa. induct B BI (λb. Φ «cons A AI a, b»)
-                                  (λb φb. k «a,b» «φa, φb»))
-                  (fst p)
-                  (snd p)
-  »»»;
--}
+  eliminate x then i1 x ih_x.
+  \i2 y.
+  eliminate y then i2 y ih_y.
+  k i1 i2 x y ih_x ih_y
 
 ;
