@@ -43,8 +43,9 @@ Between x «l,u» = BTLe Nat Le l (`el x) × BTLe Nat Le (`el x) u
 OList:Desc : Bounds -> IDesc Bounds
 OList:Desc «l,u» =
   "Sg" (Unit + Unit)
-    (\c. case c with { inl _. "K" (BTLe Nat Le l u)
-                     ; inr _. "Sg" Nat (\n. "IId" «`el n,u» “×” "K" (BTLe Nat Le l (`el n))) })
+    (\c. case c with
+      { inl _. "K" (BTLe Nat Le l u)
+      ; inr _. "Sg" Nat (\n. "IId" «`el n,u» “×” "K" (BTLe Nat Le l (`el n))) })
 
 {-
 - explicit mentioning of the index variable. Doesn't generate equalities...
@@ -79,11 +80,10 @@ insertionsort l = recursionOn l with
   `nil.      construct «inl (), ()»
   `cons n l. insert «`bot,`top» n (recurseOn l) «(),()»
 
-{-
 normalise insertionsort (`cons (`succ `zero)
                          (`cons `zero
                           (`cons (`succ (`succ (`succ `zero)))
                            (`cons (`succ (`succ `zero))
                             `nil))))
--}
+
 ;
