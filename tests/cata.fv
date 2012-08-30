@@ -26,6 +26,6 @@ cata : (I : Set) ->
        ((i : I) -> semI[D i, i. A i] -> A i) ->
        (i : I) -> muI I D i -> A i;
 cata I D A k i x =
-  eliminate x then i x φ. k i (idrop I D A i x φ)
+  eliminate x then i x φ. k i (drop I D A i x φ)
 
 ;
