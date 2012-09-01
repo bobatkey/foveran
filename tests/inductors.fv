@@ -1,0 +1,729 @@
+inductor :
+  (I : Set) ->
+  (I -> Set) ->
+  Set 2
+inductor I A =
+  (H : ((i : I) × A i) -> IDesc ((i : I) × A i)) ×
+  ((P : (i : I) -> A i -> Set) ->
+   ((i : I) -> (a : A i) -> semI[H «i,a», «i,a». P i a] -> P i a) ->
+   (i  : I) -> (a : A i) -> P i a)
+
+----------------------------------------------------------------------
+-- some times to do with liftI
+
+-- liftI is an applicative functor:
+ap :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P Q : (i : I) -> A i -> Set 1) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i a. P i a -> Q i a, x] ->
+  liftI[D, i. A i, i a. P i a, x] ->
+  liftI[D, i. A i, i a. Q i a, x]
+ap I D A P Q =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         liftI[D, i. A i, i a. P i a -> Q i a, x] ->
+         liftI[D, i. A i, i a. P i a, x] ->
+         liftI[D, i. A i, i a. Q i a, x])
+    (\i a f p. f p)
+    (\A a _ _. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «f1,f2» «p1,p2».
+      «rD1 x1 f1 p1, rD2 x2 f2 p2»)
+    (\B D rD «b,x» f p. rD b x f p)
+    (\B D rD g f l. \b. rD b (g b) (f b) (l b))
+    D
+
+all :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P : (i : I) -> A i -> Set 1) ->
+  (p : (i : I) -> (a : A i) -> P i a) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i a. P i a, x]
+all I D A P p =
+  elimID I
+    (\D. (x : semI[D, i. A i]) -> liftI[D, i. A i, i a. P i a, x])
+    p
+    (\B b. ())
+    (\D1 D2 rD1 rD2 «x1,x2». «rD1 x1, rD2 x2»)
+    (\B D rD «b,x». rD b x)
+    (\B D rD f. \b. rD b (f b))
+    D
+
+liftIDesc :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  semI[D, i. A i] ->
+  IDesc ((i : I) × A i)
+liftIDesc I D A =
+  elimID I (\D. semI[D, i. A i] -> IDesc ((i : I) × A i))
+    (\i a. "IId" «i,a»)
+    (\B b. "K" Unit)
+    (\D1 D2 rD1 rD2 «x,y». rD1 x “×” rD2 y)
+    (\B D rD «b,x». rD b x)
+    (\B R rD f. "Pi" B (\b. rD b (f b)))
+    D
+
+liftI-to-liftIDesc :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P : (i : I) -> A i -> Set 1) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i a. P i a, x] ->
+  semI[liftIDesc I D A x, «i,a». P i a]
+liftI-to-liftIDesc I D A P =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         liftI[D, i. A i, i a. P i a, x] ->
+         semI[liftIDesc I D A x, «i,a». P i a])
+    (\i a p. p)
+    (\B b u. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «p1,p2». «rD1 x1 p1, rD2 x2 p2»)
+    (\B D rD «b,x» p. rD b x p)
+    (\B D rD f p b. rD b (f b) (p b))
+    D
+
+liftIDesc-to-liftI :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (P : (i : I) -> A i -> Set 1) ->
+  (x : semI[D, i. A i]) ->
+  semI[liftIDesc I D A x, «i,a». P i a] ->
+  liftI[D, i. A i, i a. P i a, x]
+liftIDesc-to-liftI I D A P =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         semI[liftIDesc I D A x, «i,a». P i a] ->
+         liftI[D, i. A i, i a. P i a, x])
+    (\i a p. p)
+    (\B b u. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «p1,p2». «rD1 x1 p1, rD2 x2 p2»)
+    (\B D rD «b,x» p. rD b x p)
+    (\B D rD f p b. rD b (f b) (p b))
+    D
+
+idesc-inductor :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  inductor I (muI I D)
+idesc-inductor I D =
+  « \«i,x». liftIDesc I (D i) (muI I D) (eliminate x then _ x _. x)
+  , \P k i x.
+      eliminate x then i x ih.
+      k i (construct x) (liftI-to-liftIDesc I (D i) (muI I D) P x ih)
+  »
+
+----------------------------------------------------------------------
+lex-inductor :
+  (I : Set) ->
+  (A : I -> Set) ->
+  inductor I A ->
+  (J : Set) ->
+  (B : J -> Set) ->
+  inductor J B ->
+  inductor (I × J) (\«i,j». A i × B j)
+lex-inductor I A «ihA,indA» J B «ihB,indB» =
+  « \««i,j», «a,b»».
+        (bind «i,a» <- ihA «i,a» in
+         "Pi" J (\j. "Pi" (B j) (\b. "IId" ««i,j», «a,b»»)))
+    “×” (bind «j,b» <- ihB «j,b» in
+         "IId" ««i,j»,«a,b»»)
+  , \P k «i,j» «a,b».
+      indA (\i a. (j : J) -> (b : B j) -> P «i,j» «a,b»)
+        (\i a pa.
+          indB (\j b. P «i,j» «a,b»)
+            (\j b pb. k «i,j» «a,b» «pa,pb»))
+        i
+        a
+        j
+        b
+  »
+
+----------------------------------------------------------------------
+flat :
+  (I : Set) ->
+  (A : I -> Set) ->
+  inductor I A
+flat I A =
+  « \«i,a». "K" Unit
+  , \P k i a. k i a ()
+  »
+
+----------------------------------------------------------------------
+pair-inductor :
+  (I : Set) ->
+  (A : I -> Set) ->
+  inductor I A ->
+  (J : Set) ->
+  (B : J -> Set) ->
+  inductor J B ->
+  inductor (I × J) (\«i,j». A i × B j)
+pair-inductor I A «ihA,indA» J B «ihB,indB» =
+  « \««i,j», «a,b»».
+         (bind «i,a» <- ihA «i,a» in "IId" ««i,j», «a,b»»)
+     “×” (bind «j,b» <- ihB «j,b» in "IId" ««i,j», «a,b»»)
+  , \P k «i,j» «a,b».
+      indA (\i a. (j : J) -> (b : B j) -> P «i,j» «a,b»)
+       (\i a pa.
+         indB (\j b. P «i,j» «a,b»)
+           (\j b pb. k «i,j» «a,b»
+             «mapI[ihA «i,a»,
+                   «i,a». (j : J) -> (b : B j) -> P «i,j» «a,b»,
+                   «i,a». P «i,j» «a,b»,
+                   \«i,a» f. f j b,
+                   pa]
+             ,pb»))
+       i a j b
+  »
+
+----------------------------------------------------------------------
+maybe : (I : Set) -> (I -> Set) -> (I -> Set)
+maybe I A = \i. Unit + A i
+
+with-bottom :
+  (I : Set) ->
+  (A : I -> Set) ->
+  inductor I A ->
+  inductor I (maybe I A)
+with-bottom I A «ihA,indA» =
+  « \«i,a». case a with
+      inl _. "Pi" I (\i. "Pi" (A i) (\a. "IId" «i,inr a»))
+      inr a. bind «i,a» <- ihA «i,a» in "IId" «i,inr a»
+  , \P k i s. case s with
+      inl _.
+        k i (inl ())
+          (indA (\i a. P i (inr a)) (\i a pa. k i (inr a) pa))
+      inr a.
+        indA (\i a. P i (inr a)) (\i a pa. k i (inr a) pa) i a
+  »
+
+with-top :
+  (I : Set) ->
+  (A : I -> Set) ->
+  inductor I A ->
+  inductor I (maybe I A)
+with-top I A «ihA, indA» =
+  « \«i,s». case s with
+      inl _. "K" Unit
+      inr a. (bind «i,a» <- ihA «i,a» in "IId" «i,inr a»)
+             “×” "IId" «i,inl ()»
+  , \P k i s. case s with
+      inl _. k i (inl ()) ()
+      inr a.
+        indA (\i a. P i (inr a))
+          (\i a pa. k i (inr a) «pa, k i (inl ()) ()»)
+          i a
+  »
+
+----------------------------------------------------------------------
+-- comonadic induction
+
+comonad : (I : Set) -> (A : I -> Set) -> Set 2
+comonad I A =
+  (W      : ((i : I) × A i) -> IDesc ((i : I) × A i)) ×
+  (counit : (P : (i : I) -> A i -> Set 1) ->
+            (i : I) -> (a : A i) ->
+            semI[W «i,a», «i,a». P i a] ->
+            P i a) ×
+  (cojoin : (P : (i : I) -> A i -> Set 1) ->
+            (i : I) -> (a : A i) ->
+            semI[W «i,a», «i,a». P i a] ->
+            semI[W «i,a», «i,a». semI[W «i,a», «i,a». P i a]]) ×
+  Unit
+
+comonadic-inductor :
+  (I  : Set) ->
+  (A  : I -> Set) ->
+  (AI : inductor I A) ->
+  (W  : comonad I A) ->
+  (d  : (P : (i : I) -> A i -> Set 1) ->
+        (i : I) -> (a : A i) ->
+        semI[fst AI «i,a», ia. semI[fst W ia, «i,a». P i a]] ->
+        semI[fst W «i,a», ia. semI[fst AI ia, «i,a». P i a]]) ->
+  inductor I A
+comonadic-inductor I A «ihA,indA» «W,counit,cojoin,_» d =
+  « \«i,a».
+      bind «i,a» <- ihA «i,a» in W «i,a»
+  , \P k i a.
+      counit P i a
+        (indA (\i a. semI[W «i,a», «i,a». P i a])
+           (\i a pa. 
+             mapI[W «i,a»,
+                  ia. semI[ihA ia, ia. semI[W ia, «i,a». P i a]],
+                  «i,a». P i a,
+                  \«i,a» p. k i a p,
+                  d (\i a. semI[W «i,a», «i,a». P i a]) i a
+                    mapI[ihA «i,a»,
+                         ia. semI[W ia, «i,a». P i a],
+                         ia. semI[W ia, ia. semI[W ia, «i,a». P i a]],
+                         \«i,a». cojoin P i a,
+                         pa]])
+           i a)
+  »
+
+----------------------------------------------------------------------
+-- primitive recursion inductors...
+primrec-inductor :
+  (I  : Set) ->
+  (A  : I -> Set) ->
+  (AI : inductor I A) ->
+  (Q  : (i : I) -> A i -> Set) ->
+  (k  : (i : I) -> (a : A i) -> semI[fst AI «i,a», «i,a». Q i a] -> Q i a) ->
+  inductor I A
+primrec-inductor I A «ihA,indA» Q k =
+  comonadic-inductor I A «ihA,indA»
+    « \«i,a». "K" (Q i a) “×” "IId" «i,a»
+    , \P i a «_,p». p
+    , \P i a «q,p». «q,q,p»
+    , ()»
+    (\P i a p.
+       « k i a mapI[ihA «i,a», «i,a». Q i a × P i a, «i,a». Q i a, \ia «q,p». q, p]
+       , mapI[ihA «i,a», «i,a». Q i a × P i a, «i,a». P i a, \ia «q,p». p, p]
+       »)
+
+----------------------------------------------------------------------
+-- complete induction, using a memoisation table
+collapse :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i x. IDesc ((i : I) × A i), x] ->
+  IDesc ((i : I) × A i)
+collapse I D A =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         liftI[D, i. A i, i x. IDesc ((i : I) × A i), x] ->
+         IDesc ((i : I) × A i))
+    (\i a desc. desc)
+    (\B b _. "K" Unit)
+    (\D1 D2 rD1 rD2 «x1,x2» «l1,l2». rD1 x1 l1 “×” rD2 x2 l2)
+    (\B D rD «b,x» l. rD b x l)
+    (\B D rD f l. "Pi" B (\b. rD b (f b) (l b)))
+    D
+
+step :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (p : (i : I) -> A i -> IDesc ((i : I) × A i)) ->
+  (P : (i : I) -> A i -> Set 1) ->
+  (x : semI[D, i. A i]) ->
+  liftI[D, i. A i, i x. semI[p i x, «i,x». P i x], x] ->
+  semI[collapse I D A x (all I D A (\i x. IDesc ((i : I) × A i)) p x), «i,x». P i x]
+step I D A p P =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         liftI[D, i. A i, i x. semI[p i x, «i,x». P i x], x] ->
+         semI[collapse I D A x (all I D A (\i x. IDesc ((i : I) × A i)) p x), «i,x». P i x])
+    (\i a x. x)
+    (\B b _. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «l1,l2». «rD1 x1 l1, rD2 x2 l2»)
+    (\B D rD «b,x» l. rD b x l)
+    (\B D rD f l. \b. rD b (f b) (l b))
+    D
+
+unstep :
+  (I : Set) ->
+  (D : IDesc I) ->
+  (A : I -> Set) ->
+  (p : (i : I) -> A i -> IDesc ((i : I) × A i)) ->
+  (P : (i : I) -> A i -> Set 1) ->
+  (x : semI[D, i. A i]) ->
+  semI[collapse I D A x (all I D A (\i x. IDesc ((i : I) × A i)) p x), «i,x». P i x] ->
+  liftI[D, i. A i, i x. semI[p i x, «i,x». P i x], x]
+unstep I D A p P =
+  elimID I
+    (\D. (x : semI[D, i. A i]) ->
+         semI[collapse I D A x (all I D A (\i x. IDesc ((i : I) × A i)) p x), «i,x». P i x] ->
+         liftI[D, i. A i, i x. semI[p i x, «i,x». P i x], x])
+    (\i a x. x)
+    (\B b _. ())
+    (\D1 D2 rD1 rD2 «x1,x2» «l1,l2». «rD1 x1 l1, rD2 x2 l2»)
+    (\B D rD «b,x» l. rD b x l)
+    (\B D rD f l. \b. rD b (f b) (l b))
+    D
+
+complete-carrier :
+  (I : Set) -> (D : I -> IDesc I) -> 
+  ((i : I) × muI I D i) -> IDesc ((i : I) × muI I D i)
+complete-carrier I D «i,x» =
+  eliminate x then i x r.
+  "IId" «i,construct x» “×” (collapse I (D i) (muI I D) x r)
+
+complete-snd :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set 1) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  semI[complete-carrier I D «i,x», «i,x». P i x] ->
+  liftI[D i,
+        i. muI I D i,
+        i x. semI[complete-carrier I D «i,x», «i,x». P i x],
+        eliminate x then _ x _. x]
+complete-snd I D P i x =
+  eliminate x then i x _.
+  \«_,p».
+  unstep I (D i) (muI I D) (\i x. complete-carrier I D «i,x») P x p
+
+complete-snd2 :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set 1) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  semI[complete-carrier I D «i,x», «i,x». P i x] ->
+  semI[fst (idesc-inductor I D) «i,x», ix. semI[complete-carrier I D ix, «i,x». P i x]]
+complete-snd2 I D P i x l =
+  liftI-to-liftIDesc I (D i) (muI I D) (\i x. semI[complete-carrier I D «i,x», «i,x». P i x]) (eliminate x then _ x _. x) (complete-snd I D P i x l)
+
+complete-counit :
+  (I : Set) -> 
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set 1) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  semI[complete-carrier I D «i,x», «i,x». P i x] ->
+  P i x
+complete-counit I D P i x =
+  eliminate x then _ x _. \«p,_». p
+
+complete-cojoin :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set 1) ->
+  (i : I) ->
+  (x : muI I D i) ->
+  semI[complete-carrier I D «i,x», «i,x». P i x] ->
+  semI[complete-carrier I D «i,x», ix. semI[complete-carrier I D ix, «i,x». P i x]]
+complete-cojoin I D P i x =
+  eliminate x then i x p.
+  \q.
+  « q
+  , step I (D i) (muI I D)
+      (\i x. complete-carrier I D «i,x»)
+      (\i x. semI[complete-carrier I D «i,x», «i,x». P i x])
+      x
+      (ap I (D i) (muI I D)
+        (\i x. semI[complete-carrier I D «i,x», «i,x». P i x])
+        (\i x. semI[complete-carrier I D «i,x», ix. semI[complete-carrier I D ix, «i,x». P i x]])
+        x
+        p
+        (complete-snd I D P i (construct x) q))
+  »
+
+complete-dist :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (P : (i : I) -> muI I D i -> Set 1) ->
+  (i : I) -> (x : muI I D i) ->
+  semI[fst (idesc-inductor I D) «i,x»,
+       ix. semI[complete-carrier I D ix, «i,x». P i x]] ->
+  semI[complete-carrier I D «i,x»,
+       ix. semI[fst (idesc-inductor I D) ix, «i,x». P i x]]
+complete-dist I D P i x =
+  eliminate x then i x p.
+  \y.
+  « mapI[fst (idesc-inductor I D) «i,construct x»,
+         ix. semI[complete-carrier I D ix, «i,x». P i x],
+         «i,x». P i x,
+         \«i,x». complete-counit I D P i x,
+         y]
+  , step I (D i) (muI I D) (\i x. complete-carrier I D «i,x»)
+      (\i x. semI[fst (idesc-inductor I D) «i,x», «i,x». P i x])
+      x
+      (ap I (D i) (muI I D)
+        (\i x. semI[fst (idesc-inductor I D) «i,x»,
+                    ix. semI[complete-carrier I D ix, «i,x». P i x]])
+        (\i x. semI[complete-carrier I D «i,x»,
+                    ix. semI[fst (idesc-inductor I D) ix, «i,x». P i x]])
+        x
+        p
+        (liftIDesc-to-liftI I (D i) (muI I D)
+          (\i x. semI[fst (idesc-inductor I D) «i,x»,
+                      ix. semI[complete-carrier I D ix, «i,x». P i x]])
+          x
+          mapI[fst (idesc-inductor I D) «i,construct x»,
+               ix. semI[complete-carrier I D ix, «i,x». P i x],
+               ix. semI[fst (idesc-inductor I D) ix,
+                        ix. semI[complete-carrier I D ix, «i,x». P i x]],
+               \«i,x». complete-snd2 I D P i x,
+               y]))
+  »
+
+
+complete-inductor :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  inductor I (muI I D)
+complete-inductor I D =
+  comonadic-inductor I (muI I D) (idesc-inductor I D)
+    « complete-carrier I D, complete-counit I D, complete-cojoin I D, ()»
+    (complete-dist I D)
+
+----------------------------------------------------------------------
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+add : Nat -> Nat -> Nat
+add n1 n2 = recursionOn n1 with
+  `zero. n2
+  `succ n1. `succ (recurseOn n1)
+
+one : Nat
+one = `succ `zero
+
+four : Nat
+four = `succ (`succ (`succ (`succ `zero)))
+
+five  : Nat
+five = `succ four
+
+eight : Nat
+eight = add four four
+
+fibonacci : Nat -> Nat
+fibonacci =
+  snd (complete-inductor Unit Nat:code) (\_ n. Nat)
+    (\_ n. casesOn n with
+      `zero. \_. one
+      `succ n. casesOn n with
+        `zero. \_. one
+        `succ n. \««rn,p,_»,_».
+          add rn (complete-counit Unit Nat:code (\_ _. Nat) () n p)
+    )
+    ()
+
+test-fibonacci : fibonacci five == eight
+test-fibonacci = refl
+
+----------------------------------------------------------------------
+eq1 : (A B : Set) ->
+      (a b : A × B) ->
+      a == b ->
+      fst a == fst b
+eq1 A B a b eq =
+  rewriteBy eq for x p. fst a == fst x then refl
+
+eq2 : (A B : Set) ->
+      (a b : A × B) ->
+      a == b ->
+      snd a == snd b
+eq2 A B a b eq =
+  rewriteBy eq for x p. snd a == snd x then refl;
+
+----------------------------------------------------------------------
+-- GCD...
+-- see also http://www.cse.chalmers.se/~nad/repos/lib/src/Data/Nat/GCD.agda
+add-succ : (n1 n2 : Nat) -> add (`succ n1) n2 == add n1 (`succ n2)
+add-succ n1 n2 = inductionOn n1 with
+  `zero.
+    refl
+  `succ n1.
+    rewriteBy inductionHypothesisFor n1 then
+    refl
+
+CompareView : Nat -> Nat -> Set
+CompareView n1 n2 =
+    (n1 == n2)
+  + ((k : Nat) × `succ (add n1 k) : Nat == n2)
+  + ((k : Nat) × `succ (add n2 k) : Nat == n1)
+
+compare : (n1 n2 : Nat) -> CompareView n1 n2
+compare n1 = recursionOn n1 with
+  `zero. \n2. casesOn n2 with
+    `zero. inl refl
+    `succ n2. inr (inl «n2, refl»)
+  `succ n1. \n2. casesOn n2 with
+    `zero. inr (inr «n1, refl»)
+    `succ n2. case recurseOn n1 n2 with
+      inl eq. inl (rewriteBy eq then refl)
+      inr c. case c with
+        inl «k,eq». inr (inl «k,rewriteBy eq then refl»)
+        inr «k,eq». inr (inr «k,rewriteBy eq then refl»)
+
+{-
+data CompareView : Nat × Nat -> Set where
+  `equal : (n : Nat) ->              CompareView «n,n»
+  `lt    : (n : Nat) -> (k : Nat) -> CompareView «n, `succ (add n k)»
+  `gt    : (n : Nat) -> (k : Nat) -> CompareView «`succ (add n k), n»
+
+compare : (n1 n2 : Nat) -> CompareView «n1,n2»
+compare n1 = recursionOn n1 with
+  `zero. \n2. casesOn n2 with
+    `zero.    `equal `zero
+    `succ n2. `lt `zero n2
+  `succ n1. \n2. casesOn n2 with
+    `zero.    `gt `zero n1
+    `succ n2.
+      eliminate recurseOn n1 n2
+        for «n1,n2» _. CompareView «`succ n1, `succ n2»
+        then «n1,n2» «c,d» _.
+      generalise d then
+      case c with
+        inl _.
+          \«n,eq».
+          rewriteBy eq1 Nat Nat «n,n» «n1,n2» eq then
+          rewriteBy eq2 Nat Nat «n,n» «n1,n2» eq then
+          `equal (`succ n)
+        inr c. case c with
+          inl _.
+            \«n,k,eq».
+            rewriteBy eq1 Nat Nat «n,`succ (add n k)» «n1,n2» eq then
+            rewriteBy eq2 Nat Nat «n,`succ (add n k)» «n1,n2» eq then
+            `lt (`succ n) k
+          inr _.
+            \«n,k,eq».
+            rewriteBy eq1 Nat Nat «`succ (add n k),n» «n1,n2» eq then
+            rewriteBy eq2 Nat Nat «`succ (add n k),n» «n1,n2» eq then
+            `gt (`succ n) k
+{-
+        -- FIXME: generalisation broken for pairs
+       casesOn recurseOn n1 n2 with
+        `equal n. `equal (`succ n)
+        `lt n k.  `lt (`succ n) k
+        `gt n k.  `gt (`succ n) k
+-}
+
+----------------------------------------------------------------------
+project :
+  (P : Nat -> Set) ->
+  (n : Nat) ->
+  semI[fst (complete-inductor Unit Nat:code) «(), `succ n», «_,n». P n] ->
+  P n
+project P n = casesOn n with
+  `zero. \««p,_»,_». p
+  `succ _. \««p,_»,_». p
+
+step-down :
+  (P : Nat -> Set) ->
+  (n : Nat) ->
+  semI[fst (complete-inductor Unit Nat:code) «(), `succ n», «_,n». P n] ->
+  semI[fst (complete-inductor Unit Nat:code) «(), n», «_,n». P n]
+step-down P n = casesOn n with
+  `zero. \_. ()
+  `succ n. \««_,p»,_». p
+
+descend :
+  (P : Nat -> Set) ->
+  (k n1 n2 : Nat) ->
+  `succ (add n1 k) : Nat == n2 ->
+  semI[fst (complete-inductor Unit Nat:code) «(),n2», «_,n». P n] ->
+  P k
+descend P k n1 = recursionOn n1 with
+  `zero.
+    \n2 eq.
+    rewriteBy eq then
+    project P k
+  `succ n1.
+    \n2 eq.
+    rewriteBy eq then
+    \p.
+    recurseOn n1 (`succ (add n1 k)) refl (step-down P (`succ (add n1 k)) p)
+
+descend-gcd :
+  (P : Nat -> Set) ->
+  (k n1 n2 : Nat) ->
+  `succ (add (`succ n1) k) : Nat == n2 ->
+  semI[fst (complete-inductor Unit Nat:code) «(),n2», «_,n». P n] ->
+  P (`succ k)
+descend-gcd P k n1 n2 eq =
+  descend P (`succ k) n1 n2 (rewriteBy add-succ n1 k then eq)
+
+gcd-inductor : inductor (Unit × Unit) (\_. Nat × Nat)
+gcd-inductor =
+  pair-inductor
+    Unit (\_. Nat) (complete-inductor Unit Nat:code)
+    Unit (\_. Nat) (complete-inductor Unit Nat:code)
+
+symmetry : (n1 n2 : Nat) -> n1 == n2 -> n2 == n1
+symmetry n1 n2 eq = rewriteBy eq then refl
+
+gcd : Nat -> Nat -> Nat
+gcd n1 n2 =
+  snd gcd-inductor (\_ _. Nat)
+    (\_ «n1,n2». casesOn n1 with
+      `zero. casesOn n2 with
+        `zero. \p. `zero
+        `succ n2. \p. n2
+      `succ n1. casesOn n2 with
+        `zero. \p. n1
+        `succ n2.
+          case compare (`succ n1) (`succ n2) with
+            inl eq. \_. `succ n1
+            inr c. case c with
+              inl «k,eq». \«_,ih2».
+                descend-gcd (\_. Nat) k n1 (`succ n2) eq ih2
+              inr «k,eq». \«ih1,_».
+                descend-gcd (\_. Nat) k n2 (`succ n1) eq ih1
+
+          -- elimination with a motive would be useful here...
+{-
+          (eliminate compare (`succ n1) (`succ n2)
+             for «n1',n2'» _.
+               `succ n1 : Nat == n1' ->
+               `succ n2 : Nat == n2' ->
+               semI[fst gcd-inductor ««(),()»,«n1',n2'»», «_,n». Nat] ->
+               Nat
+             then «n1',n2'» «c,d» _.
+           generalise d then
+           case c with
+             inl _. \«n, eq» _ _ _. `succ n
+             inr c. case c with
+               inl _.
+                 \«n,k,eq».
+                 \eqn1 eqn2.
+                 rewriteBy eqn2 then
+                 \«ih1,ih2».
+                 descend-gcd (\_. Nat) k n1 (`succ n2) ?
+{-                    (rewriteBy
+                       – symmetry n (`succ n1)
+                         (eq1 Nat Nat «n,`succ (add n k)» «`succ n1,`succ n2»
+                           (rewriteBy symmetry (`succ n1) n1' eqn1 then rewriteBy symmetry (`succ n2) n2' eqn2 then eq)) then
+                     eq2 Nat Nat «n,`succ (add n k)» «`succ n1,`succ n2»
+                        (rewriteBy symmetry (`succ n1) n1' eqn1 then
+                         rewriteBy symmetry (`succ n2) n2' eqn2 then
+                         eq)) -}
+{-                    ih2
+               inr _. \«n,k,eq».
+                 \eqn1 eqn2.
+                 rewriteBy eqn1 then
+                 \«ih1,ih2».
+                 descend-gcd (\_. Nat) k n2 (`succ n1) ? ih1
+          ) refl refl
+{-
+          \«ih1,ih2».
+          casesOn compare (`succ n1) (`succ n2) with
+            `equal n. `succ n1
+            `lt n k.  descend-gcd (\_. Nat) k n (`succ n2) ? ih2
+            `gt n k.  descend-gcd (\_. Nat) k n (`succ n1) ? ih1
+-}
+    )
+    «(),()» «n1,n2»
+
+-- a test:
+two : Nat
+two = `succ one
+
+nine : Nat;
+nine = `succ eight;
+
+six : Nat;
+six = add four two;
+
+three : Nat;
+three = `succ two;
+
+test-gcd : gcd nine six == three;
+test-gcd = refl
+
+
+;
