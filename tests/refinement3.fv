@@ -215,6 +215,52 @@ assume iso2 : (I J : Set) ->
 – probably not possible, due to the Π construct.
 
 --------------------------------------------------------------------------------
+-- from natural numbers to fin
+finRefinement : refinement Unit Nat Nat:code
+finRefinement =
+  « \_. ()
+  , \n. casesOn n with `zero. Empty; `succ n. Unit + Unit
+  , \n. casesOn n with
+          `zero. \e. absurdBy e
+          `succ n. \c. case c with
+            inl _. «inl (), refl»
+            inr _. «inr (), «n, refl», refl»
+  »
+
+fin:code : Nat -> IDesc Nat
+fin:code = refinement:code Unit Nat Nat:code finRefinement
+
+fin : Nat -> Set
+fin = muI Nat fin:code
+
+fz : (n : Nat) -> fin (`succ n)
+fz n = construct «inl (), ()»
+
+fs : (n : Nat) -> fin n -> fin (`succ n)
+fs n x = construct «inr (), x, ()»
+
+{-
+fog : (n : Nat) -> fin n -> Nat
+fog =   – needs forget, defined below
+-}
+
+fin:elim :
+  (P : (n : Nat) -> fin n -> Set) ->
+  ((n : Nat) -> P (`succ n) (fz n)) ->
+  ((n : Nat) -> (x : fin n) -> P n x -> P (`succ n) (fs n x)) ->
+  (n : Nat) -> (x : fin n) -> P n x
+fin:elim P pz ps n x =
+  eliminate x then n «c,d» ih.
+  generalise ih then
+  generalise d then
+  generalise c then
+  casesOn n with
+    `zero. \e _ _. absurdBy e
+    `succ n. \c. case c with
+      inl _. \_ _. pz n
+      inr _. \«x,_» «ih,_». ps n x ih
+
+--------------------------------------------------------------------------------
 -- from natural numbers to lists
 listRefinement : (A : Set) -> refinement Unit Unit Nat:code
 listRefinement A =
@@ -417,9 +463,6 @@ algRefinement I D A =
       mapI[D i, i. fst A i, i. (j : (i : I) × fst A i) × fst j ≡ i,
            λi a. ««i, a», refl»,
            x]
-–      fmapI I (D i) (λi. fst A i) (λi. (j : (i : I) × fst A i) × fst j ≡ i)
-–        (λi a. ««i, a», refl»)
-–        x
   »
 
 vectorRefinement : (A : Set) -> refinement Unit ((u : Unit) × Nat) (list:code A)
