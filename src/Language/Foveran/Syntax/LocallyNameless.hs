@@ -13,6 +13,7 @@ module Language.Foveran.Syntax.LocallyNameless
     )
     where
 
+import           Text.Show.Functions ()
 import           Data.Traversable (sequenceA, traverse)
 import           Control.Applicative
 import           Data.Rec
@@ -61,16 +62,9 @@ data TermCon tm
   | Refl
   | ElimEq    tm (Maybe (Ident, Ident, tm)) tm
 
-  | Desc
   | Desc_K    tm
-  | Desc_Id
   | Desc_Prod tm tm
-  | Desc_Sum  tm tm
-  | Desc_Elim
-  | Sem
-  | Mu        tm
   | Construct tm
-  | Induction
     
   | IDesc
   | IDesc_Id   tm
@@ -208,16 +202,9 @@ toLN (DS.ElimEq t t1 t2) bv =
                    ((\(x,y,t1) -> (x, y, return $ t1 (BindVar y:BindVar x:bv))) <$> t1)
                    (return $ t2 bv)
 
-toLN DS.Desc              bv = Layer $ Desc
 toLN (DS.Desc_K t)        bv = Layer $ Desc_K (return $ t bv)
-toLN DS.Desc_Id           bv = Layer $ Desc_Id
 toLN (DS.Desc_Prod t1 t2) bv = Layer $ Desc_Prod (return $ t1 bv) (return $ t2 bv)
-toLN (DS.Desc_Sum t1 t2)  bv = Layer $ Desc_Sum (return $ t1 bv) (return $ t2 bv)
-toLN DS.Desc_Elim         bv = Layer $ Desc_Elim
-toLN DS.Sem               bv = Layer $ Sem
-toLN (DS.Mu t)            bv = Layer $ Mu (return $ t bv)
 toLN (DS.Construct t)     bv = Layer $ Construct (return $ t bv)
-toLN DS.Induction         bv = Layer $ Induction
 
 toLN DS.IDesc             bv = Layer $ IDesc
 toLN (DS.IDesc_Id t)      bv = Layer $ IDesc_Id (return $ t bv)
@@ -314,16 +301,9 @@ close' fnm Refl             = pure Refl
 close' fnm (ElimEq t Nothing t2) = ElimEq <$> t <*> pure Nothing <*> t2
 close' fnm (ElimEq t (Just (x,y,t1)) t2) = ElimEq <$> t <*> ((\t1 -> Just (x,y,t1)) <$> binder (binder t1)) <*> t2
 
-close' fnm Desc             = pure Desc
 close' fnm (Desc_K t)       = Desc_K <$> t
-close' fnm Desc_Id          = pure Desc_Id
 close' fnm (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
-close' fnm (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
-close' fnm Desc_Elim        = pure Desc_Elim
-close' fnm Sem              = pure Sem
-close' fnm (Mu t)           = Mu <$> t
 close' fnm (Construct t)    = Construct <$> t
-close' fnm Induction        = pure Induction
 
 close' fnm IDesc            = pure IDesc
 close' fnm (IDesc_Id t)     = IDesc_Id <$> t

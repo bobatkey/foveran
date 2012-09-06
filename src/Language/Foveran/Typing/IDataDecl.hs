@@ -11,7 +11,7 @@ import           Data.Maybe (fromMaybe, isJust)
 import           Data.Rec (AnnotRec (Annot))
 import           Language.Foveran.Typing.DeclCheckMonad
 import           Language.Foveran.Typing.Errors (DataDeclError (..))
-import           Language.Foveran.Syntax.Display hiding (Constructor, consPos)
+import           Language.Foveran.Syntax.Display
 import           Language.Foveran.Syntax.Identifier ((<+>))
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
 import           Text.Position (Span (..), makeSpan)

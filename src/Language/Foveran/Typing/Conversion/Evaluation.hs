@@ -92,26 +92,7 @@ eval Refl             = pure VRefl
 eval (ElimEq tA ta tb teq a e tP tp) =
     velimeq <$> tA <*> ta <*> tb <*> teq <*> pure (fromIrrelevant a) <*> pure (fromIrrelevant e) <*> binder (binder tP) <*> tp
                                    
-eval Desc               = pure VDesc
-eval (Desc_K t)         = VDesc_K <$> t
-eval Desc_Id            = pure VDesc_Id
-eval (Desc_Prod t1 t2)  = VDesc_Prod <$> t1 <*> t2
-eval (Desc_Sum t1 t2)   = VDesc_Sum <$> t1 <*> t2
-eval Desc_Elim          = pure (VLam "P" $ \p ->
-                                VLam "K" $ \k ->
-                                VLam "Id" $ \i ->
-                                VLam "Pr" $ \pr ->
-                                VLam "Su" $ \su ->
-                                VLam "Tg" $ \tg ->
-                                vdesc_elim p k i pr su tg)
-eval Sem                = pure (VLam "D" $ vsem)
-eval (Mu t)             = VMu <$> t
 eval (Construct tag t)  = VConstruct (fromIrrelevant tag) <$> t
-eval Induction          = pure (VLam "F" $ \f ->
-                                VLam "P" $ \p ->
-                                VLam "k" $ \k ->
-                                VLam "x" $ \x ->
-                                vinduction f p k x)
 
 eval IDesc              = pure (VLam "I" $ \i -> VIDesc i)
 eval (IDesc_K t)        = VIDesc_K <$> t

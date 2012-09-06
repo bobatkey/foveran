@@ -405,10 +405,6 @@ hasType (Annot p UnitI) v = do
   raiseError p (TermIsAUnitIntroduction v)
 
 
-hasType (Annot p (Desc_K t)) VDesc = do
-  tm <- t `hasType` (VSet 0)
-  return (In $ CS.Desc_K tm)
-
 hasType (Annot p (Desc_K t)) (VIDesc v) = do
   tm <- t `hasType` (VSet 0)
   return (In $ CS.IDesc_K tm)
@@ -416,18 +412,6 @@ hasType (Annot p (Desc_K t)) (VIDesc v) = do
 hasType (Annot p (Desc_K t)) v = do
   raiseError p (TermIsADesc v)
 
-
-hasType (Annot p Desc_Id) VDesc = do
-  return (In $ CS.Desc_Id)
-
-hasType (Annot p Desc_Id) v = do
-  raiseError p (TermIsADesc v)
-
-
-hasType (Annot p (Desc_Prod t1 t2)) VDesc = do
-  tm1 <- t1 `hasType` VDesc
-  tm2 <- t2 `hasType` VDesc
-  return (In $ CS.Desc_Prod tm1 tm2)
 
 hasType (Annot p (Desc_Prod t1 t2)) (VIDesc v) = do
   tm1 <- t1 `hasType` (VIDesc v)
@@ -437,19 +421,6 @@ hasType (Annot p (Desc_Prod t1 t2)) (VIDesc v) = do
 hasType (Annot p (Desc_Prod t1 t2)) v = do
   raiseError p (TermIsADesc v)
 
-
-hasType (Annot p (Desc_Sum t1 t2)) VDesc = do
-  tm1 <- t1 `hasType` VDesc
-  tm2 <- t2 `hasType` VDesc
-  return (In $ CS.Desc_Sum tm1 tm2)
-
-hasType (Annot p (Desc_Sum t1 t2)) v = do
-  raiseError p (TermIsADesc v)
-
-
-hasType (Annot p (Construct t)) (VMu f) = do
-  tm <- t `hasType` (vsem f $$ VMu f)
-  return (In $ CS.Construct (CS.Irrelevant Nothing) tm)
 
 hasType (Annot p (Construct t)) (VMuI a d i) = do
   tm <- t `hasType` (vsemI a (d $$ i) "i" (vmuI a d $$))
@@ -795,43 +766,11 @@ synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
     ty ->
         do raiseError (annot t) (ExpectingEqualityType ty)
 
-synthesiseTypeFor (Annot p Desc) = do
-  return (VSet 1, In $ CS.Desc)
-
-synthesiseTypeFor (Annot p Desc_Elim) = do
-  return ( forall "P" (VDesc .->. VSet 10) $ \vP ->
-           (forall "A" (VSet 0) $ \x -> vP $$ VDesc_K x) .->.
-           (vP $$ VDesc_Id) .->.
-           (forall "d1" VDesc $ \d1 ->
-            forall "d2" VDesc $ \d2 ->
-            (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Prod d1 d2))) .->.
-           (forall "d1" VDesc $ \d1 ->
-            forall "d2" VDesc $ \d2 ->
-            (vP $$ d1) .->. (vP $$ d2) .->. (vP $$ (VDesc_Sum d1 d2))) .->.
-           (forall "x" VDesc $ \x -> vP $$ x)
-         , In $ CS.Desc_Elim)
-
-synthesiseTypeFor (Annot p Sem) = do
-  return ( VDesc .->. VSet 0 .->. VSet 0, In $ CS.Sem )
-
-synthesiseTypeFor (Annot p (Mu t)) = do
-  tm <- t `hasType` VDesc
-  return (VSet 0, In $ CS.Mu tm)
-
 synthesiseTypeFor (Annot p (MuI t1 t2)) = do
   tm1 <- t1 `hasType` (VSet 0)
   v   <- eval tm1
   tm2 <- t2 `hasType` (v .->. VIDesc v)
   return (v .->. VSet 0, In $ CS.MuI tm1 tm2)
-
-synthesiseTypeFor (Annot p Induction) = do
-  return ( forall "F" VDesc               $ \f ->
-           forall "P" (VMu f .->. VSet 2) $ \p ->
-           (forall "x" (vsem f $$ VMu f) $ \x ->
-            (vlift $$ f $$ VMu f $$ p $$ x) .->.
-            p $$ (VConstruct Nothing x)) .->.
-           (forall "x" (VMu f) $ \x -> p $$ x)
-         , In CS.Induction)
 
 synthesiseTypeFor (Annot p (Proj1 t)) = do
   (tP, tmP) <- synthesiseTypeFor t

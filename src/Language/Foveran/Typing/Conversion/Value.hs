@@ -15,18 +15,13 @@ module Language.Foveran.Typing.Conversion.Value
     , velimEmpty
     , velimeq
 
-    , vdesc_elim
     , videsc_elim
 
     , videsc_bind
 
-    , vsem
     , vsemI
     , vmapI
 
-    , vliftTy
-    , vlift
-    , vinduction
     , vliftI
     , vmuI
     , veliminate
@@ -76,12 +71,6 @@ data Value
     | VEq    Value Value Value Value
     | VRefl
 
-    | VDesc
-    | VMu         Value
-    | VDesc_K     Value
-    | VDesc_Id
-    | VDesc_Prod  Value Value
-    | VDesc_Sum   Value Value
     | VConstruct  (Maybe Ident) Value
 
     | VIDesc      Value
@@ -187,17 +176,6 @@ velimeq tA ta tb (VNeutral n) a e tP tp =
                      <*> reify (tP ta VRefl) tp))
 
 {------------------------------------------------------------------------------}
-vsem :: Value -> Value
-vsem vD = loop vD
-    where
-      loop (VDesc_K v)        = VLam "X" $ \_  -> v
-      loop VDesc_Id           = VLam "X" $ \vX -> vX
-      loop (VDesc_Prod v1 v2) = VLam "X" $ \vX -> (loop v1 $$ vX) .*. (loop v2 $$ vX)
-      loop (VDesc_Sum v1 v2)  = VLam "X" $ \vX -> (loop v1 $$ vX) .+. (loop v2 $$ vX)
-      loop (VNeutral tm)      =
-          reflect (VSet 0 .->. VSet 0)
-                  (pure (In Sem) `tmApp` tm)
-
 vsemI :: Value -> Value -> Ident -> (Value -> Value) -> Value
 vsemI vI vD x vA = loop vD
     where
@@ -227,34 +205,6 @@ vmapI vI vD i1 vA i2 vB vf vx = loop vD vx
           VMapI vB (VLam i $ \vi -> VLam "b" $ \vb -> loop (vA vi) (vg $$ vi $$ vb)) tmx
 
 {------------------------------------------------------------------------------}
-vdesc_elim vP vK vI vPr vSu = loop
-    where
-      loop (VDesc_K v)        = vK $$ v
-      loop VDesc_Id           = vI
-      loop (VDesc_Prod v1 v2) = vPr $$ v1 $$ v2 $$ loop v1 $$ loop v2
-      loop (VDesc_Sum  v1 v2) = vSu $$ v1 $$ v2 $$ loop v1 $$ loop v2
-      loop (VNeutral n)       =
-          reflect (vP $$ VNeutral n)
-                  (pure (In Desc_Elim)
-                   `tmApp` reify (VDesc .->. VSet 1) vP
-                   `tmApp` reify (forall "A" (VSet 0) $ \x ->
-                                  vP $$ VDesc_K x) vK
-                   `tmApp` reify (vP $$ VDesc_Id) vI
-                   `tmApp` reify (forall "F" VDesc $ \f ->
-                                  forall "G" VDesc $ \g ->
-                                  (vP $$ f) .->.
-                                  (vP $$ g) .->.
-                                  (vP $$ (VDesc_Prod f g))) vPr
-                   `tmApp` reify (forall "F" VDesc $ \f ->
-                                  forall "G" VDesc $ \g ->
-                                  (vP $$ f) .->.
-                                  (vP $$ g) .->.
-                                  (vP $$ (VDesc_Sum f g))) vSu
-                   `tmApp` n)
-      loop x                  =
-          error $ "internal: type error in the evaluator: vdesc_elim"
-
-{------------------------------------------------------------------------------}
 videsc_elim vI vP vId vK vPair vSg vPi = loop
     where
       loop (VIDesc_Id i)       = vId $$ i
@@ -282,98 +232,6 @@ videsc_elim vI vP vId vK vPair vSg vPi = loop
                                                          (forall "x" a $ \x -> vP $$ (d $$ x)) .->.
                                                          (vP $$ VIDesc_Pi a d)) vPi
                                           `tmApp` reify (VIDesc vI) v)
-
-{------------------------------------------------------------------------------}
--- FIXME: is this the right level? why not Set_1, or Set_0? Some kind
--- of level-shifting thing?
-vliftTy :: Value
-vliftTy = forall "D" VDesc $ \vD ->
-          forall "A" (VSet 0) $ \vA ->
-          forall "P" (vA .->. VSet 2) $ \vP ->
-          (vsem vD $$ vA) .->. VSet 2
-
-vlift :: Value
-vlift = VLam "D" $ \d ->
-        VLam "X" $ \vA ->
-        VLam "P" $ \p ->
-        VLam "x" $ \v ->
-        vdesc_elim (VLam "D" $ \d ->
-                    (vsem d $$ vA) .->. VSet 2)
-                   (VLam "A" $ \a ->
-                    VLam "x" $ \x ->
-                    VUnit Nothing)
-                   (VLam "x" $ \x ->
-                    p $$ x)
-                   (VLam "F" $ \fd ->
-                    VLam "G" $ \gd ->
-                    VLam "f" $ \f ->
-                    VLam "g" $ \g ->
-                    VLam "x" $ \x ->
-                    VSigma Nothing (f $$ vfst x) (\_ -> g $$ vsnd x))
-                   (VLam "F" $ \fd ->
-                    VLam "G" $ \gd ->
-                    VLam "f" $ \f ->
-                    VLam "g" $ \g ->
-                    VLam "x" $ \x ->
-                    vcase x
-                          (vsem fd $$ vA)
-                          (vsem gd $$ vA)
-                          "x" (\_ -> VSet 2)
-                          "x" (\x -> f $$ x)
-                          "x" (\x -> g $$ x))
-                   d
-                   $$ v
-
-{------------------------------------------------------------------------------}
-vall :: Value
-vall = VLam "D" $ \vF ->
-       VLam "X" $ \vX ->
-       VLam "P" $ \vP ->
-       VLam "p" $ \vp ->
-       vdesc_elim (VLam "D" $ \vD ->
-                   forall "xs" (vsem vD $$ vX) $ \xs ->
-                   vlift $$ vD $$ vX $$ vP $$ xs)
-                  (VLam "A" $ \a ->
-                   VLam "x" $ \x ->
-                   VUnitI)
-                  (VLam "x" $ \x ->
-                   vp $$ x)
-                  (VLam "F" $ \vF ->
-                   VLam "G" $ \vG ->
-                   VLam "f" $ \vf ->
-                   VLam "g" $ \vg ->
-                   VLam "x" $ \x ->
-                   VPair (vf $$ vfst x) (vg $$ vsnd x))
-                  (VLam "F" $ \vF ->
-                   VLam "G" $ \vG ->
-                   VLam "f" $ \vf ->
-                   VLam "g" $ \vg ->
-                   VLam "x" $ \x ->
-                   vcase x
-                         (vsem vF $$ vX)
-                         (vsem vG $$ vX)
-                         "d" (\d -> vlift $$ VDesc_Sum vF vG $$ vX $$ vP $$ d)
-                         "y" (\y -> vf $$ y)
-                         "z" (\z -> vg $$ z))
-                  vF
-
-{------------------------------------------------------------------------------}
-vinduction :: Value -> Value -> Value -> Value -> Value
-vinduction vF vP vK = loop
-    where
-      loop (VConstruct _ x) =
-          vK $$ x $$ (vall $$ vF $$ (VMu vF) $$ vP $$ (VLam "x" loop) $$ x)
-      loop (VNeutral n) =
-          reflect (vP $$ VNeutral n)
-                  (pure (In Induction)
-                   `tmApp` reify VDesc vF
-                   `tmApp` reify (VMu vF .->. VSet 2) vP
-                   `tmApp` reify (VPi (Just "x") (vsem vF $$ VMu vF) $ \x ->
-                                  (vlift $$ vF $$ VMu vF $$ vP $$ x) .->.
-                                  vP $$ VConstruct Nothing x)
-                                 vK
-                   `tmApp` n)
-      loop v = error ("internal: vinduction stuck on " ++ show v)
 
 {------------------------------------------------------------------------------}
 videsc_bind :: Value
@@ -520,8 +378,6 @@ reifyType (VSet l)        = In <$> pure (Set l)
 reifyType (VUnit tag)     = In <$> pure (Unit (Irrelevant tag))
 reifyType VEmpty          = In <$> pure Empty
 reifyType (VEq vA vB va vb) = In <$> (Eq <$> reifyType vA <*> reifyType vB <*> reify vA va <*> reify vB vb)
-reifyType VDesc           = In <$> pure Desc
-reifyType (VMu v)         = In <$> (Mu <$> reify VDesc v)
 reifyType (VMuI v1 v2 v3) = (In <$> (MuI <$> reifyType v1 <*> reify (v1 .->. VIDesc v1) v2)) `tmApp` reify v1 v3
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
@@ -552,11 +408,6 @@ reify (VSum tA tB)     (VInr v) = In <$> (Inr <$> reify tB v)
 reify (VUnit _)        VUnitI   = In <$> pure UnitI
 reify (VUnit _)        _        = error "internal: reify: values of type unit should only be VUnitI"
 
-reify VDesc            (VDesc_K v)         = In <$> (Desc_K <$> reifyType v)
-reify VDesc            VDesc_Id            = In <$> pure Desc_Id
-reify VDesc            (VDesc_Prod v1 v2)  = In <$> (Desc_Prod <$> reify VDesc v1 <*> reify VDesc v2)
-reify VDesc            (VDesc_Sum v1 v2)   = In <$> (Desc_Sum  <$> reify VDesc v1 <*> reify VDesc v2)
-reify (VMu tA)         (VConstruct tag v)  = In <$> (Construct (Irrelevant tag) <$> reify (vsem tA $$ (VMu tA)) v)
 reify (VMuI tI tD ti)  (VConstruct tag v)  = In <$> (Construct (Irrelevant tag) <$> reify (vsemI tI (tD $$ ti) "i" (vmuI tI tD $$)) v)
 reify (VIDesc tI)      (VIDesc_Id x)       = In <$> (IDesc_Id <$> reify tI x)
 reify (VIDesc tI)      (VIDesc_K a)        = In <$> (IDesc_K <$> reifyType a)

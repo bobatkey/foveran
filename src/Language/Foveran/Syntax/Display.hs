@@ -8,9 +8,6 @@ module Language.Foveran.Syntax.Display
     , AssumeDecl (..)
     , Definition (..)
 
-    , Datatype (..)
-    , Constructor (..)
-
     , IDataDecl (..)
     , DataParameter (..)
     , IConstructor (..)
@@ -35,16 +32,8 @@ import Data.Rec
 data Declaration
     = AssumptionDecl AssumeDecl
     | DefinitionDecl Definition
-    | DatatypeDecl   Datatype
     | IDataDecl      IDataDecl
     | Normalise      TermPos
-
---------------------------------------------------------------------------------
-data Datatype =
-    Datatype Span Ident [(Ident,TermPos)] [Constructor]
-
-data Constructor
-    = Constructor Ident [TermPos]
 
 --------------------------------------------------------------------------------
 data AssumeDecl =
@@ -124,19 +113,10 @@ data TermCon tm
     | Refl
     | ElimEq tm (Maybe (Ident, Ident, tm)) tm
 
-    {- Descriptions of non-indexed types -}
-    | Desc
-    | Desc_K    tm
-    | Desc_Id
-    | Desc_Prod tm tm
-    | Desc_Sum  tm tm
-    | Desc_Elim
-    | Sem
-    | Mu        tm
-    | Construct tm
-    | Induction
-      
     {- Descriptions of indexed types -}
+    | Construct tm
+    | Desc_K    tm
+    | Desc_Prod tm tm
     | IDesc
     | IDesc_Id   tm
     | IDesc_Sg   tm tm

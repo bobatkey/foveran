@@ -67,16 +67,7 @@ data TermCon tm
     | Refl
     | ElimEq tm tm tm tm (Irrelevant Ident) (Irrelevant Ident) tm tm
 
-    | Desc
-    | Desc_K    tm
-    | Desc_Id
-    | Desc_Prod tm tm
-    | Desc_Sum  tm tm
-    | Desc_Elim
-    | Sem
-    | Mu        tm
     | Construct (Irrelevant (Maybe Ident)) tm
-    | Induction
       
     {- Descriptions of indexed types -}
     | IDesc
@@ -141,16 +132,7 @@ traverseSyn Refl             = pure Refl
 traverseSyn (ElimEq tA ta tb t a e t1 t2) =
     ElimEq <$> tA <*> ta <*> tb <*> t <*> pure a <*> pure e <*> binder (binder t1) <*> t2
 
-traverseSyn Desc             = pure Desc
-traverseSyn (Desc_K t)       = Desc_K <$> t
-traverseSyn Desc_Id          = pure Desc_Id
-traverseSyn (Desc_Prod t1 t2)= Desc_Prod <$> t1 <*> t2
-traverseSyn (Desc_Sum t1 t2) = Desc_Sum <$> t1 <*> t2
-traverseSyn Desc_Elim        = pure Desc_Elim
-traverseSyn Sem              = pure Sem
-traverseSyn (Mu t)           = Mu <$> t
 traverseSyn (Construct tag t)= Construct tag <$> t
-traverseSyn Induction        = pure Induction
 
 traverseSyn IDesc            = pure IDesc
 traverseSyn (IDesc_K t)      = IDesc_K <$> t
@@ -264,21 +246,12 @@ toDisplay (ElimEq _ _ _ t ia ie t1 t2) =
     where a = fromIrrelevant ia
           e = fromIrrelevant ie
 
-toDisplay Desc                    = pure DS.Desc
-toDisplay (Desc_K t)              = DS.Desc_K <$> t
-toDisplay Desc_Id                 = pure DS.Desc_Id
-toDisplay (Desc_Prod t1 t2)       = DS.Desc_Prod <$> t1 <*> t2
-toDisplay (Desc_Sum t1 t2)        = DS.Desc_Sum <$> t1 <*> t2
-toDisplay Desc_Elim               = pure DS.Desc_Elim
-toDisplay Sem                     = pure DS.Sem
-toDisplay (Mu t)                  = DS.Mu <$> t
 toDisplay (Construct (Irrelevant Nothing) t) =
     DS.Construct <$> t
 toDisplay (Construct (Irrelevant (Just nm)) t) =
     DS.NamedConstructor <$> pure nm <*> (gatherParts <$> t)
         where gatherParts (In (DS.Tuple l)) = tail (init l)
               gatherParts _ = error "internal: malformed constructor found"
-toDisplay Induction               = pure DS.Induction
 
 toDisplay IDesc                   = pure DS.IDesc
 toDisplay (IDesc_Id t)            = DS.IDesc_Id <$> t
@@ -404,16 +377,7 @@ cmp compareLevel (In (ElimEq tA  ta  tb  t  _ _ tP  tp))
       cmp compareLevel tP tP' &&
       cmp compareLevel tp tp'
 
-cmp compareLevel (In Desc)              (In Desc)                = True
-cmp compareLevel (In (Desc_K t))        (In (Desc_K t'))         = cmp compareLevel t t'
-cmp compareLevel (In Desc_Id)           (In Desc_Id)             = True
-cmp compareLevel (In (Desc_Prod t1 t2)) (In (Desc_Prod t1' t2')) = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
-cmp compareLevel (In (Desc_Sum t1 t2))  (In (Desc_Sum t1' t2'))  = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
-cmp compareLevel (In Desc_Elim)         (In Desc_Elim)           = True
-cmp compareLevel (In Sem)               (In Sem)                 = True
-cmp compareLevel (In (Mu t))            (In (Mu t'))             = cmp compareLevel t t'
 cmp compareLevel (In (Construct _ t))   (In (Construct _ t'))    = cmp compareLevel t t'
-cmp compareLevel (In Induction)         (In Induction)           = True
 
 cmp compareLevel (In IDesc)             (In IDesc)               = True
 cmp compareLevel (In (IDesc_K t))       (In (IDesc_K t'))        = cmp compareLevel t t'

@@ -79,16 +79,9 @@ pprint (ElimEq t (Just (a, e, t1)) t2) =
               $$ nest 3 "for" <+> ppIdent a <+> ppIdent e <> "." <+> resetPrec t1
               $$ nest 2 "then" <+> resetPrec t2)
 
-pprint Desc                = "Desc"
 pprint (Desc_K t)          = paren 01 ("\"K\"" <+> down t)
-pprint Desc_Id             = "\"Id\""
 pprint (Desc_Prod t1 t2)   = paren 08 (sep [down t1, nest 2 "\"×\"", t2])
-pprint (Desc_Sum t1 t2)    = paren 09 (down t1 <+> "\"+\"" <+> t2)
-pprint Desc_Elim           = "elimD"
-pprint Sem                 = "sem"
-pprint (Mu t)              = paren 01 ("µ" <+> down t)
 pprint (Construct t)       = paren 01 ("construct" <+> down t)
-pprint Induction           = "induction"
 
 pprint IDesc               = "IDesc"
 pprint (IDesc_Id t)        = paren 01 ("\"IId\"" <+> down t)
@@ -194,7 +187,6 @@ ppIDataDecl d = doc `atPrecedenceLevel` 10
 ppDecl :: Declaration -> PP.Doc
 ppDecl (AssumptionDecl _)   = mempty
 ppDecl (DefinitionDecl def) = ppDefinition def
-ppDecl (DatatypeDecl _)     = mempty
 ppDecl (IDataDecl decl)     = ppIDataDecl decl
 ppDecl (Normalise _)        = mempty
 

@@ -77,16 +77,6 @@ declaration =
     <|>
     IDataDecl <$> idata
     <|>
-    (\p nm params constructors ->
-         DatatypeDecl $ Datatype (makeSpan p p) nm params constructors)
-        <$> token Tok.Data
-        <*> identifier
-        <*> ((map (\p -> (paramIdent p,paramType p))) <$> dataParamList)
-        <*  token Tok.Colon
-        <*  token Tok.Set
-        <*  token Tok.ColonEquals
-        <*> constructorList
-    <|>
     (\p tm -> Normalise tm)
        <$> token Tok.Normalise
        <*> term
@@ -100,18 +90,6 @@ dataParamList =
         <*> term
         <*> token Tok.RParen
         <*> dataParamList
-    <|>
-    pure []
-
-constructorList :: Parser Tok.Token [Constructor]
-constructorList =
-    (\nm elems constructors -> Constructor nm elems : constructors)
-        <$  token Tok.Pipe
-        <*  commit
-        <*> identifier
-        <*  token Tok.Colon
-        <*> many term00
-        <*> constructorList
     <|>
     pure []
 
@@ -190,9 +168,7 @@ term09 :: Parser Tok.Token TermPos
 term09 =
     -- sum types, and their descriptions
     -- right associative
-    optBinary <$> term08 <*> (optional $ (Sum,) <$ token Tok.Plus <*> term09
-                                         <|>
-                                         (Desc_Sum,) <$ token Tok.QuotePlus <*> term09)
+    optBinary <$> term08 <*> (optional $ (Sum,) <$ token Tok.Plus <*> term09)
 
 term08 :: Parser Tok.Token TermPos
 term08 =
@@ -222,9 +198,6 @@ term01 =
     <|>
     -- constant functor descriptions
     unary Desc_K <$> token Tok.QuoteK <*> term00
-    <|>
-    -- µ
-    unary Mu <$> token Tok.Mu <*> term00
     <|>
     unary Construct <$> token Tok.Construct <*> term00
     <|>
@@ -301,12 +274,6 @@ term00 =
     binaryPrefix MuI <$> token Tok.MuI <*> term00 <*> term00
     <|>
     (\(nm,p) -> Annot p (NamedConstructor nm [])) <$> tokenWithText Tok.ConstructorName
-    <|>
-    keyword Induction <$> token Tok.Induction
-    <|>
-    keyword Desc_Elim <$> token Tok.ElimD
-    <|>
-    keyword Sem <$> token Tok.Sem
     <|>
     (\p tD i tA p' -> Annot (makeSpan p p') (SemI tD i tA))
       <$> token Tok.SemI <* token Tok.LSqBracket <*> term10 <* token Tok.Comma <*> pattern <* token Tok.FullStop <*> term10 <*> token Tok.RSqBracket
@@ -394,10 +361,6 @@ term00 =
     keyword Unit <$> token Tok.UnitType
     <|>
     keyword GroupUnit <$> token Tok.GroupUnit
-    <|>
-    keyword Desc_Id <$> token Tok.QuoteId
-    <|>
-    keyword Desc <$> token Tok.Desc
     <|>
     keyword IDesc <$> token Tok.IDesc
     <|>

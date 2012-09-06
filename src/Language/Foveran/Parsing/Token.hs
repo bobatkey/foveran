@@ -15,7 +15,6 @@ data Token
     | Ident
     | ConstructorName
     | Colon
-    | ColonEquals
     | Semicolon
     | Equals
     | Lambda
@@ -23,21 +22,15 @@ data Token
     | LeftArrow
     | LParen
     | RParen
-    | QuoteArrow
     | Times
     | QuoteTimes
     | Plus
-    | QuotePlus
     | Fst
     | Snd
     | Inl
     | Inr
     | QuoteK
-    | Mu
     | Construct
-    | Induction
-    | ElimD
-    | Sem
     | UnitValue
     | LDoubleAngle
     | RDoubleAngle
@@ -52,10 +45,7 @@ data Token
     | EmptyType
     | ElimEmpty
     | UnitType
-    | QuoteId
-    | Desc
     | Number
-    | Pipe
     | Data
     | Normalise
     | Where
@@ -104,7 +94,6 @@ instance SyntaxHighlight Token where
     lexicalClass Ident       = Identifier
     lexicalClass ConstructorName = Constructor
     lexicalClass Colon       = Operator
-    lexicalClass ColonEquals = Operator
     lexicalClass Semicolon   = Punctuation
     lexicalClass Equals      = Operator
     lexicalClass Lambda      = Keyword
@@ -114,20 +103,15 @@ instance SyntaxHighlight Token where
     lexicalClass RParen      = Punctuation
     lexicalClass LSqBracket  = Punctuation
     lexicalClass RSqBracket  = Punctuation
-    lexicalClass QuoteArrow  = Constructor
     lexicalClass Times       = Operator
     lexicalClass QuoteTimes  = Constructor
     lexicalClass Plus        = Operator
-    lexicalClass QuotePlus   = Constructor
     lexicalClass Fst         = Keyword
     lexicalClass Snd         = Keyword
     lexicalClass Inl         = Constructor
     lexicalClass Inr         = Constructor
     lexicalClass QuoteK      = Constructor
-    lexicalClass Mu          = Type
     lexicalClass Construct   = Constructor
-    lexicalClass Induction   = Keyword
-    lexicalClass ElimD       = Keyword
     lexicalClass UnitValue   = Constructor
     lexicalClass LDoubleAngle= Constructor
     lexicalClass RDoubleAngle= Constructor
@@ -142,14 +126,10 @@ instance SyntaxHighlight Token where
     lexicalClass EmptyType   = Type
     lexicalClass ElimEmpty   = Keyword
     lexicalClass UnitType    = Type
-    lexicalClass QuoteId     = Constructor
-    lexicalClass Desc        = Type
     lexicalClass Number      = Constant
-    lexicalClass Pipe        = Punctuation
     lexicalClass Data        = Keyword
     lexicalClass Normalise   = Keyword
     lexicalClass IDesc       = Type
-    lexicalClass Sem         = Keyword
     lexicalClass Quote_IId   = Constructor
     lexicalClass Quote_Sg    = Constructor
     lexicalClass Quote_Pi    = Constructor
@@ -166,7 +146,7 @@ instance SyntaxHighlight Token where
     lexicalClass Generalise  = Keyword
     lexicalClass CasesOn     = Keyword
     lexicalClass RecursionOn = Keyword
-    lexicalClass RecurseOn   = Keyword
+    lexicalClass RecurseOn   = Operator
     lexicalClass Where       = Keyword
     lexicalClass In          = Keyword
     lexicalClass Underscore  = Punctuation
@@ -191,7 +171,6 @@ instance Show Token where
   show Ident  = "<identifier>"
   show ConstructorName = "`<constructor-name>"
   show Colon  = ":"
-  show ColonEquals = ":=" 
   show Semicolon   = ";"
   show Equals      = "="
   show Lambda      = "\\"
@@ -201,20 +180,15 @@ instance Show Token where
   show RParen      = ")"
   show LSqBracket  = "["
   show RSqBracket  = "]"
-  show QuoteArrow  = "“→”"
   show Times       = "×"
   show QuoteTimes  = "“×”"
   show Plus        = "+"
-  show QuotePlus   = "“+”"
   show Fst         = "fst"
   show Snd         = "snd"
   show Inl         = "inl"
   show Inr         = "inr"
   show QuoteK      = "“K”"
-  show Mu          = "µ"
   show Construct   = "construct"
-  show Induction   = "induction"
-  show ElimD       = "elimD"
   show UnitValue   = "()"
   show LDoubleAngle = "«"
   show RDoubleAngle = "»"
@@ -229,10 +203,7 @@ instance Show Token where
   show EmptyType   = "Empty"
   show ElimEmpty   = "elimEmpty"
   show UnitType    = "Unit"
-  show QuoteId     = "“Id“"
-  show Desc        = "Desc"
   show Number      = "<number>"
-  show Pipe        = "|"
   show Data        = "data"
   show IDesc       = "IDesc"
   show Quote_IId   = "“IId”"
@@ -240,7 +211,6 @@ instance Show Token where
   show Quote_Pi    = "“Π”"
   show Bind        = "bind"
   show IDesc_Elim  = "elimID"
-  show Sem         = "sem"
   show SemI        = "semI"
   show MapI        = "mapI"
   show LiftI       = "liftI"

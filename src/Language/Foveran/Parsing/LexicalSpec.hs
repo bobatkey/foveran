@@ -15,28 +15,21 @@ lexicalSpec = $([|compileLexicalSpecification
     [ "assume" :==>          emit Assume
     , "normalise" :==>       emit Normalise
     , ":" :==>               emit Colon
-    , ":=" :==>              emit ColonEquals
     , ";" :==>               emit Semicolon
     , "=" :==>               emit Equals
     , "\\" .|. "\x03bb" :==> emit Lambda
     , "->" .|. "→" :==>      emit Arrow
     , "(" :==>               emit LParen
     , ")" :==>               emit RParen
-    , "“→”" :==>             emit QuoteArrow
     , "×" :==>               emit Times
     , "“×”" :==>             emit QuoteTimes
     , "+" :==>               emit Plus
-    , "“+”" :==>             emit QuotePlus
     , "fst" :==>             emit Fst
     , "snd" :==>             emit Snd
     , "inl" :==>             emit Inl
     , "inr" :==>             emit Inr
     , "“K”" .|. "\"K\"" :==> emit QuoteK
-    , "µ" :==>               emit Mu
     , "construct" :==>       emit Construct
-    , "induction" :==>       emit Induction
-    , "elimD" :==>           emit ElimD
-    , "sem" :==>             emit Sem
     , "()" .|. "⋄" :==>      emit UnitValue
     , "«" :==>               emit LDoubleAngle
     , "»" :==>               emit RDoubleAngle
@@ -51,10 +44,7 @@ lexicalSpec = $([|compileLexicalSpecification
     , "Empty" .|. "𝟘" :==>   emit EmptyType
     , "Unit" .|. "𝟙" :==>    emit UnitType
     , "elimEmpty" :==>       emit ElimEmpty
-    , "“Id”" :==>            emit QuoteId
-    , "Desc" :==>            emit Desc
     , "data" :==>            emit Data
-    , "|" :==>               emit Pipe
     , "IDesc" :==>           emit IDesc
     , "“IId”".|. "\"IId\"" :==> emit Quote_IId
     , "“Σ”" .|. "\"Sg\"" :==> emit Quote_Sg

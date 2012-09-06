@@ -10,10 +10,8 @@ module Language.Foveran.Typing.Conversion
        , (.->.)
        , forall
        , reflect
-       , vsem
        , vsemI
        , vfst
-       , vlift
        , vliftI
        , vmuI
        )
