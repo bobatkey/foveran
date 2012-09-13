@@ -474,8 +474,8 @@ hasType (Annot p (IDesc_Bind t1 x t2)) v = do
 hasType (Annot p Refl) (VEq vA vB va vb) = do
   let tA = reifyType0 vA
       tB = reifyType0 vB
-      ta = reify vA va 0
-      tb = reify vB vb 0
+      ta = reify0 vA va
+      tb = reify0 vB vb
   unless (tA == tB) $ do
     raiseError p (ReflCanOnlyProduceHomogenousEquality vA vB)
   unless (ta == tb) $ do
@@ -509,9 +509,9 @@ hasType (Annot p (ElimEq t Nothing tp)) tP =
                     tB = reifyType0 vB
                 unless (tA == tB) $ do
                   raiseError (annot t) (ExpectingHomogeneousEquality vA vB)
-                let ta   = reify vA va 0
-                    tb   = reify vB vb 0
-                eq <- reify ty <$> eval tm <*> pure 0 -- normalise the equality proof
+                let ta   = reify0 vA va
+                    tb   = reify0 vB vb
+                eq <- reify0 ty <$> eval tm -- normalise the equality proof
                 let tmP  = reifyType0 tP
                     tmPg = CS.generalise [eq,tb] tmP
                 vP'  <- tmPg `evalWith` [VRefl, va]
@@ -529,7 +529,7 @@ hasType (Annot p (Case t Nothing y tL z tR)) tP = do
   (tS,tmS) <- synthesiseTypeFor t
   case tS of
     VSum tA tB ->
-        do tmS' <- reify tS <$> eval tmS <*> pure 0
+        do tmS' <- reify0 tS <$> eval tmS
            let tmP = CS.generalise [tmS'] $ reifyType0 tP
            tmL <- bindVar y tA tL $ \y tL -> do
                     vP <- tmP `evalWith` [VInl y]
@@ -555,8 +555,8 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
   -- FIXME: this does not work when the index is a pair, and 'vty' refers to the parts separately
   -- need to make a better 'generalise' that can spot that the term being generalised over is a tuple
   -- see interpreter.fv, definitions "lookup" and "eval"
-  tmi <- return (reify vI vi 0)
-  tm' <- reify ty <$> eval tm <*> pure 0
+  tmi <- return (reify0 vI vi)
+  tm' <- reify0 ty <$> eval tm
   let tmP = CS.generalise [tm',tmi] $ reifyType0 vty
   -- check the algebra
   vP  <- evalA tmP
@@ -566,7 +566,7 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
          tK `hasType` (vP [VConstruct Nothing x,i])
   vtm <- eval tm
   let tyI  = reifyType0 vI
-      desc = reify (vI .->. VIDesc vI) vDesc 0
+      desc = reify0 (vI .->. VIDesc vI) vDesc
   return ( In $ CS.Eliminate tyI desc tmi tm
                              (CS.Irrelevant "i") (CS.Irrelevant "x") tmP
                              (CS.Irrelevant inm) (CS.Irrelevant xnm) (CS.Irrelevant pnm) tmK)
@@ -577,7 +577,7 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
 -- in it.
 hasType (Annot p (Generalise t1 t2)) v = do
   (ty1,tm1) <- synthesiseTypeFor t1
-  tm1normalised <- reify ty1 <$> eval tm1 <*> pure 0
+  tm1normalised <- reify0 ty1 <$> eval tm1
   v' <- evalA (CS.generalise [tm1normalised] $ reifyType0 v)
   tm2 <- t2 `hasType` (forall "x" ty1 $ \x -> v' [x])
   return (In $ CS.App tm2 tm1)
@@ -760,8 +760,8 @@ synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
            vtm   <- eval tm
            vtmP' <- tmP `evalWith` [vtm, vb]
            -- create the term
-           let ta = reify vA va 0
-               tb = reify vB vb 0
+           let ta = reify0 vA va
+               tb = reify0 vB vb
            return (vtmP', In $ CS.ElimEq tA ta tb tm (CS.Irrelevant a) (CS.Irrelevant e) tmP tm_p)
     ty ->
         do raiseError (annot t) (ExpectingEqualityType ty)
@@ -848,8 +848,8 @@ synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
          tK `hasType` (vP [VConstruct Nothing x,i])
   vtm <- eval tm
   let tyI  = reifyType0 vI
-      desc = reify (vI .->. VIDesc vI) vDesc 0
-      tmi  = reify vI vi 0
+      desc = reify0 (vI .->. VIDesc vI) vDesc
+      tmi  = reify0 vI vi
   return ( vP [vtm,vi]
          , In $ CS.Eliminate tyI desc tmi tm
                              (CS.Irrelevant i) (CS.Irrelevant x) tmP
@@ -869,8 +869,8 @@ synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
     VGroup nm1 ab1 vparam1 ->
         case ty2 of
           VGroup nm2 ab2 vparam2 -> do
-              let param1 = fmap (\(vty,vtm) -> (reifyType0 vty, reify vty vtm 0)) vparam1
-                  param2 = fmap (\(vty,vtm) -> (reifyType0 vty, reify vty vtm 0)) vparam2
+              let param1 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam1
+                  param2 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam2
               if nm1 == nm2 && ab1 == ab2 && param1 == param2 then
                   return (VGroup nm1 ab1 vparam1, In $ CS.GroupMul tm1 tm2)
               else

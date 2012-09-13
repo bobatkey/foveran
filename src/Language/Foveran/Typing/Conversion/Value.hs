@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DeriveFunctor, GeneralizedNewtypeDeriving #-}
 
 module Language.Foveran.Typing.Conversion.Value
     ( Value (..)
@@ -34,6 +34,7 @@ module Language.Foveran.Typing.Conversion.Value
     , reflect
     , reifyType0
     , reify
+    , reify0
     )
     where
 
@@ -48,6 +49,19 @@ import qualified Data.Map as M -- for normalising abelian group expressions
 
 import Language.Foveran.Syntax.Identifier (Ident)
 import Language.Foveran.Syntax.Checked
+
+{------------------------------------------------------------------------------}
+data ReificationOpts
+    = ReificationOpts
+      { foldDefinitions :: Bool
+      }
+
+newtype ReifyFam a = ReifyFam { runReifyFam :: (ReificationOpts, Int) -> a }
+    deriving (Functor, Monad, Applicative, Show)
+
+instance Binding ReifyFam where
+    binder (ReifyFam f) = ReifyFam $ \(opts,i) -> f (opts,i+1)
+    variable c = ReifyFam $ \(_,i) -> ReifyFam $ \(_,j) -> c (j - i)
 
 {------------------------------------------------------------------------------}
 data Value
@@ -80,15 +94,15 @@ data Value
     | VIDesc_Pair Value Value
     | VIDesc_Sg   Value Value
     | VIDesc_Pi   Value Value
-    | VIDesc_Bind Value (Int -> Term) Ident (Value -> Value) -- ^ suspended 'bind' applications
+    | VIDesc_Bind Value (ReifyFam Term) Ident (Value -> Value) -- ^ suspended 'bind' applications
 
-    | VMapI       (Value -> Value) Value (Int -> Term)
-    | VSemI       Value (Int -> Term) Ident (Value -> Value)
+    | VMapI       (Value -> Value) Value (ReifyFam Term)
+    | VSemI       Value (ReifyFam Term) Ident (Value -> Value)
 
     | VGroup      Ident Abelian (Maybe (Value, Value))
-    | VGroupTerm  [(Bool, Int -> Term)]
+    | VGroupTerm  [(Bool, ReifyFam Term)]
 
-    | VNeutral   (Int -> Term)
+    | VNeutral   (ReifyFam Term)
     deriving Show
 
 {------------------------------------------------------------------------------}
@@ -123,7 +137,7 @@ vmuI :: Value -> Value -> Value
 vmuI a b = VLam "i" $ VMuI a b
 
 {------------------------------------------------------------------------------}
-bound :: Value -> (Value -> (Int -> Term)) -> Int -> Term
+bound :: Value -> (Value -> ReifyFam Term) -> ReifyFam Term
 bound ty f = tmBound (\tm -> f (reflect ty tm))
 
 {------------------------------------------------------------------------------}
@@ -357,7 +371,7 @@ vgroupInv (VGroupTerm tms) = VGroupTerm $ reverse $ map (\(inverted,tm) -> (not 
 vgroupInv _                = error "internal: type error discovered in vgroupInv"
 
 {------------------------------------------------------------------------------}
-reflect :: Value -> (Int -> Term) -> Value
+reflect :: Value -> ReifyFam Term -> Value
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
@@ -370,7 +384,7 @@ reflect _                tm = VNeutral tm
 
 
 {------------------------------------------------------------------------------}
-reifyType :: Value -> (Int -> Term)
+reifyType :: Value -> ReifyFam Term
 reifyType (VPi x v f)     = In <$> (Pi (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
 reifyType (VSigma x v f)  = In <$> (Sigma (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
 reifyType (VSum v1 v2)    = In <$> (Sum <$> reifyType v1 <*> reifyType v2)
@@ -388,10 +402,13 @@ reifyType (VNeutral t)    = t
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
 reifyType0 :: Value -> Term
-reifyType0 v = reifyType v 0
+reifyType0 v = runReifyFam (reifyType v) (ReificationOpts False, 0)
 
 {------------------------------------------------------------------------------}
-reify :: Value -> Value -> (Int -> Term)
+reify0 :: Value -> Value -> Term
+reify0 vty v = runReifyFam (reify vty v) (ReificationOpts False, 0)
+
+reify :: Value -> Value -> ReifyFam Term
 
 reify (VSet _) a = reifyType a
 
@@ -433,11 +450,11 @@ reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
 
-reifyGroupTerm :: [(Bool, Int -> Term)] -> Abelian -> Int -> Term
-reifyGroupTerm l ab i =
-    foldr smartMul (In GroupUnit) $ map doInverses $ normaliser $ map toTerm l
+reifyGroupTerm :: [(Bool, ReifyFam Term)] -> Abelian -> ReifyFam Term
+reifyGroupTerm l ab = ReifyFam $ \x ->
+                      foldr smartMul (In GroupUnit) $ map doInverses $ normaliser $ map (toTerm x) l
     where
-      toTerm (inverted, tm) = (inverted, tm i)
+      toTerm x (inverted, tm) = (inverted, runReifyFam tm x)
 
       doInverses (True, tm)  = In $ GroupInv tm
       doInverses (False, tm) = tm

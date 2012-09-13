@@ -15,7 +15,7 @@ import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers, run
 import qualified Language.Foveran.Syntax.LocallyNameless as LN
 import           Language.Foveran.Syntax.Checked (toDisplaySyntax)
 import           Language.Foveran.Typing.Context
-import           Language.Foveran.Typing.Conversion (Value, reifyType0, reify)
+import           Language.Foveran.Typing.Conversion (Value, reifyType0, reify0)
 import           Language.Foveran.Parsing.PrettyPrinter
 
 {------------------------------------------------------------------------------}
@@ -68,7 +68,7 @@ ppTerm :: UsesIdentifiers ctxt =>
        -> Value
        -> Doc
 ppTerm ctxt v vty =
-    ppPlain $ runNameGeneration ctxt $ toDisplaySyntax $ reify vty v 0
+    ppPlain $ runNameGeneration ctxt $ toDisplaySyntax $ reify0 vty v
 
 
 ppTypeError :: UsesIdentifiers ctxt => ctxt -> TypeError -> Doc

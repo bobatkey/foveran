@@ -5,7 +5,7 @@ module Language.Foveran.Typing.Conversion
        , evalInWith
        , evalIn
        , reifyType0
-       , reify
+       , reify0
        , ($$)
        , (.->.)
        , forall

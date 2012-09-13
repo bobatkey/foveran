@@ -8,7 +8,7 @@ module Language.Foveran.Typing.Conversion.Evaluation
 import Control.Applicative
 import Data.Rec (foldRec, Rec (In))
 import Data.Traversable (sequenceA)
-import Language.Foveran.Syntax.Checked
+import Language.Foveran.Syntax.Checked hiding (binder)
 import Language.Foveran.Typing.Hole
 import Language.Foveran.Typing.DefinitionContext
 import Language.Foveran.Typing.Conversion.Value
@@ -45,10 +45,10 @@ doHole identifier (_, context, holes) arguments =
 
       term = In <$> (Hole identifier <$> reifyArguments arguments holeContext)
 
-      reifyArguments []       []               i = []
-      reifyArguments (v:args) ((ident,ty):tys) i = reify vty v i:reifyArguments args tys i
+      reifyArguments []       []               = pure []
+      reifyArguments (v:args) ((ident,ty):tys) = (:) <$> reify vty v <*> reifyArguments args tys
           where vty = evalInWith ty context holes args
-      reifyArguments _        _                i = error "Incorrect number of arguments to hole"
+      reifyArguments _        _                = error "Incorrect number of arguments to hole"
 
 binder :: Eval ctxt a -> Eval ctxt (Value -> a)
 binder p = \(env,defs,holes) v -> p (v:env, defs, holes)
