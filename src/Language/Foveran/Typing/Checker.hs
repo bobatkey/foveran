@@ -118,6 +118,48 @@ runTypingMonad c context holeContext localContext =
     runReaderT (runStateT (runReaderT c context) holeContext) localContext
 
 --------------------------------------------------------------------------------
+isVSet_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Int
+isVSet_or (VSet l) (p,err) = return l
+isVSet_or v        (p,err) = raiseError p (err v)
+
+-- FIXME: this one is not like the others, and shouldn't be here
+isVIDesc_Sg_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
+isVIDesc_Sg_or (VIDesc_Sg vA vD) (p,err) = return (vA,vD)
+isVIDesc_Sg_or v                 (p,err) = raiseError p (err v)
+
+isVIDesc_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Value
+isVIDesc_or (VIDesc vI) (p,err) = return vI
+isVIDesc_or v           (p,err) = raiseError p (err v)
+
+isVPi_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
+isVPi_or (VPi _ vA vB) (p,err) = return (vA, vB)
+isVPi_or v             (p,err) = raiseError p (err v)
+
+isVSigma_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
+isVSigma_or (VSigma _ vA vB) (p,err) = return (vA, vB)
+isVSigma_or v                (p,err) = raiseError p (err v)
+
+isVSum_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
+isVSum_or (VSum vA vB) (p,err) = return (vA, vB)
+isVSum_or v            (p,err) = raiseError p (err v)
+
+isVUnit_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt ()
+isVUnit_or (VUnit _) (p,err) = return ()
+isVUnit_or v         (p,err) = raiseError p (err v)
+
+isVEq_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value, Value)
+isVEq_or (VEq vA vB va vb) (p,err) = return (vA, vB, va, vb)
+isVEq_or v                 (p,err) = raiseError p (err v)
+
+isVMuI_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value)
+isVMuI_or (VMuI vI vD vi) (p,err) = return (vI,vD,vi)
+isVMuI_or v               (p,err) = raiseError p (err v)
+
+isVGroup_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, CS.Abelian, Maybe (Value, Value))
+isVGroup_or (VGroup nm ab v) (p,err) = return (nm, ab, v)
+isVGroup_or v                (p,err) = raiseError p (err v)
+
+--------------------------------------------------------------------------------
 makeTag :: Value
         -> Value
         -> Value
@@ -144,12 +186,7 @@ getDatatypeInfo :: Value
                 -> Span
                 -> TypingMonad ctxt DatatypeInfo
 getDatatypeInfo vI vD vi p = do
-  (constrsDesc, argsDesc) <-
-      case vD $$ vi of
-        VIDesc_Sg constrsDesc argsDesc ->
-            return (constrsDesc,argsDesc)
-        _ ->
-            raiseError p (OtherError "Not a datatype in canonical form")
+  (constrsDesc, argsDesc) <- (vD $$ vi) `isVIDesc_Sg_or` (p, \_ -> OtherError "Not a datatype in canonical form")
 
   -- FIXME: going to have to do this on the reified normal form, so
   -- that we can look under the lambda. Otherwise, we'll have to just
@@ -228,37 +265,30 @@ isType (Annot p (Eq tA tB)) = do
   return (In $ CS.Eq tyA' tyB' tmA tmB)
 isType (Annot p (SemI tD x tA)) = do
   (tyD, tmD) <- synthesiseTypeFor tD
-  case tyD of
-    VIDesc tyI -> do
-      tmA <- bindVar x tyI tA $ \x tA -> isType tA
-      let tmI = reifyType0 tyI
-      return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
-    v ->
-      raiseError (annot tD) (ExpectingIDesc v)
+  tyI <- tyD `isVIDesc_or` (p, ExpectingIDesc) -- FIXME: get position of tD
+  tmA <- bindVar x tyI tA $ \x tA -> isType tA
+  let tmI = reifyType0 tyI
+  return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
 isType (Annot p (LiftI tD x tA i a tP tx)) = do
   (tyD, tmD) <- synthesiseTypeFor tD
-  case tyD of
-    VIDesc vI -> do
-      tmA <- bindVar x vI tA $ \x tA -> isType tA
-      vA  <- evalA tmA
-      tmP <- bindVar' 1 i vI tP $ \vi tP -> do
-               bindVar a (vA [vi]) tP $ \va tP -> do
-                 isType tP
-      vD <- eval tmD
-      tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
-      let tmI = reifyType0 vI
-      return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-    v -> do
-      raiseError (annot tD) (ExpectingIDesc v)
+  vI <- tyD `isVIDesc_or` (p, ExpectingIDesc) -- FIXME: get position of tD
+  tmA <- bindVar x vI tA $ \x tA -> isType tA
+  vA  <- evalA tmA
+  tmP <- bindVar' 1 i vI tP $ \vi tP -> do
+           bindVar a (vA [vi]) tP $ \va tP -> do
+             isType tP
+  vD <- eval tmD
+  tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
+  let tmI = reifyType0 vI
+  return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
 isType (Annot p (Group nm ab Nothing)) = do
   return (In $ CS.Group nm ab Nothing)
 isType (Annot p UserHole) = do
   generateHole p Nothing Nothing
 isType term@(Annot p _) = do
   (ty,tm) <- synthesiseTypeFor term
-  case ty of
-    VSet l -> return tm
-    v      -> raiseError p (ExpectingSet v)
+  _       <- ty `isVSet_or` (p, ExpectingSet)
+  return tm
 
 {------------------------------------------------------------------------------}
 -- Type checking
@@ -267,52 +297,41 @@ hasType :: (UsesIdentifiers ctxt, DefinitionContext ctxt) =>
         -> Value
         -> TypingMonad ctxt CS.Term
 
-hasType (Annot p (Set l1)) (VSet l2) = do
+hasType (Annot p (Set l1)) v = do
+  l2 <- v `isVSet_or` (p, TermIsASet)
   unless (l1 < l2) $ raiseError p (SetLevelMismatch l1 l2)
   return (In $ CS.Set l1)
 
-hasType (Annot p (Set l1)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (Pi ident tA tB)) (VSet l) = do
+hasType (Annot p (Pi ident tA tB)) v = do
+  l    <- v `isVSet_or` (p, TermIsASet)
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Pi (CS.Irrelevant ident) tmA tmB)
 
-hasType (Annot p (Pi ident tA tB)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (Sigma ident tA tB)) (VSet l) = do
+hasType (Annot p (Sigma ident tA tB)) v = do
+  l    <- v `isVSet_or` (p, TermIsASet)
   tmA  <- tA `hasType` VSet l
   vtmA <- eval tmA
   tmB  <- bindVar (fromMaybe "__x" ident) vtmA tB $ \_ tB -> tB `hasType` VSet l
   return (In $ CS.Sigma (CS.Irrelevant ident) tmA tmB)
 
-hasType (Annot p (Sigma ident tA tB)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (Sum t1 t2)) (VSet l) = do
+hasType (Annot p (Sum t1 t2)) v = do
+  l   <- v `isVSet_or` (p, TermIsASet)
   tm1 <- t1 `hasType` VSet l
   tm2 <- t2 `hasType` VSet l
   return (In $ CS.Sum tm1 tm2)
 
-hasType (Annot p (Sum t1 t2)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (Unit tag)) (VSet l) = do
+hasType (Annot p (Unit tag)) v = do
+  l <- v `isVSet_or` (p, TermIsASet)
   return (In $ CS.Unit (CS.Irrelevant tag))
 
-hasType (Annot p (Unit _)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p Empty) (VSet l) = do
+hasType (Annot p Empty) v = do
+  l <- v `isVSet_or` (p, TermIsASet)
   return (In $ CS.Empty)
 
-hasType (Annot p Empty) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (Eq tA tB)) (VSet l) = do
+hasType (Annot p (Eq tA tB)) v = do
+  l <- v `isVSet_or` (p, TermIsASet)
   (tyA, tmA) <- synthesiseTypeFor tA
   (tyB, tmB) <- synthesiseTypeFor tB
   let tyA' = reifyType0 tyA
@@ -324,154 +343,110 @@ hasType (Annot p (Eq tA tB)) (VSet l) = do
   -- types for terms that aren't of synthesisable type.
   return (In $ CS.Eq tyA' tyB' tmA tmB)
 
-hasType (Annot p (Eq tA tB)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (SemI tD x tA)) (VSet l) = do
-  (tyD, tmD) <- synthesiseTypeFor tD
-  case tyD of
-    VIDesc tyI -> do
-      tmA <- bindVar x tyI tA $ \x tA -> tA `hasType` (VSet l)
-      let tmI = reifyType0 tyI
-      return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
-    v ->
-      raiseError (annot tD) (ExpectingIDesc v)
-
 hasType (Annot p (SemI tD x tA)) v = do
-  raiseError p (TermIsASet v)
-
-hasType (Annot p (LiftI tD x tA i a tP tx)) (VSet l) = do
+  l <- v `isVSet_or` (p, TermIsASet)
   (tyD, tmD) <- synthesiseTypeFor tD
-  case tyD of
-    VIDesc vI -> do
-      tmA <- bindVar x vI tA $ \x tA -> hasType tA (VSet l)
-      vA  <- evalA tmA
-      tmP <- bindVar' 1 i vI tP $ \vi tP -> do
-               bindVar a (vA [vi]) tP $ \va tP -> do
-                 hasType tP (VSet l)
-      vD <- eval tmD
-      tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
-      let tmI = reifyType0 vI
-      return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-    v -> do
-      raiseError (annot tD) (ExpectingIDesc v)
+  tyI <- tyD `isVIDesc_or` (p, ExpectingIDesc)
+  tmA <- bindVar x tyI tA $ \x tA -> tA `hasType` (VSet l)
+  let tmI = reifyType0 tyI
+  return (In $ CS.SemI tmI tmD (CS.Irrelevant x) tmA)
 
 hasType (Annot p (LiftI tD x tA i a tP tx)) v = do
-  raiseError p (TermIsASet v)
+  l <- v `isVSet_or` (p, TermIsASet)
+  (tyD, tmD) <- synthesiseTypeFor tD
+  vI <- tyD `isVIDesc_or` (p, ExpectingIDesc)
+  tmA <- bindVar x vI tA $ \x tA -> hasType tA (VSet l)
+  vA  <- evalA tmA
+  tmP <- bindVar' 1 i vI tP $ \vi tP -> do
+           bindVar a (vA [vi]) tP $ \va tP -> do
+             hasType tP (VSet l)
+  vD <- eval tmD
+  tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
+  let tmI = reifyType0 vI
+  return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
 
-hasType (Annot p (Group nm ab Nothing)) (VSet l) = do
+hasType (Annot p (Group nm ab Nothing)) v = do
+  l <- v `isVSet_or` (p, TermIsASet)
   return (In $ CS.Group nm ab Nothing)
 
-hasType (Annot p (Group nm ab Nothing)) v =  do
-  raiseError p (TermIsASet v)
-
 {------------------------------}
-hasType (Annot p (Lam x tm)) (VPi _ tA tB) = do
+hasType (Annot p (Lam x tm)) v = do
+  (tA, tB) <- v `isVPi_or` (p, TermIsALambdaAbstraction)
   tm' <- bindVar x tA tm $ \x tm -> tm `hasType` (tB x)
   return (In $ CS.Lam (CS.Irrelevant x) tm')
 
-hasType (Annot p (Lam x t)) v = do
-  raiseError p (TermIsALambdaAbstraction v)
 
-
-hasType (Annot p (Pair t1 t2)) (VSigma _ tA tB) = do
+hasType (Annot p (Pair t1 t2)) v = do
+  (tA, tB) <- v `isVSigma_or` (p, TermIsAPairing)
   tm1  <- t1 `hasType` tA
   vtm1 <- eval tm1
   tm2  <- t2 `hasType` (tB vtm1)
   return (In $ CS.Pair tm1 tm2)
 
-hasType (Annot p (Pair _ _)) v = do
-  raiseError p (TermIsAPairing v)
 
-
-hasType (Annot p (Inl t)) (VSum tA _) = do
+hasType (Annot p (Inl t)) v = do
+  (tA,_) <- v `isVSum_or` (p, TermIsASumIntroduction)
   tm <- t `hasType` tA
   return (In $ CS.Inl tm)
 
-hasType (Annot p (Inl t)) v = do
-  raiseError p (TermIsASumIntroduction v)
-
-hasType (Annot p (Inr t)) (VSum _ tB) = do
+hasType (Annot p (Inr t)) v = do
+  (_,tB) <- v `isVSum_or` (p, TermIsASumIntroduction)
   tm <- t `hasType` tB
   return (In $ CS.Inr tm)
 
-hasType (Annot p (Inr t)) v = do
-  raiseError p (TermIsASumIntroduction v)
-
-hasType (Annot p UnitI) (VUnit tag) = do
+hasType (Annot p UnitI) v = do
+  v `isVUnit_or` (p,TermIsAUnitIntroduction)
   return (In $ CS.UnitI)
 
-hasType (Annot p UnitI) v = do
-  raiseError p (TermIsAUnitIntroduction v)
-
-
-hasType (Annot p (Desc_K t)) (VIDesc v) = do
+hasType (Annot p (Desc_K t)) v = do
+  vI <- v `isVIDesc_or` (p,TermIsADesc)
   tm <- t `hasType` (VSet 0)
   return (In $ CS.IDesc_K tm)
 
-hasType (Annot p (Desc_K t)) v = do
-  raiseError p (TermIsADesc v)
-
-
-hasType (Annot p (Desc_Prod t1 t2)) (VIDesc v) = do
-  tm1 <- t1 `hasType` (VIDesc v)
-  tm2 <- t2 `hasType` (VIDesc v)
+hasType (Annot p (Desc_Prod t1 t2)) v = do
+  vI <- v `isVIDesc_or` (p,TermIsADesc)
+  tm1 <- t1 `hasType` (VIDesc vI)
+  tm2 <- t2 `hasType` (VIDesc vI)
   return (In $ CS.IDesc_Pair tm1 tm2)
 
-hasType (Annot p (Desc_Prod t1 t2)) v = do
-  raiseError p (TermIsADesc v)
-
-
-hasType (Annot p (Construct t)) (VMuI a d i) = do
+hasType (Annot p (Construct t)) v = do
+  (a,d,i) <- v `isVMuI_or` (p,TermIsAConstruct)
   tm <- t `hasType` (vsemI a (d $$ i) "i" (vmuI a d $$))
   return (In $ CS.Construct (CS.Irrelevant Nothing) tm)
 
-hasType (Annot p (Construct t)) v = do
-  raiseError p (TermIsAConstruct v)
-
-
-hasType (Annot p (IDesc_Id t)) (VIDesc v) = do
-  tm <- t `hasType` v
-  return (In $ CS.IDesc_Id tm)
 
 hasType (Annot p (IDesc_Id t)) v = do
-  raiseError p (TermIsADesc v)
+  vI <- v `isVIDesc_or` (p,TermIsADesc)
+  tm <- t `hasType` vI
+  return (In $ CS.IDesc_Id tm)
 
-
-hasType (Annot p (IDesc_Sg t1 t2)) (VIDesc v) = do
-  tm1  <- t1 `hasType` (VSet 0)
-  vtm1 <- eval tm1
-  tm2  <- t2 `hasType` (vtm1 .->. VIDesc v)
-  return (In $ CS.IDesc_Sg tm1 tm2)
 
 hasType (Annot p (IDesc_Sg t1 t2)) v = do
-  raiseError p (TermIsADesc v)
-
-hasType (Annot p (IDesc_Pi t1 t2)) (VIDesc v) = do
+  vI   <- v `isVIDesc_or` (p,TermIsADesc)
   tm1  <- t1 `hasType` (VSet 0)
   vtm1 <- eval tm1
-  tm2  <- t2 `hasType` (vtm1 .->. VIDesc v)
-  return (In $ CS.IDesc_Pi tm1 tm2)
+  tm2  <- t2 `hasType` (vtm1 .->. VIDesc vI)
+  return (In $ CS.IDesc_Sg tm1 tm2)
 
 hasType (Annot p (IDesc_Pi t1 t2)) v = do
-  raiseError p (TermIsADesc v)
-
-hasType (Annot p (IDesc_Bind t1 x t2)) (VIDesc tyB) = do
-  (ty1, tm1) <- synthesiseTypeFor t1
-  case ty1 of
-    VIDesc tyA -> do
-      tm2 <- bindVar x tyA t2 $ \x t2 -> t2 `hasType` (VIDesc tyB)
-      let tmA = reifyType0 tyA
-          tmB = reifyType0 tyB
-      return (In $ CS.IDesc_Bind tmA tmB tm1 (CS.Irrelevant x) tm2)
-    v -> do
-      raiseError (annot t1) (ExpectingIDesc v)
+  vI   <- v `isVIDesc_or` (p,TermIsADesc)
+  tm1  <- t1 `hasType` (VSet 0)
+  vtm1 <- eval tm1
+  tm2  <- t2 `hasType` (vtm1 .->. VIDesc vI)
+  return (In $ CS.IDesc_Pi tm1 tm2)
 
 hasType (Annot p (IDesc_Bind t1 x t2)) v = do
-  raiseError p (TermIsADesc v)
+  tyB        <- v `isVIDesc_or` (p,TermIsADesc)
+  (ty1, tm1) <- synthesiseTypeFor t1
+  tyA        <- ty1 `isVIDesc_or` (annot t1,ExpectingIDesc)
+  tm2 <- bindVar x tyA t2 $ \x t2 -> t2 `hasType` (VIDesc tyB)
+  let tmA = reifyType0 tyA
+      tmB = reifyType0 tyB
+  return (In $ CS.IDesc_Bind tmA tmB tm1 (CS.Irrelevant x) tm2)
 
 
-hasType (Annot p Refl) (VEq vA vB va vb) = do
+hasType (Annot p Refl) v = do
+  (vA, vB, va, vb) <- v `isVEq_or` (p, TermIsAnEquality)
   let tA = reifyType0 vA
       tB = reifyType0 vB
       ta = reify0 vA va
@@ -482,9 +457,6 @@ hasType (Annot p Refl) (VEq vA vB va vb) = do
     raiseError p (ReflCanOnlyProduceEquality vA va vb)
   return (In $ CS.Refl)
 
-hasType (Annot p Refl) v = do
-  raiseError p (TermIsAnEquality v)
-
 
 hasType (Annot p UserHole) v = do
   generateHole p Nothing (Just v)
@@ -492,33 +464,28 @@ hasType (Annot p UserHole) v = do
 {------------------------------------------------------------------------------}
 -- The following are “high-level” features, and should be done using a general
 -- elaborator
-hasType (Annot p (NamedConstructor nm ts)) (VMuI vI vD vi) = do
+hasType (Annot p (NamedConstructor nm ts)) v = do
+  (vI, vD, vi) <- v `isVMuI_or` (p,TermIsAConstruct) -- FIXME: better error message?
   tag <- makeTag vI vD vi nm p
   let t = Annot p (Pair tag (makeConstructorArguments p ts))
   tm <- t `hasType` (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$))
   return (In $ CS.Construct (CS.Irrelevant (Just nm)) tm)
 
-hasType (Annot p (NamedConstructor nm ts)) v = do
-  raiseError p (TermIsAConstruct v) -- FIXME: better error message?
-
 hasType (Annot p (ElimEq t Nothing tp)) tP =
     do (ty, tm) <- synthesiseTypeFor t
-       case ty of
-         VEq vA vB va vb ->
-             do let tA = reifyType0 vA
-                    tB = reifyType0 vB
-                unless (tA == tB) $ do
-                  raiseError (annot t) (ExpectingHomogeneousEquality vA vB)
-                let ta   = reify0 vA va
-                    tb   = reify0 vB vb
-                eq <- reify0 ty <$> eval tm -- normalise the equality proof
-                let tmP  = reifyType0 tP
-                    tmPg = CS.generalise [eq,tb] tmP
-                vP'  <- tmPg `evalWith` [VRefl, va]
-                tm_p <- tp `hasType` vP'
-                return (In $ CS.ElimEq tA ta tb tm (CS.Irrelevant "a") (CS.Irrelevant "eq") tmPg tm_p)
-         ty ->
-             raiseError (annot t) (ExpectingEqualityType ty)
+       (vA, vB, va, vb) <- ty `isVEq_or` (annot t, ExpectingEqualityType)
+       let tA = reifyType0 vA
+           tB = reifyType0 vB
+       unless (tA == tB) $ do
+         raiseError (annot t) (ExpectingHomogeneousEquality vA vB)
+       let ta   = reify0 vA va
+           tb   = reify0 vB vb
+       eq <- reify0 ty <$> eval tm -- normalise the equality proof
+       let tmP  = reifyType0 tP
+           tmPg = CS.generalise [eq,tb] tmP
+       vP'  <- tmPg `evalWith` [VRefl, va]
+       tm_p <- tp `hasType` vP'
+       return (In $ CS.ElimEq tA ta tb tm (CS.Irrelevant "a") (CS.Irrelevant "eq") tmPg tm_p)
 
 hasType (Annot p (ElimEmpty t1 Nothing)) v =
     do tm1     <- hasType t1 VEmpty
@@ -527,30 +494,22 @@ hasType (Annot p (ElimEmpty t1 Nothing)) v =
 
 hasType (Annot p (Case t Nothing y tL z tR)) tP = do
   (tS,tmS) <- synthesiseTypeFor t
-  case tS of
-    VSum tA tB ->
-        do tmS' <- reify0 tS <$> eval tmS
-           let tmP = CS.generalise [tmS'] $ reifyType0 tP
-           tmL <- bindVar y tA tL $ \y tL -> do
-                    vP <- tmP `evalWith` [VInl y]
-                    tL `hasType` vP
-           tmR <- bindVar z tB tR $ \z tR -> do
-                    vP <- tmP `evalWith` [VInr z]
-                    tR `hasType` vP
-           let tmA = reifyType0 tA
-               tmB = reifyType0 tB
-           return (In $ CS.Case tmS tmA tmB (CS.Irrelevant "x") tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
-    v ->
-        do raiseError (annot t) (ExpectingSumType v)
+  (tA,tB)  <- tS `isVSum_or` (annot t, ExpectingSumType)
+  tmS' <- reify0 tS <$> eval tmS
+  let tmP = CS.generalise [tmS'] $ reifyType0 tP
+  tmL <- bindVar y tA tL $ \y tL -> do
+           vP <- tmP `evalWith` [VInl y]
+           tL `hasType` vP
+  tmR <- bindVar z tB tR $ \z tR -> do
+           vP <- tmP `evalWith` [VInr z]
+           tR `hasType` vP
+  let tmA = reifyType0 tA
+      tmB = reifyType0 tB
+  return (In $ CS.Case tmS tmA tmB (CS.Irrelevant "x") tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
 
 hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
   (ty,tm) <- synthesiseTypeFor t
-  (vI, vDesc, vi) <-
-      case ty of
-        VMuI vI vDesc vi ->
-            return (vI, vDesc, vi)
-        _                ->
-            raiseError (annot t) (OtherError "expecting a term of recursive type")
+  (vI, vDesc, vi) <- ty `isVMuI_or` (annot t, \_ -> OtherError "expecting a term of recursive type")
   -- generate the elimination type
   -- FIXME: this does not work when the index is a pair, and 'vty' refers to the parts separately
   -- need to make a better 'generalise' that can spot that the term being generalised over is a tuple
@@ -584,10 +543,9 @@ hasType (Annot p (Generalise t1 t2)) v = do
 
 hasType (Annot p (CasesOn isRecursive x clauses)) v = do
   (ty,_) <- synthesiseTypeFor x
-  constructorInfo <-
-      case ty of
-        VMuI vI vD vi -> getDatatypeInfo vI vD vi p
-        _ -> raiseError p (OtherError "cannot do cases on non-inductive datatype")
+  constructorInfo <- do
+    (vI, vD, vi) <- ty `isVMuI_or` (annot x, \_ -> OtherError "cannot do cases on non-inductive datatype")
+    getDatatypeInfo vI vD vi p
 
   let makeClausesMap [] m = return m
       makeClausesMap ((ident,patterns,tm):clauses) m =
@@ -661,26 +619,20 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
 {------------------------------}
 {- Built-in group operations -}
 
-hasType (Annot p GroupUnit) (VGroup nm ab _) = do
+hasType (Annot p GroupUnit) v = do
+  (nm, ab, _) <- v `isVGroup_or` (p, TermIsAGroupExpression)
   return (In $ CS.GroupUnit)
 
-hasType (Annot p GroupUnit) v = do
-  raiseError p (TermIsAGroupExpression v)
-
-hasType (Annot p (GroupMul t1 t2)) (VGroup nm ab ty) = do
+hasType (Annot p (GroupMul t1 t2)) v = do
+  (nm, ab, ty) <- v `isVGroup_or` (p, TermIsAGroupExpression)
   tm1 <- hasType t1 (VGroup nm ab ty)
   tm2 <- hasType t2 (VGroup nm ab ty)
   return (In $ CS.GroupMul tm1 tm2)
 
-hasType (Annot p (GroupMul t1 t2)) v = do
-  raiseError p (TermIsAGroupExpression v)
-
-hasType (Annot p (GroupInv t)) (VGroup nm ab ty) = do
+hasType (Annot p (GroupInv t)) v = do
+  (nm, ab, ty) <- v `isVGroup_or` (p, TermIsAGroupExpression)
   tm <- hasType t (VGroup nm ab ty)
   return (In $ CS.GroupInv tm)
-
-hasType (Annot p (GroupInv t)) v = do
-  raiseError p (TermIsAGroupExpression v)
 
 {------------------------------}
 {- Fall through case -}
@@ -710,30 +662,26 @@ synthesiseTypeFor (Annot p (Free nm globalFlag)) = do
 
 synthesiseTypeFor (Annot p (App t t')) = do
   (tF, tm) <- synthesiseTypeFor t
-  case tF of
-    VPi _ tA tB -> do tm'  <- t' `hasType` tA
-                      vtm' <- eval tm'
-                      return (tB vtm', In $ CS.App tm tm')
-    ty          -> do raiseError p (ExpectingPiType ty)
+  (tA, tB) <- tF `isVPi_or` (annot t, ExpectingPiType)
+  tm'  <- t' `hasType` tA
+  vtm' <- eval tm'
+  return (tB vtm', In $ CS.App tm tm')
 
 synthesiseTypeFor (Annot p (Case t (Just (x, tP)) y tL z tR)) = do
   (tS,tmS) <- synthesiseTypeFor t
-  case tS of
-    VSum tA tB ->
-        do tmP <- bindVar x tS tP $ \_ tP -> isType tP
-           tmL <- bindVar y tA tL $ \y tL -> do
-                    vP <- tmP `evalWith` [VInl y]
-                    tL `hasType` vP
-           tmR <- bindVar z tB tR $ \z tR -> do
-                    vP <- tmP `evalWith` [VInr z]
-                    tR `hasType` vP
-           vS  <- eval tmS
-           v   <- tmP `evalWith` [vS]
-           let tmA = reifyType0 tA
-               tmB = reifyType0 tB
-           return (v, In $ CS.Case tmS tmA tmB (CS.Irrelevant x) tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
-    v -> do
-      raiseError (annot t) (ExpectingSumType v)
+  (tA, tB) <- tS `isVSum_or` (p, ExpectingSumType)
+  tmP <- bindVar x tS tP $ \_ tP -> isType tP
+  tmL <- bindVar y tA tL $ \y tL -> do
+           vP <- tmP `evalWith` [VInl y]
+           tL `hasType` vP
+  tmR <- bindVar z tB tR $ \z tR -> do
+           vP <- tmP `evalWith` [VInr z]
+           tR `hasType` vP
+  vS  <- eval tmS
+  v   <- tmP `evalWith` [vS]
+  let tmA = reifyType0 tA
+      tmB = reifyType0 tB
+  return (v, In $ CS.Case tmS tmA tmB (CS.Irrelevant x) tmP (CS.Irrelevant y) tmL (CS.Irrelevant z) tmR)
 
 synthesiseTypeFor (Annot p (ElimEmpty t1 (Just t2))) = do
   tm1  <- t1 `hasType` VEmpty
@@ -743,28 +691,25 @@ synthesiseTypeFor (Annot p (ElimEmpty t1 (Just t2))) = do
 
 synthesiseTypeFor (Annot p (ElimEq t (Just (a, e, tP)) tp)) = do
   (ty, tm) <- synthesiseTypeFor t
-  case ty of
-    VEq vA vB va vb ->
-        do let tA = reifyType0 vA
-               tB = reifyType0 vB
-           unless (tA == tB) $ do
-             raiseError p (ExpectingHomogeneousEquality vA vB)
-           -- check the elimination set
-           tmP <- bindVar' 1 a vA tP $ \x tP -> do
-                    bindVar e (VEq vA vA va x) tP $ \e tP -> do
-                      isType tP
-           -- Check 'tp'
-           vtmP  <- tmP `evalWith` [VRefl, va]
-           tm_p  <- tp `hasType` vtmP
-           -- create the result type
-           vtm   <- eval tm
-           vtmP' <- tmP `evalWith` [vtm, vb]
-           -- create the term
-           let ta = reify0 vA va
-               tb = reify0 vB vb
-           return (vtmP', In $ CS.ElimEq tA ta tb tm (CS.Irrelevant a) (CS.Irrelevant e) tmP tm_p)
-    ty ->
-        do raiseError (annot t) (ExpectingEqualityType ty)
+  (vA, vB, va, vb) <- ty `isVEq_or` (annot t, ExpectingEqualityType)
+  let tA = reifyType0 vA
+      tB = reifyType0 vB
+  unless (tA == tB) $ do
+    raiseError p (ExpectingHomogeneousEquality vA vB)
+  -- check the elimination set
+  tmP <- bindVar' 1 a vA tP $ \x tP -> do
+           bindVar e (VEq vA vA va x) tP $ \e tP -> do
+             isType tP
+  -- Check 'tp'
+  vtmP  <- tmP `evalWith` [VRefl, va]
+  tm_p  <- tp `hasType` vtmP
+  -- create the result type
+  vtm   <- eval tm
+  vtmP' <- tmP `evalWith` [vtm, vb]
+  -- create the term
+  let ta = reify0 vA va
+      tb = reify0 vB vb
+  return (vtmP', In $ CS.ElimEq tA ta tb tm (CS.Irrelevant a) (CS.Irrelevant e) tmP tm_p)
 
 synthesiseTypeFor (Annot p (MuI t1 t2)) = do
   tm1 <- t1 `hasType` (VSet 0)
@@ -774,16 +719,14 @@ synthesiseTypeFor (Annot p (MuI t1 t2)) = do
 
 synthesiseTypeFor (Annot p (Proj1 t)) = do
   (tP, tmP) <- synthesiseTypeFor t
-  case tP of
-    VSigma _ tA _ -> do return (tA, In $ CS.Proj1 tmP)
-    v             -> do raiseError p (Proj1FromNonSigma v)
+  (tA, _)   <- tP `isVSigma_or` (p, Proj1FromNonSigma)
+  return (tA, In $ CS.Proj1 tmP)
 
 synthesiseTypeFor (Annot p (Proj2 t)) = do
   (tP, tmP) <- synthesiseTypeFor t
-  case tP of
-    VSigma _ _ tB -> do v <- vfst <$> eval tmP
-                        return (tB v, In $ CS.Proj2 tmP)
-    v             -> do raiseError p (Proj2FromNonSigma v)
+  (_, tB)   <- tP `isVSigma_or` (p, Proj2FromNonSigma)
+  v         <- vfst <$> eval tmP
+  return (tB v, In $ CS.Proj2 tmP)
 
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
@@ -792,20 +735,17 @@ synthesiseTypeFor (Annot p IDesc) = do
 
 synthesiseTypeFor (Annot p (MapI tD i1 tA i2 tB tf tx)) = do
   (tyD, tmD) <- synthesiseTypeFor tD
-  case tyD of
-    VIDesc tyI -> do
-      let tmI = reifyType0 tyI
-      tmA <- bindVar i1 tyI tA $ \_ tA -> isType tA
-      tmB <- bindVar i2 tyI tB $ \_ tB -> isType tB
-      vA <- evalA tmA
-      vB <- evalA tmB
-      vD <- eval tmD
-      tmf <- tf `hasType` (forall i1 tyI $ \vi -> vA [vi] .->. vB [vi])
-      tmx <- tx `hasType` (vsemI tyI vD i1 (\v -> vA [v]))
-      return ( vsemI tyI vD i2 (\v -> vB [v])
-             , In $ CS.MapI tmI tmD (CS.Irrelevant i1) tmA (CS.Irrelevant i2) tmB tmf tmx )
-    v ->
-        raiseError (annot tD) (ExpectingIDesc v)
+  tyI        <- tyD `isVIDesc_or` (annot tD, ExpectingIDesc)
+  let tmI = reifyType0 tyI
+  tmA <- bindVar i1 tyI tA $ \_ tA -> isType tA
+  tmB <- bindVar i2 tyI tB $ \_ tB -> isType tB
+  vA <- evalA tmA
+  vB <- evalA tmB
+  vD <- eval tmD
+  tmf <- tf `hasType` (forall i1 tyI $ \vi -> vA [vi] .->. vB [vi])
+  tmx <- tx `hasType` (vsemI tyI vD i1 (\v -> vA [v]))
+  return ( vsemI tyI vD i2 (\v -> vB [v])
+         , In $ CS.MapI tmI tmD (CS.Irrelevant i1) tmA (CS.Irrelevant i2) tmB tmf tmx )
 
 synthesiseTypeFor (Annot p IDesc_Elim) = do
   return ( forall "I" (VSet 0) $ \i ->
@@ -830,12 +770,7 @@ synthesiseTypeFor (Annot p IDesc_Elim) = do
 
 synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
   (ty,tm) <- synthesiseTypeFor t
-  (vI, vDesc, vi) <-
-      case ty of
-        VMuI vI vDesc vi ->
-            return (vI, vDesc, vi)
-        _                ->
-            raiseError (annot t) (OtherError "expecting a term of recursive type")
+  (vI, vDesc, vi) <- ty `isVMuI_or` (annot t, \_ -> OtherError "expecting a term of recursive type")
   -- check the elimination type
   tmP <- bindVar' 1 i vI tP $ \i tP ->
          bindVar x (VMuI vI vDesc i) tP $ \x tP ->
@@ -865,28 +800,19 @@ synthesiseTypeFor (Annot p (Group nm ab (Just ty))) = do
 synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
   (ty1, tm1) <- synthesiseTypeFor t1
   (ty2, tm2) <- synthesiseTypeFor t2
-  case ty1 of
-    VGroup nm1 ab1 vparam1 ->
-        case ty2 of
-          VGroup nm2 ab2 vparam2 -> do
-              let param1 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam1
-                  param2 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam2
-              if nm1 == nm2 && ab1 == ab2 && param1 == param2 then
-                  return (VGroup nm1 ab1 vparam1, In $ CS.GroupMul tm1 tm2)
-              else
-                  raiseError p (OtherError "Groups not equal")
-          _ ->
-              raiseError (annot t2) (OtherError "Right operand not a group element")
-    _ ->
-        raiseError (annot t1) (OtherError "Left operand not a group element")
+  (nm1, ab1, vparam1) <- ty1 `isVGroup_or` (annot t1, \_ -> OtherError "Operand is not a group element")
+  (nm2, ab2, vparam2) <- ty2 `isVGroup_or` (annot t2, \_ -> OtherError "Operand is not a group element")
+  let param1 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam1
+      param2 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam2
+  if nm1 == nm2 && ab1 == ab2 && param1 == param2 then
+      return (VGroup nm1 ab1 vparam1, In $ CS.GroupMul tm1 tm2)
+  else
+      raiseError p (OtherError "Groups not equal")
 
 synthesiseTypeFor (Annot p (GroupInv t)) = do
-  (ty, tm) <- synthesiseTypeFor t
-  case ty of
-    VGroup nm ab vparam ->
-        return (VGroup nm ab vparam, In $ CS.GroupInv tm)
-    _ ->
-        raiseError (annot t) (OtherError "Operand is not a group element")
+  (ty, tm)         <- synthesiseTypeFor t
+  (nm, ab, vparam) <- ty `isVGroup_or` (annot t, \_ -> OtherError "Operand is not a group element")
+  return (VGroup nm ab vparam, In $ CS.GroupInv tm)
 
 --------------------------------------------------------------------------------
 -- Type ascription

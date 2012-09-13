@@ -40,6 +40,9 @@ apply = \f a. f a ;
 big : Set 1;
 big = Set -> Set ;
 
+big2 : Set 1;
+big2 = Set;
+
 k : (A B : Set) -> A -> B -> A ;
 k = \A B x y. y ;
 
