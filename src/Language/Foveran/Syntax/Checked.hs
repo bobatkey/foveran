@@ -9,12 +9,12 @@ module Language.Foveran.Syntax.Checked
 
     , Term
     , TermCon (..)
+    , Binding (..)
     , tmApp
     , tmFree
     , tmBound
     , tmFst
     , tmSnd
-    , vbound
       
     , bindFree
     , generalise
@@ -96,12 +96,31 @@ data TermCon tm
     deriving (Show, Functor, Eq, Ord)
 
 --------------------------------------------------------------------------------
-class Applicative f => Binding f where
-    binder :: f a -> f a
+class (Monad f, Applicative f) => Binding f where
+    binder   :: f a -> f a
+    variable :: (Int -> a) -> f (f a)
 
 instance Binding ((->) Int) where
     binder f i = f (i+1)
+    variable c i j = c (j - i)
 
+--------------------------------------------------------------------------------
+tmApp :: Binding f => f Term -> f Term -> f Term
+tmApp t1 t2 = In <$> (App <$> t1 <*> t2)
+
+tmFst :: Binding f => f Term -> f Term
+tmFst t = In . Proj1 <$> t
+
+tmSnd :: Binding f => f Term -> f Term
+tmSnd t = In . Proj2 <$> t
+
+tmBound :: Binding f => (f Term -> f Term) -> f Term
+tmBound f = binder (f =<< variable (In . Bound))
+
+tmFree :: Binding f => Ident -> f Term
+tmFree nm = pure (In $ Free nm)
+
+--------------------------------------------------------------------------------
 traverseSyn :: Binding f => TermCon (f a) -> f (TermCon a)
 traverseSyn (Free nm')       = pure $ Free nm'
 traverseSyn (Bound k)        = pure $ Bound k
@@ -300,31 +319,6 @@ toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
 
 toDisplaySyntax :: Term -> NameGeneration DS.Term
 toDisplaySyntax = translateRec toDisplay
-
-{------------------------------------------------------------------------------}
-tmApp :: (Int -> Term) -> (Int -> Term) -> (Int -> Term)
-tmApp t1 t2 = In <$> (App <$> t1 <*> t2)
-
-tmFst :: (Int -> Term) -> (Int -> Term)
-tmFst t = In . Proj1 <$> t
-
-tmSnd :: (Int -> Term) -> (Int -> Term)
-tmSnd t = In . Proj2 <$> t
-
-tmInl :: (Int -> Term) -> (Int -> Term)
-tmInl t = In . Inl <$> t
-
-tmInr :: (Int -> Term) -> (Int -> Term)
-tmInr t = In . Inr <$> t
-
-vbound :: Int -> (Int -> Term)
-vbound i j = In $ Bound (j - i - 1)
-
-tmBound :: ((Int -> Term) -> (Int -> Term)) -> Int -> Term
-tmBound f i = f (vbound i) (i+1)
-
-tmFree :: Ident -> Int -> Term
-tmFree nm = \i -> In $ Free nm
 
 {------------------------------------------------------------------------------}
 cmp :: (Int -> Int -> Bool)
