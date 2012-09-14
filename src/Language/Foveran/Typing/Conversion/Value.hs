@@ -442,12 +442,21 @@ reify (VIDesc tI)      (VIDesc_K a)        = In <$> (IDesc_K <$> reifyType a)
 reify (VIDesc tI)      (VIDesc_Pair d1 d2) = In <$> (IDesc_Pair <$> reify (VIDesc tI) d1 <*> reify (VIDesc tI) d2)
 reify (VIDesc tI)      (VIDesc_Sg a d)     = In <$> (IDesc_Sg <$> reifyType a <*> reify (a .->. VIDesc tI) d)
 reify (VIDesc tI)      (VIDesc_Pi a d)     = In <$> (IDesc_Pi <$> reifyType a <*> reify (a .->. VIDesc tI) d)
-reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
+reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) = do
+  opts    <- getReificationOpts
+  tmf     <- bound vA (\v -> reify (VIDesc tI) (vf v))
+  tmf_iid <- bound tI (\v -> reify (VIDesc tI) (VIDesc_Id v))
+  tyA     <- reifyType vA
+  tyI     <- reifyType tI
+  -- FIXME: this will check equality using the 'display' terms
+  if foldDefinitions opts && tyA == tyI && tmf == tmf_iid then
+      tm
+  else
      In <$> (IDesc_Bind <$> reifyType vA
                         <*> reifyType tI
                         <*> tm
                         <*> pure (Irrelevant x)
-                        <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
+                        <*> pure tmf) -- bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
   opts   <- getReificationOpts
