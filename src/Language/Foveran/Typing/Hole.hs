@@ -21,7 +21,7 @@ import           Language.Foveran.Syntax.Identifier (Ident, UsesIdentifiers (..)
 import           Language.Foveran.Syntax.Checked (Term, bindFree, toDisplaySyntax)
 import           Language.Foveran.Parsing.PrettyPrinter
 import           Language.Foveran.Typing.LocalContext
-import           Language.Foveran.Typing.Conversion.Value (Value, reifyType0)
+import           Language.Foveran.Typing.Conversion.Value (Value, reifyTypeForDisplay)
 import qualified Data.Set as S
 
 --------------------------------------------------------------------------------
@@ -48,12 +48,12 @@ makeHole localContext goal =
 
       holeGoal = case goal of
                    Nothing -> GoalIsType
-                   Just t  -> GoalType (bindFree (map fst members) (reifyType0 t) 0)
+                   Just t  -> GoalType (bindFree (map fst members) (reifyTypeForDisplay t) 0)
 
       go []                       = []
       go ((ident,v):localContext) =
           let holeContext = go localContext
-              ty          = bindFree (map fst holeContext) (reifyType0 v) 0
+              ty          = bindFree (map fst holeContext) (reifyTypeForDisplay v) 0
           in (ident,ty):holeContext
 
 --------------------------------------------------------------------------------

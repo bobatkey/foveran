@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, DeriveFunctor, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings, DeriveFunctor, GeneralizedNewtypeDeriving, DoAndIfThenElse #-}
 
 module Language.Foveran.Typing.Conversion.Value
     ( Value (..)
@@ -33,8 +33,10 @@ module Language.Foveran.Typing.Conversion.Value
 
     , reflect
     , reifyType0
+    , reifyTypeForDisplay
     , reify
     , reify0
+    , reifyForDisplay
     )
     where
 
@@ -62,6 +64,9 @@ newtype ReifyFam a = ReifyFam { runReifyFam :: (ReificationOpts, Int) -> a }
 instance Binding ReifyFam where
     binder (ReifyFam f) = ReifyFam $ \(opts,i) -> f (opts,i+1)
     variable c = ReifyFam $ \(_,i) -> ReifyFam $ \(_,j) -> c (j - i)
+
+getReificationOpts :: ReifyFam ReificationOpts
+getReificationOpts = ReifyFam $ \(opts,_) -> opts
 
 {------------------------------------------------------------------------------}
 data Value
@@ -404,9 +409,15 @@ reifyType v               = error ("internal: reifyType given non-type: " ++ sho
 reifyType0 :: Value -> Term
 reifyType0 v = runReifyFam (reifyType v) (ReificationOpts False, 0)
 
+reifyTypeForDisplay :: Value -> Term
+reifyTypeForDisplay v = runReifyFam (reifyType v) (ReificationOpts True, 0)
+
 {------------------------------------------------------------------------------}
 reify0 :: Value -> Value -> Term
 reify0 vty v = runReifyFam (reify vty v) (ReificationOpts False, 0)
+
+reifyForDisplay :: Value -> Value -> Term
+reifyForDisplay vty v = runReifyFam (reify vty v) (ReificationOpts True, 0)
 
 reify :: Value -> Value -> ReifyFam Term
 
@@ -438,11 +449,19 @@ reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) =
                         <*> pure (Irrelevant x)
                         <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
-reify (VSemI vI tmD i vA) (VMapI vB vf tmX) =
+reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
+  opts   <- getReificationOpts
+  tyA    <- bound vI (\i -> reifyType (vA i))
+  tyB    <- bound vI (\i -> reifyType (vB i))
+  tmf    <- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
+  tmf_id <- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) (VLam i $ \i -> VLam "x" $ \x -> x)
+  if foldDefinitions opts && tyA == tyB && tmf == tmf_id then -- FIXME: split up the reification options to be finer-grained
+      tmX
+  else
     In <$> (MapI <$> reifyType vI <*> tmD
-                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vB i))
-                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vA i))
-                 <*> reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
+                 <*> pure (Irrelevant i) <*> pure tyB
+                 <*> pure (Irrelevant i) <*> pure tyA
+                 <*> pure tmf -- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl

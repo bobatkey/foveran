@@ -28,7 +28,13 @@ normalise ex
 
 assume x : semI[exD, i. A i]
 
+-- this will print out 'x', for now
 normalise x
+
+test : x == mapI[exD, i. A i, i. A i, \i x. x, x]
+test = refl
+
+normalise mapI[exD, i. A i, i. A i, \i x. x, x]
 
 assume f : (i : I) -> A i -> B i
 assume g : (i : I) -> B i -> C i
