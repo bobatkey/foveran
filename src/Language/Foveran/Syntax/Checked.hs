@@ -439,3 +439,6 @@ instance Eq Term where
 
 instance Ord Term where
     compare (In tm) (In tm') = compare tm tm'
+
+instance Show Term where
+    show (In tm) = "(" ++ show tm ++ ")"

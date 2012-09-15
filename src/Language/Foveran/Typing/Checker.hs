@@ -119,43 +119,53 @@ runTypingMonad c context holeContext localContext =
 
 --------------------------------------------------------------------------------
 isVSet_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Int
+isVSet_or (VDefnRef _ v _ _) (p,err) = isVSet_or v (p,err)
 isVSet_or (VSet l) (p,err) = return l
 isVSet_or v        (p,err) = raiseError p (err v)
 
 -- FIXME: this one is not like the others, and shouldn't be here
 isVIDesc_Sg_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
-isVIDesc_Sg_or (VIDesc_Sg vA vD) (p,err) = return (vA,vD)
-isVIDesc_Sg_or v                 (p,err) = raiseError p (err v)
+isVIDesc_Sg_or (VDefnRef _ v _ _) (p,err) = isVIDesc_Sg_or v (p,err)
+isVIDesc_Sg_or (VIDesc_Sg vA vD)  (p,err) = return (vA,vD)
+isVIDesc_Sg_or v                  (p,err) = raiseError p (err v)
 
 isVIDesc_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Value
+isVIDesc_or (VDefnRef _ v _ _) (p,err) = isVIDesc_or v (p,err)
 isVIDesc_or (VIDesc vI) (p,err) = return vI
 isVIDesc_or v           (p,err) = raiseError p (err v)
 
 isVPi_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
+isVPi_or (VDefnRef _ v _ _) (p,err) = isVPi_or v (p,err)
 isVPi_or (VPi _ vA vB) (p,err) = return (vA, vB)
 isVPi_or v             (p,err) = raiseError p (err v)
 
 isVSigma_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
+isVSigma_or (VDefnRef _ v _ _) (p,err) = isVSigma_or v (p,err)
 isVSigma_or (VSigma _ vA vB) (p,err) = return (vA, vB)
 isVSigma_or v                (p,err) = raiseError p (err v)
 
 isVSum_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
+isVSum_or (VDefnRef _ v _ _) (p,err) = isVSum_or v (p,err)
 isVSum_or (VSum vA vB) (p,err) = return (vA, vB)
 isVSum_or v            (p,err) = raiseError p (err v)
 
 isVUnit_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt ()
+isVUnit_or (VDefnRef _ v _ _) (p,err) = isVUnit_or v (p,err)
 isVUnit_or (VUnit _) (p,err) = return ()
 isVUnit_or v         (p,err) = raiseError p (err v)
 
 isVEq_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value, Value)
+isVEq_or (VDefnRef _ v _ _) (p,err) = isVEq_or v (p,err)
 isVEq_or (VEq vA vB va vb) (p,err) = return (vA, vB, va, vb)
 isVEq_or v                 (p,err) = raiseError p (err v)
 
 isVMuI_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value)
+isVMuI_or (VDefnRef _ v _ _) (p,err) = isVMuI_or v (p,err)
 isVMuI_or (VMuI vI vD vi) (p,err) = return (vI,vD,vi)
 isVMuI_or v               (p,err) = raiseError p (err v)
 
 isVGroup_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, CS.Abelian, Maybe (Value, Value))
+isVGroup_or (VDefnRef _ v _ _) (p,err) = isVGroup_or v (p,err)
 isVGroup_or (VGroup nm ab v) (p,err) = return (nm, ab, v)
 isVGroup_or v                (p,err) = raiseError p (err v)
 
@@ -478,11 +488,11 @@ hasType (Annot p (ElimEq t Nothing tp)) tP =
            tB = reifyType0 vB
        unless (tA == tB) $ do
          raiseError (annot t) (ExpectingHomogeneousEquality vA vB)
-       let ta   = reify0 vA va
+       let ta   = reifyForDisplay vA va
            tb   = reify0 vB vb
-       eq <- reify0 ty <$> eval tm -- normalise the equality proof
+       -- eq <- reify0 ty <$> eval tm -- normalise the equality proof; FIXME: why?
        let tmP  = reifyType0 tP
-           tmPg = CS.generalise [eq,tb] tmP
+           tmPg = CS.generalise [tm,tb] tmP
        vP'  <- tmPg `evalWith` [VRefl, va]
        tm_p <- tp `hasType` vP'
        return (In $ CS.ElimEq tA ta tb tm (CS.Irrelevant "a") (CS.Irrelevant "eq") tmPg tm_p)
@@ -495,8 +505,8 @@ hasType (Annot p (ElimEmpty t1 Nothing)) v =
 hasType (Annot p (Case t Nothing y tL z tR)) tP = do
   (tS,tmS) <- synthesiseTypeFor t
   (tA,tB)  <- tS `isVSum_or` (annot t, ExpectingSumType)
-  tmS' <- reify0 tS <$> eval tmS
-  let tmP = CS.generalise [tmS'] $ reifyType0 tP
+  -- FIXME: tmS' <- reify0 tS <$> eval tmS
+  let tmP = CS.generalise [tmS] $ reifyTypeForDisplay tP
   tmL <- bindVar y tA tL $ \y tL -> do
            vP <- tmP `evalWith` [VInl y]
            tL `hasType` vP
@@ -514,9 +524,9 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
   -- FIXME: this does not work when the index is a pair, and 'vty' refers to the parts separately
   -- need to make a better 'generalise' that can spot that the term being generalised over is a tuple
   -- see interpreter.fv, definitions "lookup" and "eval"
-  tmi <- return (reify0 vI vi)
-  tm' <- reify0 ty <$> eval tm
-  let tmP = CS.generalise [tm',tmi] $ reifyType0 vty
+  tmi <- return (reifyForDisplay vI vi)
+  -- tm' <- reifyForDisplay ty <$> eval tm
+  let tmP = CS.generalise [tm,tmi] $ reifyTypeForDisplay vty
   -- check the algebra
   vP  <- evalA tmP
   tmK <- bindVar' 2 inm vI tK $ \i tK ->
@@ -536,8 +546,9 @@ hasType (Annot p (Eliminate t Nothing inm xnm pnm tK)) vty = do
 -- in it.
 hasType (Annot p (Generalise t1 t2)) v = do
   (ty1,tm1) <- synthesiseTypeFor t1
-  tm1normalised <- reify0 ty1 <$> eval tm1
-  v' <- evalA (CS.generalise [tm1normalised] $ reifyType0 v)
+  -- tm1normalised <- reify0 ty1 <$> eval tm1 -- FIXME: is the normalisation strictly required here?
+  let ty = CS.generalise [tm1] $ reifyTypeForDisplay v
+  v' <- evalA ty
   tm2 <- t2 `hasType` (forall "x" ty1 $ \x -> v' [x])
   return (In $ CS.App tm2 tm1)
 

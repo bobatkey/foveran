@@ -107,6 +107,8 @@ data Value
     | VGroup      Ident Abelian (Maybe (Value, Value))
     | VGroupTerm  [(Bool, ReifyFam Term)]
 
+    | VDefnRef    Ident Value Value [Value] -- VDefnRef 'identifier' 'underlying-value' 'type' 'args'
+
     | VNeutral   (ReifyFam Term)
     deriving Show
 
@@ -128,13 +130,17 @@ infixr 5 .->.
 {------------------------------------------------------------------------------}
 ($$) :: Value -> Value -> Value
 ($$) (VLam _ f)   v = f v
+($$) (VDefnRef identifier vf ty args) v =
+    VDefnRef identifier (vf $$ v) ty (v:args)
 ($$) v            _ = error $ "internal: vapp given non-function: " ++ show v
 
 vfst :: Value -> Value
+vfst (VDefnRef _ v _ _) = vfst v
 vfst (VPair v _) = v
 vfst v           = error $ "internal: vfst given non-pair: " ++ show v
 
 vsnd :: Value -> Value
+vsnd (VDefnRef _ v _ _) = vsnd v
 vsnd (VPair _ v) = v
 vsnd v           = error $ "internal: vsnd given non-pair: " ++ show v
 
@@ -153,6 +159,7 @@ vcase :: Value ->
          Ident -> (Value -> Value) ->
          Ident -> (Value -> Value) ->
          Value
+vcase (VDefnRef _ v _ _) vA vB x vP y vL z vR = vcase v vA vB x vP y vL z vR
 vcase (VInl v)     vA vB x vP y vL z vR = vL v
 vcase (VInr v)     vA vB x vP y vL z vR = vR v
 vcase (VNeutral n) vA vB x vP y vL z vR
@@ -170,7 +177,10 @@ vcase _            _  _  _ _  _ _  _ _  = error "internal: type error when elimi
 velimEmpty :: Value -- ^ a purported element of the empty type
            -> Value -- ^ result type
            -> Value -- ^ an element of the result type
-velimEmpty (VNeutral n) a = reflect a (In <$> (ElimEmpty <$> n <*> reifyType a))
+velimEmpty (VDefnRef identifier _ ty args) a =
+    reflect a (In <$> (ElimEmpty <$> reifyDefnRef identifier ty args <*> reifyType a))
+velimEmpty (VNeutral n) a =
+    reflect a (In <$> (ElimEmpty <$> n <*> reifyType a))
 
 {------------------------------------------------------------------------------}
 velimeq :: Value -- ^ The type of the equality 'A'
@@ -183,6 +193,7 @@ velimeq :: Value -- ^ The type of the equality 'A'
         -> Value -- ^ Value of type 'P a refl'
         -> Value -- ^ Value of type 'P b e'
 velimeq tA ta tb VRefl a e tP tp = tp
+velimeq tA ta tb (VDefnRef _ v _ _) a e tP tp = velimeq tA ta tb v a e tP tp
 velimeq tA ta tb (VNeutral n) a e tP tp =
     reflect (tP tb (VNeutral n))
             (In <$> (ElimEq
@@ -198,6 +209,7 @@ velimeq tA ta tb (VNeutral n) a e tP tp =
 vsemI :: Value -> Value -> Ident -> (Value -> Value) -> Value
 vsemI vI vD x vA = loop vD
     where
+      loop (VDefnRef _ v _ _)  = loop v
       loop (VIDesc_Id i)       = vA i
       loop (VIDesc_K a)        = a
       loop (VIDesc_Pair d1 d2) = loop d1 .*. loop d2
@@ -215,17 +227,21 @@ vmapI :: Value ->
          Value
 vmapI vI vD i1 vA i2 vB vf vx = loop vD vx
     where
-      loop (VIDesc_Id i)       a           = vf $$ i $$ a
-      loop (VIDesc_K _)        a           = a
-      loop (VIDesc_Pair d1 d2) (VPair x y) = VPair (loop d1 x) (loop d2 y)
-      loop (VIDesc_Sg c d)     (VPair x y) = VPair x (loop (d $$ x) y)
-      loop (VIDesc_Pi c d)     (VLam nm f) = VLam nm $ \v -> loop (d $$ v) (f v)
+      loop (VDefnRef _ v _ _)  a = loop v a
+      loop (VIDesc_Id i)       a = vf $$ i $$ a
+      loop (VIDesc_K _)        a = a
+      loop (VIDesc_Pair d1 d2) a = VPair (loop d1 (vfst a)) (loop d2 (vsnd a))
+      loop (VIDesc_Sg c d)     a = VPair (vfst a) (loop (d $$ vfst a) (vsnd a))
+      loop (VIDesc_Pi c d)     f = VLam "x" $ \v -> loop (d $$ v) (f $$ v)
+      loop (VIDesc_Bind vI tmD i vA) (VDefnRef _ v _ _) =
+          loop (VIDesc_Bind vI tmD i vA) v
       loop (VIDesc_Bind vI tmD i vA) (VMapI vB vg tmx) =
           VMapI vB (VLam i $ \vi -> VLam "b" $ \vb -> loop (vA vi) (vg $$ vi $$ vb)) tmx
 
 {------------------------------------------------------------------------------}
 videsc_elim vI vP vId vK vPair vSg vPi = loop
     where
+      loop (VDefnRef _ v _ _)  = loop v
       loop (VIDesc_Id i)       = vId $$ i
       loop (VIDesc_K a)        = vK $$ a
       loop (VIDesc_Pair d1 d2) = vPair $$ d1 $$ d2 $$ loop d1 $$ loop d2
@@ -261,6 +277,7 @@ videsc_bind :: Value
             -> Value
 videsc_bind vA vB vc x vf = loop vc
     where
+      loop (VDefnRef _ v _ _)  = loop v
       loop (VIDesc_Id i)       = vf i
       loop (VIDesc_K vB)       = VIDesc_K vB
       loop (VIDesc_Pair d1 d2) = VIDesc_Pair (loop d1) (loop d2)
@@ -277,6 +294,7 @@ vliftI :: Value   -- ^ index type
        -> Value
 vliftI vI vD x vA i a vP vx = loop vD vx
     where
+      loop (VDefnRef _ v _ _)  vx = loop v vx
       loop (VIDesc_Id i)       vx = vP i vx
       loop (VIDesc_K vB)       vx = VUnit Nothing
       loop (VIDesc_Pair d1 d2) vx = loop d1 (vfst vx) .*. loop d2 (vsnd vx)
@@ -335,6 +353,7 @@ veliminate :: Value -- ^ The index type (@I : Set@)
            -> Value
 veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
     where
+      loop vi (VDefnRef _ v _ _) = loop vi v
       loop vi (VConstruct _ x) =
           vK vi x
              -- FIXME: vallI should be a built-in, because it needs to
@@ -369,14 +388,18 @@ vgroupUnit = VGroupTerm []
 
 vgroupMul :: Value -> Value -> Value
 vgroupMul (VGroupTerm tms1) (VGroupTerm tms2) = VGroupTerm (tms1 ++ tms2)
-vgroupMul _                 _                 = error "internal: type error discovered in vgroupMul"
+vgroupMul (VDefnRef _ v1 _ _) v2 = vgroupMul v1 v2
+vgroupMul v1 (VDefnRef _ v2 _ _) = vgroupMul v1 v2
+vgroupMul _                 _    = error "internal: type error discovered in vgroupMul"
 
 vgroupInv :: Value -> Value
 vgroupInv (VGroupTerm tms) = VGroupTerm $ reverse $ map (\(inverted,tm) -> (not inverted,tm)) tms
+vgroupInv (VDefnRef _ v _ _) = vgroupInv v
 vgroupInv _                = error "internal: type error discovered in vgroupInv"
 
 {------------------------------------------------------------------------------}
 reflect :: Value -> ReifyFam Term -> Value
+reflect (VDefnRef _ v _ _) tm = reflect v tm
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
                                   v2 = reflect (tB v1) (tmSnd tm)
@@ -390,6 +413,12 @@ reflect _                tm = VNeutral tm
 
 {------------------------------------------------------------------------------}
 reifyType :: Value -> ReifyFam Term
+reifyType (VDefnRef identifier v defn_ty args) = do
+  opts <- getReificationOpts
+  if foldDefinitions opts && not (any isUnfoldTrigger args) then
+      reifyDefnRef identifier defn_ty args
+  else
+      reifyType v
 reifyType (VPi x v f)     = In <$> (Pi (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
 reifyType (VSigma x v f)  = In <$> (Sigma (Irrelevant x) <$> reifyType v <*> bound v (\v -> reifyType (f v)))
 reifyType (VSum v1 v2)    = In <$> (Sum <$> reifyType v1 <*> reifyType v2)
@@ -419,7 +448,17 @@ reify0 vty v = runReifyFam (reify vty v) (ReificationOpts False, 0)
 reifyForDisplay :: Value -> Value -> Term
 reifyForDisplay vty v = runReifyFam (reify vty v) (ReificationOpts True, 0)
 
+-- | `reify type value`
 reify :: Value -> Value -> ReifyFam Term
+
+reify (VDefnRef _ vty _ _) v = reify vty v
+
+reify vty (VDefnRef identifier v defn_ty args) = do
+  opts <- getReificationOpts
+  if foldDefinitions opts && not (any isUnfoldTrigger args) then
+      reifyDefnRef identifier defn_ty args
+  else
+      reify vty v
 
 reify (VSet _) a = reifyType a
 
@@ -479,6 +518,29 @@ reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl
 reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
+
+-- FIXME: this is a clunky, fixed heuristic. should try to work out
+-- from a definition's body which args are to be used as triggers.
+isUnfoldTrigger :: Value -> Bool
+isUnfoldTrigger (VDefnRef _ v _ _) = isUnfoldTrigger v
+isUnfoldTrigger (VInl _)           = True
+isUnfoldTrigger (VInr _)           = True
+isUnfoldTrigger (VRefl)            = True
+isUnfoldTrigger (VConstruct _ _)   = True
+isUnfoldTrigger (VIDesc_K _)       = True
+isUnfoldTrigger (VIDesc_Id _)      = True
+isUnfoldTrigger (VIDesc_Pair _ _)  = True
+isUnfoldTrigger (VIDesc_Sg _ _)    = True
+isUnfoldTrigger (VIDesc_Pi _ _)    = True
+isUnfoldTrigger _                  = False
+
+reifyDefnRef :: Ident -> Value -> [Value] -> ReifyFam Term
+reifyDefnRef identifier vty args =
+    doArgs vty (reverse args) (tmFree identifier)
+    where
+      doArgs vty                []       tm = tm
+      doArgs (VDefnRef _ v _ _) args     tm = doArgs v args tm
+      doArgs (VPi _ vA vB)      (a:args) tm = doArgs (vB a) args (tm `tmApp` reify vA a)
 
 reifyGroupTerm :: [(Bool, ReifyFam Term)] -> Abelian -> ReifyFam Term
 reifyGroupTerm l ab = ReifyFam $ \x ->
