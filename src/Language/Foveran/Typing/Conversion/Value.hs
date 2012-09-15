@@ -463,8 +463,10 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
   tyA    <- bound vI (\i -> reifyType (vA i))
   tyB    <- bound vI (\i -> reifyType (vB i))
   tmf    <- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
-  tmf_id <- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) (VLam i $ \i -> VLam "x" $ \x -> x)
-  if foldDefinitions opts && tyA == tyB && tmf == tmf_id then -- FIXME: split up the reification options to be finer-grained
+  tm_id  <- reify (forall "i" vI $ \vi -> vA vi .->. vA vi) (VLam i $ \i -> VLam "x" $ \x -> x)
+  -- FIXME: this will check equality using the 'display' terms
+  -- FIXME: split up the reification options to be finer-grained
+  if foldDefinitions opts && tyA == tyB && tmf == tm_id then
       tmX
   else
     In <$> (MapI <$> reifyType vI <*> tmD
