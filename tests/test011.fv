@@ -1,0 +1,11 @@
+assume A : Set
+
+f : A × A -> (A -> A) -> A
+f a b = fst a
+
+assume a : A × A
+assume b : A
+
+normalise f a (\a. b)
+
+;
