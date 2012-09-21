@@ -68,6 +68,10 @@ instance Binding ReifyFam where
 getReificationOpts :: ReifyFam ReificationOpts
 getReificationOpts = ReifyFam $ \(opts,_) -> opts
 
+withFullReification :: ReifyFam a -> ReifyFam a
+withFullReification r =
+    ReifyFam $ \(_,i) -> runReifyFam r (ReificationOpts False, i)
+
 {------------------------------------------------------------------------------}
 data Value
     = VSet   Int
@@ -483,10 +487,10 @@ reify (VIDesc tI)      (VIDesc_Sg a d)     = In <$> (IDesc_Sg <$> reifyType a <*
 reify (VIDesc tI)      (VIDesc_Pi a d)     = In <$> (IDesc_Pi <$> reifyType a <*> reify (a .->. VIDesc tI) d)
 reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) = do
   opts    <- getReificationOpts
-  tmf     <- bound vA (\v -> reify (VIDesc tI) (vf v))
-  tmf_iid <- bound tI (\v -> reify (VIDesc tI) (VIDesc_Id v))
-  tyA     <- reifyType vA
-  tyI     <- reifyType tI
+  tmf     <- withFullReification $ bound vA (\v -> reify (VIDesc tI) (vf v))
+  tmf_iid <- withFullReification $ bound tI (\v -> reify (VIDesc tI) (VIDesc_Id v))
+  tyA     <- withFullReification $ reifyType vA
+  tyI     <- withFullReification $ reifyType tI
   -- FIXME: this will check equality using the 'display' terms
   if foldDefinitions opts && tyA == tyI && tmf == tmf_iid then
       tm
@@ -495,23 +499,22 @@ reify (VIDesc tI)      (VIDesc_Bind vA tm x vf) = do
                         <*> reifyType tI
                         <*> tm
                         <*> pure (Irrelevant x)
-                        <*> pure tmf) -- bound vA (\v -> reify (VIDesc tI) (vf v)))
+                        <*> bound vA (\v -> reify (VIDesc tI) (vf v)))
 reify (VIDesc tI)      v                   = error $ "internal: reify: non-canonical value of VIDesc: " ++ show v
 reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
   opts   <- getReificationOpts
-  tyA    <- bound vI (\i -> reifyType (vA i))
-  tyB    <- bound vI (\i -> reifyType (vB i))
-  tmf    <- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
+  tyA    <- withFullReification $ bound vI (\i -> reifyType (vA i))
+  tyB    <- withFullReification $ bound vI (\i -> reifyType (vB i))
+  tmf    <- withFullReification $ reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
   tm_id  <- reify (forall "i" vI $ \vi -> vA vi .->. vA vi) (VLam i $ \i -> VLam "x" $ \x -> x)
-  -- FIXME: this will check equality using the 'display' terms
   -- FIXME: split up the reification options to be finer-grained
   if foldDefinitions opts && tyA == tyB && tmf == tm_id then
       tmX
   else
     In <$> (MapI <$> reifyType vI <*> tmD
-                 <*> pure (Irrelevant i) <*> pure tyB
-                 <*> pure (Irrelevant i) <*> pure tyA
-                 <*> pure tmf -- reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
+                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vB i))
+                 <*> pure (Irrelevant i) <*> bound vI (\i -> reifyType (vA i))
+                 <*> reify (forall "i" vI $ \vi -> vB vi .->. vA vi) vf
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl
