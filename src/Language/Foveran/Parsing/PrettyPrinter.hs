@@ -159,10 +159,11 @@ ppPlain t = foldRec pprint t `atPrecedenceLevel` 10
 
 --------------------------------------------------------------------------------
 ppDefinition :: Definition -> PP.Doc
-ppDefinition (Definition _ nm1 ty nm2 tm) =
+ppDefinition (Definition _ nm1 ty nm2 argPatterns tm) =
     (sep [ppIdent nm1 <+> ":", nest 2 (foldAnnot pprint ty <> ";")]
      $$
-     sep [ppIdent nm2 <+> "=", nest 2 (foldAnnot pprint tm <> ";")]) `atPrecedenceLevel` 10
+     sep [ hsep (ppIdent nm1:map ppPattern argPatterns) <+> "="
+         , nest 2 (foldAnnot pprint tm <> ";")]) `atPrecedenceLevel` 10
 
 --------------------------------------------------------------------------------
 ppIDataDecl :: IDataDecl -> PP.Doc

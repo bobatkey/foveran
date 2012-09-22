@@ -68,10 +68,10 @@ declaration =
         <*  token Tok.Colon
         <*> term
     <|>
-    (\(nm1,p) t1 (nm2,p2) nms t2 ->
-         DefinitionDecl $ Definition (makeSpan p t2) nm1 t1 nm2 (case nms of [] -> t2; nms -> Annot (makeSpan p2 t2) (Lam nms t2)))
+    (\(nm1,p) t1 (nm2,p2) argPatterns t2 ->
+         DefinitionDecl $ Definition (makeSpan p t2) nm1 t1 nm2 argPatterns t2)
         <$> tokenWithText Tok.Ident <* commit <* token Tok.Colon  <*> term <*  some (token Tok.Semicolon)
-        <*> tokenWithText Tok.Ident                       
+        <*> tokenWithText Tok.Ident
         <*> patternList
         <*  token Tok.Equals <*> term
     <|>

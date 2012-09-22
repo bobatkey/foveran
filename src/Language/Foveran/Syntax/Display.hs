@@ -48,6 +48,7 @@ data Definition =
                , defnName  :: Ident
                , defnType  :: TermPos
                , defnName2 :: Ident
+               , defnArgs  :: [Pattern]
                , defnTerm  :: TermPos
                }
 
