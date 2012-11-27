@@ -119,53 +119,43 @@ runTypingMonad c context holeContext localContext =
 
 --------------------------------------------------------------------------------
 isVSet_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Int
-isVSet_or (VDefnRef _ v _ _) (p,err) = isVSet_or v (p,err)
 isVSet_or (VSet l) (p,err) = return l
 isVSet_or v        (p,err) = raiseError p (err v)
 
 -- FIXME: this one is not like the others, and shouldn't be here
 isVIDesc_Sg_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
-isVIDesc_Sg_or (VDefnRef _ v _ _) (p,err) = isVIDesc_Sg_or v (p,err)
 isVIDesc_Sg_or (VIDesc_Sg vA vD)  (p,err) = return (vA,vD)
 isVIDesc_Sg_or v                  (p,err) = raiseError p (err v)
 
 isVIDesc_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt Value
-isVIDesc_or (VDefnRef _ v _ _) (p,err) = isVIDesc_or v (p,err)
 isVIDesc_or (VIDesc vI) (p,err) = return vI
 isVIDesc_or v           (p,err) = raiseError p (err v)
 
 isVPi_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
-isVPi_or (VDefnRef _ v _ _) (p,err) = isVPi_or v (p,err)
 isVPi_or (VPi _ vA vB) (p,err) = return (vA, vB)
 isVPi_or v             (p,err) = raiseError p (err v)
 
 isVSigma_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value -> Value)
-isVSigma_or (VDefnRef _ v _ _) (p,err) = isVSigma_or v (p,err)
 isVSigma_or (VSigma _ vA vB) (p,err) = return (vA, vB)
 isVSigma_or v                (p,err) = raiseError p (err v)
 
 isVSum_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value)
-isVSum_or (VDefnRef _ v _ _) (p,err) = isVSum_or v (p,err)
 isVSum_or (VSum vA vB) (p,err) = return (vA, vB)
 isVSum_or v            (p,err) = raiseError p (err v)
 
 isVUnit_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt ()
-isVUnit_or (VDefnRef _ v _ _) (p,err) = isVUnit_or v (p,err)
 isVUnit_or (VUnit _) (p,err) = return ()
 isVUnit_or v         (p,err) = raiseError p (err v)
 
 isVEq_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value, Value)
-isVEq_or (VDefnRef _ v _ _) (p,err) = isVEq_or v (p,err)
 isVEq_or (VEq vA vB va vb) (p,err) = return (vA, vB, va, vb)
 isVEq_or v                 (p,err) = raiseError p (err v)
 
 isVMuI_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Value, Value)
-isVMuI_or (VDefnRef _ v _ _) (p,err) = isVMuI_or v (p,err)
 isVMuI_or (VMuI vI vD vi) (p,err) = return (vI,vD,vi)
 isVMuI_or v               (p,err) = raiseError p (err v)
 
 isVGroup_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, CS.Abelian, Maybe (Value, Value))
-isVGroup_or (VDefnRef _ v _ _) (p,err) = isVGroup_or v (p,err)
 isVGroup_or (VGroup nm ab v) (p,err) = return (nm, ab, v)
 isVGroup_or v                (p,err) = raiseError p (err v)
 

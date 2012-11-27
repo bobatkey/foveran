@@ -28,7 +28,7 @@ lookupFree nm (_, context, _) =
     case lookupDefinition nm context of
       Nothing             -> error "Evaluation: unbound identifier"
       Just (ty, Nothing)  -> reflect ty (tmFree nm)
-      Just (ty, Just def) -> VDefnRef nm def ty []
+      Just (ty, Just def) -> def
 
 doHole :: DefinitionContext ctxt =>
           Ident
