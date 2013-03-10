@@ -7,7 +7,8 @@ module Language.Foveran.Parsing.Parser
 import           Control.Applicative
 import           Data.Maybe
 import           Data.Rec
-import           Text.ParserCombinators
+import           Data.Pair
+import           Text.ParserCombinators hiding (Return)
 import           Text.Position
 import qualified Data.Text as T
 import qualified Language.Foveran.Parsing.Token as Tok
@@ -190,6 +191,10 @@ term06 =
 
 term01 :: Parser Tok.Token TermPos
 term01 =
+    unary Return <$> token Tok.Return <*> term00
+    <|>
+    unary Call <$> token Tok.Call <*> term00
+    <|>
     -- left injection
     unary Inl <$> token Tok.Inl <*> term00
     <|>
@@ -265,6 +270,14 @@ term01 =
 
 term00 :: Parser Tok.Token TermPos
 term00 =
+    (\p nm args ty p' -> Annot (makeSpan p p') (LabelledType nm args ty))
+      <$> token Tok.LAngle
+      <*> identifier
+      <*> many (Pair <$ token Tok.LParen <*> term10 <* token Tok.Colon <*> term10 <* token Tok.RParen)
+      <*  token Tok.Colon
+      <*> term10
+      <*> token Tok.RAngle
+    <|>
     unary Proj1 <$> token Tok.Fst <* commit <*> term00
     <|>
     unary Proj2 <$> token Tok.Snd <* commit <*> term00

@@ -78,6 +78,11 @@ data Token
     | GroupInv
     | GroupMul
 
+    | Return
+    | LAngle
+    | RAngle
+    | Call
+
     | Underscore
     | LSqBracket
     | RSqBracket
@@ -159,6 +164,10 @@ instance SyntaxHighlight Token where
     lexicalClass GroupMul    = Operator
     lexicalClass GroupInv    = Operator
     lexicalClass Eliminate   = Keyword
+    lexicalClass Return      = Keyword
+    lexicalClass LAngle      = Punctuation
+    lexicalClass RAngle      = Punctuation
+    lexicalClass Call        = Keyword
 
 instance Layout Token where
     lbrace = LBrace
@@ -236,3 +245,7 @@ instance Show Token where
   show GroupMul    = "#"
   show GroupInv    = "inv"
   show Eliminate   = "eliminate"
+  show Return      = "return"
+  show LAngle      = "<"
+  show RAngle      = ">"
+  show Call        = "call"

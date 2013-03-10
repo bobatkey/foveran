@@ -9,6 +9,8 @@ module Language.Foveran.Typing.Conversion.Value
 
     , ($$)
 
+    , vcall
+
     , vfst
     , vsnd
     , vcase
@@ -45,7 +47,9 @@ import Text.Show.Functions ()
 import Control.Applicative
 
 import Data.Maybe (fromMaybe)
+import Data.Pair
 import Data.Rec
+import Data.Traversable (traverse)
 
 import qualified Data.Map as M -- for normalising abelian group expressions
 
@@ -111,6 +115,9 @@ data Value
     | VGroup      Ident Abelian (Maybe (Value, Value))
     | VGroupTerm  [(Bool, ReifyFam Term)]
 
+    | VLabelledType Ident [Pair Value] Value
+    | VReturn       Value
+
     | VNeutral   (ReifyFam Term)
     deriving Show
 
@@ -148,6 +155,20 @@ vmuI a b = VLam "i" $ VMuI a b
 {------------------------------------------------------------------------------}
 bound :: Value -> (Value -> ReifyFam Term) -> ReifyFam Term
 bound ty f = tmBound (\tm -> f (reflect ty tm))
+
+{------------------------------------------------------------------------------}
+vcall :: Ident -> [Pair Value] -> Value -> Value -> Value
+vcall nm args ty (VReturn v)  = v
+vcall nm args ty (VNeutral n) =
+    reflect ty $ do
+      -- opts <- getReificationOpts
+      -- FIXME: for now, just always reify to a function
+      -- application. Also want an option to reify the call explicitly
+      -- call   <- foldl (\x y -> In (App x y)) (In $ Free nm) <$> traverse (\(Pair v ty) -> reify ty v) args
+      call   <- n
+      tmArgs <- traverse (\(Pair v ty) -> Pair <$> reify ty v <*> reifyType ty) args
+      tmTy   <- reifyType ty
+      return $ In (Call nm tmArgs tmTy call)
 
 {------------------------------------------------------------------------------}
 vcase :: Value ->
@@ -408,6 +429,8 @@ reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
 reifyType (VGroup nm ab Nothing)         = In <$> pure (Group nm ab Nothing)
 reifyType (VGroup nm ab (Just (t1, t2))) = (In <$> (Group nm ab <$> (Just <$> reifyType t1))) `tmApp` reify t1 t2
+reifyType (VLabelledType nm args ty) =
+    In <$> (LabelledType nm <$> mapM (\(Pair v t) -> Pair <$> reify t v <*> reifyType t) args <*> reifyType ty)
 reifyType (VNeutral t)    = t
 reifyType v               = error ("internal: reifyType given non-type: " ++ show v)
 
@@ -434,7 +457,7 @@ reify (VPi _ tA tB)    _           = error "internal: reify: values of type Pi-b
 
 reify (VSigma _ tA tB) e = let v1 = vfst e
                                v2 = vsnd e
-                           in In <$> (Pair <$> reify tA v1 <*> reify (tB v1) v2)
+                           in In <$> (Tuple <$> reify tA v1 <*> reify (tB v1) v2)
 
 reify (VSum tA tB)     (VInl v) = In <$> (Inl <$> reify tA v)
 reify (VSum tA tB)     (VInr v) = In <$> (Inr <$> reify tB v)
@@ -482,33 +505,9 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl
 reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
+reify (VLabelledType _ _ ty) (VReturn v)   = In <$> (Return <$> reify ty v)
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
-
-{-
--- FIXME: this is a clunky, fixed heuristic. should try to work out
--- from a definition's body which args are to be used as triggers.
-isUnfoldTrigger :: Value -> Bool
-isUnfoldTrigger (VDefnRef _ v _ _) = isUnfoldTrigger v
-isUnfoldTrigger (VInl _)           = True
-isUnfoldTrigger (VInr _)           = True
-isUnfoldTrigger (VRefl)            = True
-isUnfoldTrigger (VConstruct _ _)   = True
-isUnfoldTrigger (VIDesc_K _)       = True
-isUnfoldTrigger (VIDesc_Id _)      = True
-isUnfoldTrigger (VIDesc_Pair _ _)  = True
-isUnfoldTrigger (VIDesc_Sg _ _)    = True
-isUnfoldTrigger (VIDesc_Pi _ _)    = True
-isUnfoldTrigger _                  = False
-
-reifyDefnRef :: Ident -> Value -> [Value] -> ReifyFam Term
-reifyDefnRef identifier vty args =
-    doArgs vty (reverse args) (tmFree identifier)
-    where
-      doArgs vty                []       tm = tm
-      doArgs (VDefnRef _ v _ _) args     tm = doArgs v args tm
-      doArgs (VPi _ vA vB)      (a:args) tm = doArgs (vB a) args (tm `tmApp` reify vA a)
--}
 
 reifyGroupTerm :: [(Bool, ReifyFam Term)] -> Abelian -> ReifyFam Term
 reifyGroupTerm l ab = ReifyFam $ \x ->

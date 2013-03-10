@@ -13,6 +13,7 @@ module Language.Foveran.Parsing.PrettyPrinter
 import           Data.String
 import           Data.List (intersperse)
 import           Data.Functor ((<$>))
+import           Data.Pair
 import           Data.Monoid (mempty)
 import           Data.Maybe (fromMaybe)
 import           Data.Rec (foldAnnot, Rec, foldRec, AnnotRec (..))
@@ -144,6 +145,13 @@ pprint (TypeAscrip t1 t2)  = paren 06 (down t1 <+> ":" <+> down t2)
 
 pprint (Generalise t1 t2)  = paren 01 ("generalise" <+> resetPrec t1 <+> "then"
                                        $$ resetPrec t2)
+
+pprint (LabelledType nm args ty) =
+    resetPrec ("<" <+> ppIdent nm <+> sep (map (\(Pair t ty) -> "(" <+> t <+> ":" <+> ty <+> ")") args) <+> ":" <+> ty <+> ">")
+pprint (Return t) =
+    paren 01 ("return" <+> down t)
+pprint (Call t) =
+    paren 01 ("call" <+> down t)
 
 pprint UserHole            = "?"
 pprint (Hole nm tms)       = "?" <> ppIdent nm <> "{" <> hcat (punctuate "," (map resetPrec (reverse tms))) <> "}"

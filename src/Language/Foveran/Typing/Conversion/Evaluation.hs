@@ -7,7 +7,7 @@ module Language.Foveran.Typing.Conversion.Evaluation
 
 import Control.Applicative
 import Data.Rec (foldRec, Rec (In))
-import Data.Traversable (sequenceA)
+import Data.Traversable (sequenceA, traverse)
 import Language.Foveran.Syntax.Checked hiding (binder)
 import Language.Foveran.Typing.Hole
 import Language.Foveran.Typing.DefinitionContext
@@ -26,7 +26,7 @@ lookupFree :: DefinitionContext ctxt =>
            -> Eval ctxt Value
 lookupFree nm (_, context, _) =
     case lookupDefinition nm context of
-      Nothing             -> error "Evaluation: unbound identifier"
+      Nothing             -> error ("Evaluation: unbound identifier: " ++ show nm)
       Just (ty, Nothing)  -> reflect ty (tmFree nm)
       Just (ty, Just def) -> def
 
@@ -67,7 +67,7 @@ eval (Lam nm t)    = VLam (fromIrrelevant nm) <$> binder t
 eval (App t1 t2)   = ($$) <$> t1 <*> t2
 
 eval (Sigma nm t1 t2) = VSigma (fromIrrelevant nm) <$> t1 <*> binder t2
-eval (Pair t1 t2)     = VPair <$> t1 <*> t2
+eval (Tuple t1 t2)    = VPair <$> t1 <*> t2
 eval (Proj1 t)        = vfst <$> t
 eval (Proj2 t)        = vsnd <$> t
 
@@ -91,7 +91,7 @@ eval (Eq tA tB ta tb) = VEq <$> tA <*> tB <*> ta <*> tb
 eval Refl             = pure VRefl
 eval (ElimEq tA ta tb teq a e tP tp) =
     velimeq <$> tA <*> ta <*> tb <*> teq <*> pure (fromIrrelevant a) <*> pure (fromIrrelevant e) <*> binder (binder tP) <*> tp
-                                   
+
 eval (Construct tag t)  = VConstruct (fromIrrelevant tag) <$> t
 
 eval IDesc              = pure (VLam "I" $ \i -> VIDesc i)
@@ -126,6 +126,13 @@ eval (Group nm ab ty)   = vgroup nm ab <$> sequenceA ty
 eval GroupUnit          = pure vgroupUnit
 eval (GroupMul t1 t2)   = vgroupMul <$> t1 <*> t2
 eval (GroupInv t)       = vgroupInv <$> t
+
+eval (LabelledType nm args ty) =
+    VLabelledType nm <$> traverse sequenceA args <*> ty
+eval (Return t) =
+    VReturn <$> t
+eval (Call nm args ty t) =
+    vcall nm <$> traverse sequenceA args <*> ty <*> t
 
 eval (Hole nm tms)      = doHole nm <*> sequenceA tms
 

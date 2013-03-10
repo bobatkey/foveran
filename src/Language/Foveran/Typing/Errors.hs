@@ -30,6 +30,7 @@ data TypeError
     | TermIsAConstruct Value
     | TermIsASet                  Value
     | TermIsAGroupExpression      Value
+    | TermIsAReturn               Value
 
     -- Checking errors for equality
     | ReflCanOnlyProduceHomogenousEquality Value Value
@@ -49,6 +50,7 @@ data TypeError
     | ExpectingIDesc              Value
     | Proj1FromNonSigma           Value
     | Proj2FromNonSigma           Value
+    | CallOnNonLabelledType       Value
 
     -- Term not well-formed
     | UnableToSynthesise          LN.TermPos
@@ -101,6 +103,9 @@ ppTypeError ctxt (TermIsAnEquality ty)
       $$ nest 4 (ppType ctxt ty)
 ppTypeError ctxt (SetLevelMismatch l1 l2)
     = "Set level problem: 'Set" <+> int l1 <> "' does not have type 'Set" <+> int l2 <> "'"
+ppTypeError ctxt (TermIsAReturn ty)
+    = "This term produces values of a labelled type, but the context was expecting a term of type"
+      $$ nest 4 (ppType ctxt ty)
 
 ppTypeError ctxt (ReflCanOnlyProduceHomogenousEquality tyA tyB)
     = "'refl' can only produce homogenous equalities; types given:"
@@ -142,6 +147,9 @@ ppTypeError ctxt (ExpectingHomogeneousEquality ty1 ty2)
       $$ nest 4 (ppType ctxt ty2)
 ppTypeError ctxt (ExpectingIDesc ty)
     = "Expecting term to have indexed description type, but type is"
+      $$ nest 4 (ppType ctxt ty)
+ppTypeError ctxt (CallOnNonLabelledType ty)
+    = "Call invocation on a non-labelled type, type is:"
       $$ nest 4 (ppType ctxt ty)
 
 ppTypeError ctxt (UnableToSynthesise t)

@@ -26,6 +26,7 @@ module Language.Foveran.Syntax.Display
 import Language.Foveran.Syntax.Identifier (Ident)
 import Language.Foveran.Syntax.Common (Abelian (..))
 import Text.Position (Span)
+import Data.Pair
 import Data.Rec
 
 --------------------------------------------------------------------------------
@@ -142,6 +143,10 @@ data TermCon tm
 
     | Generalise  tm tm
     | TypeAscrip  tm tm
+
+    | LabelledType Ident [Pair tm] tm
+    | Return       tm
+    | Call         tm
 
     | UserHole
     | Hole       Ident [tm]

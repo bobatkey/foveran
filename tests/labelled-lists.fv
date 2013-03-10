@@ -1,0 +1,60 @@
+data List (A : Set) : Set where
+  `nil  : List A
+  `cons : A -> List A -> List A
+
+
+append : (A : Set) -> (l1 : List A) -> (l2 : List A) -> <append (A : Set) (l1 : List A) (l2 : List A) : List A >
+append A l1 l2 = recursionOn l1 with
+  `nil.       return l2
+  `cons a l1. return (`cons a (call (recurseOn l1)))
+
+symmetry : (A : Set) -> (a1 a2 : A) -> a1 == a2 -> a2 == a1
+symmetry A a1 a2 eq = rewriteBy eq then refl
+
+append-nil : (A : Set) -> (l : List A) -> l == call (append A l `nil)
+append-nil A l = recursionOn l with
+  `nil.      refl
+  `cons a l.
+    rewriteBy inductionHypothesisFor l then
+    refl
+
+append-assoc :
+  (A : Set) ->
+  (l1 l2 l3 : List A) ->
+  call (append A l1 (call (append A l2 l3))) == call (append A (call (append A l1 l2)) l3)
+append-assoc A l1 l2 l3 = inductionOn l1 with
+  `nil.      refl
+  `cons a l. rewriteBy inductionHypothesisFor l then refl
+
+reverse-body : (A : Set) -> (l1 : List A) -> < reverse-body (A : Set) (l1 : List A) : List A -> List A >
+reverse-body A l = recursionOn l with
+  `nil.      return (\acc. acc)
+  `cons a l. return (\acc. (call (recurseOn l)) (`cons a acc))
+
+reverse : (A : Set) -> (l : List A) -> < reverse (A : Set) (l : List A) : List A >
+reverse A l = return ((call (reverse-body A l)) `nil)
+
+slowreverse : (A : Set) -> (l : List A) -> < slowreverse (A : Set) (l : List A) : List A >
+slowreverse A l = recursionOn l with
+  `nil.      return `nil
+  `cons a l. return (call (append A (call (recurseOn l)) (`cons a `nil)))
+
+lem : (A : Set) -> (l1 l2 : List A) ->
+  (call (reverse-body A l1)) l2 == call (append A (call (slowreverse A l1)) l2)
+lem A l1 = inductionOn l1 with
+  `nil. \l2. refl
+  `cons a l. \l2.
+    rewriteBy append-assoc A (call (slowreverse A l)) (`cons a `nil) l2 then
+    rewriteBy inductionHypothesisFor l (`cons a l2) then
+    refl
+
+reverses-agree :
+  (A : Set) ->
+  (l : List A) ->
+  call (reverse A l) == call (slowreverse A l)
+reverses-agree A l =
+  rewriteBy symmetry (List A) ((call (reverse-body A l)) `nil) (call (append A (call (slowreverse A l)) `nil)) (lem A l `nil) then
+  rewriteBy append-nil A (call (slowreverse A l)) then
+  refl
+
+;

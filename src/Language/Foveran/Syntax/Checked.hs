@@ -26,12 +26,14 @@ module Language.Foveran.Syntax.Checked
 
 import           Control.Applicative
 import           Data.Rec
+import           Data.Pair
 import           Data.List (elemIndex)
 import           Data.Traversable
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
 import           Language.Foveran.Syntax.Common (Abelian)
 
+--------------------------------------------------------------------------------
 newtype Irrelevant a = Irrelevant { fromIrrelevant :: a }
     deriving (Show)
 
@@ -41,6 +43,7 @@ instance Eq (Irrelevant a) where
 instance Ord (Irrelevant a) where
     compare _ _ = EQ
 
+--------------------------------------------------------------------------------
 type Term = Rec TermCon
 
 data TermCon tm
@@ -51,7 +54,7 @@ data TermCon tm
     | Set   Int
     | Pi    (Irrelevant (Maybe Ident)) tm tm
     | Sigma (Irrelevant (Maybe Ident)) tm tm
-    | Pair  tm tm
+    | Tuple tm tm
     | Proj1 tm
     | Proj2 tm
     | Sum   tm tm
@@ -92,6 +95,10 @@ data TermCon tm
     | GroupMul   tm tm
     | GroupInv   tm
 
+    | LabelledType Ident [Pair tm] tm
+    | Return       tm
+    | Call         Ident [Pair tm] tm tm
+
     | Hole       Ident [tm]
     deriving (Show, Functor, Eq, Ord)
 
@@ -129,7 +136,7 @@ traverseSyn (App t t')       = App <$> t <*> t'
 traverseSyn (Set l)          = pure $ Set l
 traverseSyn (Pi nm t1 t2)    = Pi nm <$> t1 <*> binder t2
 traverseSyn (Sigma nm t1 t2) = Sigma nm <$> t1 <*> binder t2
-traverseSyn (Pair t1 t2)     = Pair <$> t1 <*> t2
+traverseSyn (Tuple t1 t2)    = Tuple <$> t1 <*> t2
 traverseSyn (Proj1 t)        = Proj1 <$> t
 traverseSyn (Proj2 t)        = Proj2 <$> t
 traverseSyn (Sum t1 t2)      = Sum <$> t1 <*> t2
@@ -176,6 +183,13 @@ traverseSyn (Group nm ab ty) = Group nm ab <$> sequenceA ty
 traverseSyn GroupUnit        = pure GroupUnit
 traverseSyn (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
 traverseSyn (GroupInv t)     = GroupInv <$> t
+
+traverseSyn (LabelledType nm args ty) =
+    LabelledType nm <$> traverse sequenceA args <*> ty
+traverseSyn (Return t) =
+    Return <$> t
+traverseSyn (Call nm args ty t) =
+    Call nm <$> traverse sequenceA args <*> ty <*> t
 
 traverseSyn (Hole nm tms)    = Hole nm <$> sequenceA tms
 
@@ -236,7 +250,7 @@ toDisplay (Sigma (Irrelevant Nothing) t1 t2)
     = DS.Prod <$> t1 <*> bindDummy t2
 toDisplay (Sigma (Irrelevant (Just nm)) t1 t2)
     = bindK nm t2 $ \nm t2 -> DS.Sigma [DS.PatVar nm] <$> t1 <*> pure t2
-toDisplay (Pair t1 t2)            = gatheringTuple <$> t1 <*> t2
+toDisplay (Tuple t1 t2)           = gatheringTuple <$> t1 <*> t2
 toDisplay (Proj1 t)               = DS.Proj1 <$> t
 toDisplay (Proj2 t)               = DS.Proj2 <$> t
 toDisplay (Sum t1 t2)             = DS.Sum <$> t1 <*> t2
@@ -315,6 +329,15 @@ toDisplay GroupUnit               = pure DS.GroupUnit
 toDisplay (GroupMul t1 t2)        = DS.GroupMul <$> t1 <*> t2
 toDisplay (GroupInv t)            = DS.GroupInv <$> t
 
+toDisplay (LabelledType nm args ty) =
+    DS.LabelledType nm <$> traverse sequenceA args <*> ty
+toDisplay (Return t) =
+    DS.Return <$> t
+toDisplay (Call nm args ty t) =
+    -- FIXME: (a) what about name shadowing
+    --        (b) make this configurable
+    DS.Call <$> (In <$> (DS.App <$> pure (In (DS.Var nm)) <*> traverse (\(Pair t _) -> t) args))
+
 toDisplay (Hole nm tms)           = DS.Hole nm <$> sequenceA tms
 
 toDisplaySyntax :: Term -> NameGeneration DS.Term
@@ -334,7 +357,7 @@ cmp compareLevel (In (Pi _ t1 t2))       (In (Pi _ t1' t2'))     = cmp (flip com
 cmp compareLevel (In (Set i))            (In (Set j))            = compareLevel i j
 
 cmp compareLevel (In (Sigma _ t1 t2))    (In (Sigma _ t1' t2'))  = cmp (==) t1 t1' && cmp compareLevel t2 t2' -- FIXME: is this right?
-cmp compareLevel (In (Pair t1 t2))       (In (Pair t1' t2'))     = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
+cmp compareLevel (In (Tuple t1 t2))      (In (Tuple t1' t2'))    = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
 cmp compareLevel (In (Proj1 t))          (In (Proj1 t'))         = cmp compareLevel t t'
 cmp compareLevel (In (Proj2 t))          (In (Proj2 t'))         = cmp compareLevel t t'
 
@@ -430,6 +453,15 @@ cmp compareLevel (In (GroupInv t))     (In (GroupInv t'))
 
 cmp compareLevel (In (Hole nm tms))    (In (Hole nm' tms'))
     = nm == nm' && length tms == length tms' && all (uncurry (cmp compareLevel)) (zip tms tms') -- FIXME: write a proper comparison
+
+cmp compareLevel (In (LabelledType nm args ty)) (In (LabelledType nm' args' ty'))
+    = nm == nm' && length args == length args'
+                && all (\(Pair x y, Pair x' y') -> cmp compareLevel x x' && cmp compareLevel y y') (zip args args')
+                && cmp compareLevel ty ty'
+cmp compareLevel (In (Return t)) (In (Return t'))
+    = cmp compareLevel t t'
+cmp compareLevel (In (Call _ _ _ t)) (In (Call _ _ _ t'))
+    = cmp compareLevel t t'
 
 cmp compareLevel _ _ = False
 

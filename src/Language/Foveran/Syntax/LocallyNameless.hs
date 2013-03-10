@@ -19,6 +19,7 @@ import           Control.Applicative
 import           Data.Rec
 import           Text.Position (Span)
 import           Data.FreeMonad
+import           Data.Pair
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier (Ident)
 import           Language.Foveran.Syntax.Common (Abelian)
@@ -46,7 +47,7 @@ data TermCon tm
   | Set   Int
   | Pi    (Maybe Ident) tm tm
   | Sigma (Maybe Ident) tm tm
-  | Pair  tm tm
+  | Tuple tm tm
   | Proj1 tm
   | Proj2 tm
   | Sum   tm tm
@@ -91,6 +92,10 @@ data TermCon tm
 
   | Generalise  tm tm
 
+  | LabelledType Ident [Pair tm] tm
+  | Return       tm
+  | Call         tm
+
   | UserHole
   | Hole       Ident [tm]
   deriving (Show, Functor)
@@ -98,6 +103,7 @@ data TermCon tm
 instance Show (TermPos' p) where
     show (Annot p t) = "(" ++ show t ++ ")"
 
+--------------------------------------------------------------------------------
 identOfPattern :: DS.Pattern -> Ident
 identOfPattern (DS.PatVar nm)  = nm
 identOfPattern (DS.PatTuple _) = "p" -- FIXME: concatenate all the names, or something
@@ -169,7 +175,7 @@ toLN (DS.Prod t1 t2)      bv = Layer $ Sigma Nothing (return $ t1 bv) (return $ 
 toLN (DS.Tuple tms)       bv = doTuple tms
     where doTuple []       = Layer $ UnitI
           doTuple [tm]     = Var $ tm bv
-          doTuple (tm:tms) = Layer $ Pair (Var $ tm bv) (doTuple tms)
+          doTuple (tm:tms) = Layer $ Tuple (Var $ tm bv) (doTuple tms)
 toLN (DS.Proj1 t)         bv = Layer $ Proj1 (return $ t bv)
 toLN (DS.Proj2 t)         bv = Layer $ Proj2 (return $ t bv)
 toLN (DS.Sum t1 t2)       bv = Layer $ Sum (return $ t1 bv) (return $ t2 bv)
@@ -254,6 +260,13 @@ toLN DS.GroupUnit         bv = Layer $ GroupUnit
 toLN (DS.GroupMul t1 t2)  bv = Layer $ GroupMul (return $ t1 bv) (return $ t2 bv)
 toLN (DS.GroupInv t)      bv = Layer $ GroupInv (return $ t bv)
 
+toLN (DS.LabelledType nm args ty) bv =
+    Layer $ LabelledType nm (map (fmap (\x -> return (x bv))) args) (return $ ty bv)
+toLN (DS.Return t) bv =
+    Layer $ Return (return $ t bv)
+toLN (DS.Call t) bv =
+    Layer $ Call (return $ t bv)
+
 toLN DS.UserHole          bv = Layer $ UserHole
 toLN (DS.Hole nm tms)     bv = Layer $ Hole nm (map (\t -> return (t bv)) tms)
 
@@ -280,7 +293,7 @@ close' fnm (App t ts)       = App <$> t <*> ts
 close' fnm (Set i)          = pure $ Set i
 close' fnm (Pi nm t1 t2)    = Pi nm <$> t1 <*> binder t2
 close' fnm (Sigma nm t1 t2) = Sigma nm <$> t1 <*> binder t2
-close' fnm (Pair t1 t2)     = Pair <$> t1 <*> t2
+close' fnm (Tuple t1 t2)    = Tuple <$> t1 <*> t2
 close' fnm (Proj1 t)        = Proj1 <$> t
 close' fnm (Proj2 t)        = Proj2 <$> t
 close' fnm (Sum t1 t2)      = Sum <$> t1 <*> t2
@@ -338,6 +351,13 @@ close' fnm (GroupInv t)     = GroupInv <$> t
 close' fnm (TypeAscrip tm ty) = TypeAscrip <$> tm <*> ty
 
 close' fnm (Generalise t1 t2) = Generalise <$> t1 <*> t2
+
+close' fnm (LabelledType nm args ty) =
+    LabelledType nm <$> traverse sequenceA args <*> ty
+close' fnm (Return t) =
+    Return <$> t
+close' fnm (Call t) =
+    Call <$> t
 
 close :: [Ident] -> AnnotRec a TermCon -> Int -> AnnotRec a TermCon
 close nms x offset = translate (close' nms) x offset

@@ -14,6 +14,8 @@ import           Control.Monad.Trans (lift)
 import           Control.Monad.Reader (ReaderT, runReaderT, ask, local)
 import           Control.Monad.State (StateT, runStateT, get, modify)
 import           Data.Maybe (fromMaybe)
+import           Data.Pair
+import           Data.Traversable
 import           Data.Rec (AnnotRec (Annot), Rec (In), annot)
 import qualified Data.Map as M -- for doing the clauses in CasesOn
 import           Text.Position (Span)
@@ -159,6 +161,10 @@ isVGroup_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, C
 isVGroup_or (VGroup nm ab v) (p,err) = return (nm, ab, v)
 isVGroup_or v                (p,err) = raiseError p (err v)
 
+isVLabelledType_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, [Pair Value], Value)
+isVLabelledType_or (VLabelledType nm args ty) (p,err) = return (nm, args, ty)
+isVLabelledType_or v                          (p,err) = raiseError p (err v)
+
 --------------------------------------------------------------------------------
 makeTag :: Value
         -> Value
@@ -220,7 +226,7 @@ getDatatypeInfo vI vD vi p = do
 -- FIXME: do this in LocallyNameless
 makeConstructorArguments :: Span -> [TermPos] -> TermPos
 makeConstructorArguments p []     = Annot p $ Refl
-makeConstructorArguments p (t:ts) = Annot p $ Pair t (makeConstructorArguments p ts)
+makeConstructorArguments p (t:ts) = Annot p $ Tuple t (makeConstructorArguments p ts)
 
 
 {------------------------------------------------------------------------------}
@@ -283,6 +289,14 @@ isType (Annot p (LiftI tD x tA i a tP tx)) = do
   return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
 isType (Annot p (Group nm ab Nothing)) = do
   return (In $ CS.Group nm ab Nothing)
+isType (Annot p (LabelledType nm args ty)) = do
+  argsTm <- forM args $ \(Pair t ty) -> do
+              tyTm <- isType ty
+              vTy  <- eval tyTm
+              tmTm <- t `hasType` vTy
+              return (Pair tmTm tyTm)
+  tyTm   <- isType ty
+  return (In $ CS.LabelledType nm argsTm tyTm)
 isType (Annot p UserHole) = do
   generateHole p Nothing Nothing
 isType term@(Annot p _) = do
@@ -376,12 +390,12 @@ hasType (Annot p (Lam x tm)) v = do
   return (In $ CS.Lam (CS.Irrelevant x) tm')
 
 
-hasType (Annot p (Pair t1 t2)) v = do
+hasType (Annot p (Tuple t1 t2)) v = do
   (tA, tB) <- v `isVSigma_or` (p, TermIsAPairing)
   tm1  <- t1 `hasType` tA
   vtm1 <- eval tm1
   tm2  <- t2 `hasType` (tB vtm1)
-  return (In $ CS.Pair tm1 tm2)
+  return (In $ CS.Tuple tm1 tm2)
 
 
 hasType (Annot p (Inl t)) v = do
@@ -457,6 +471,10 @@ hasType (Annot p Refl) v = do
     raiseError p (ReflCanOnlyProduceEquality vA va vb)
   return (In $ CS.Refl)
 
+hasType (Annot p (Return t)) v = do
+  (nm, args, ty) <- v `isVLabelledType_or` (p, TermIsAReturn)
+  tm <- t `hasType` ty
+  return (In $ CS.Return tm)
 
 hasType (Annot p UserHole) v = do
   generateHole p Nothing (Just v)
@@ -467,7 +485,7 @@ hasType (Annot p UserHole) v = do
 hasType (Annot p (NamedConstructor nm ts)) v = do
   (vI, vD, vi) <- v `isVMuI_or` (p,TermIsAConstruct) -- FIXME: better error message?
   tag <- makeTag vI vD vi nm p
-  let t = Annot p (Pair tag (makeConstructorArguments p ts))
+  let t = Annot p (Tuple tag (makeConstructorArguments p ts))
   tm <- t `hasType` (vsemI vI (vD $$ vi) "i" (vmuI vI vD $$))
   return (In $ CS.Construct (CS.Irrelevant (Just nm)) tm)
 
@@ -728,6 +746,13 @@ synthesiseTypeFor (Annot p (Proj2 t)) = do
   (_, tB)   <- tP `isVSigma_or` (p, Proj2FromNonSigma)
   v         <- vfst <$> eval tmP
   return (tB v, In $ CS.Proj2 tmP)
+
+synthesiseTypeFor (Annot p (Call t)) = do
+  (tL, tmL)      <- synthesiseTypeFor t
+  (nm, args, ty) <- tL `isVLabelledType_or` (p, CallOnNonLabelledType)
+  let args'      = map (\(Pair vt vty) -> Pair (reify0 vty vt) (reifyType0 vty)) args
+      ty'        = reifyType0 ty
+  return (ty, In $ CS.Call nm args' ty' tmL)
 
 {------------------------------------------------------------------------------}
 -- Descriptions of indexed types
