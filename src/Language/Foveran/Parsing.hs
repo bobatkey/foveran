@@ -80,6 +80,7 @@ lexer :: T.Text
 lexer text =
     lex lexicalSpec
         (OnError $ Left . PE_LexingError)
+        ""
         text
 
 exceptIgnorable :: Monad m => Processor (Lexeme (Action tok)) m (Lexeme tok)
