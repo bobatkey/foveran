@@ -28,11 +28,6 @@ module Language.Foveran.Typing.Conversion.Value
     , vmuI
     , veliminate
 
-    , vgroup
-    , vgroupUnit
-    , vgroupMul
-    , vgroupInv
-
     , reflect
     , reifyType0
     , reifyTypeForDisplay
@@ -111,9 +106,6 @@ data Value
 
     | VMapI       (Value -> Value) Value (ReifyFam Term)
     | VSemI       Value (ReifyFam Term) Ident (Value -> Value)
-
-    | VGroup      Ident Abelian (Maybe (Value, Value))
-    | VGroupTerm  [(Bool, ReifyFam Term)]
 
     | VLabelledType Ident [Pair Value] Value
     | VReturn       Value
@@ -386,22 +378,6 @@ veliminate vI vD vi vt i1 x1 vP i2 x2 p2 vK = loop vi vt
       loop vi x = error $ "internal: eliminate/loop got : " ++ show x
 
 {------------------------------------------------------------------------------}
-vgroup :: Ident -> Abelian -> Maybe Value -> Value
-vgroup nm ab Nothing   = VGroup nm ab Nothing
-vgroup nm ab (Just ty) = VLam "x" $ \x -> VGroup nm ab (Just (ty, x))
-
-vgroupUnit :: Value
-vgroupUnit = VGroupTerm []
-
-vgroupMul :: Value -> Value -> Value
-vgroupMul (VGroupTerm tms1) (VGroupTerm tms2) = VGroupTerm (tms1 ++ tms2)
-vgroupMul _                 _    = error "internal: type error discovered in vgroupMul"
-
-vgroupInv :: Value -> Value
-vgroupInv (VGroupTerm tms) = VGroupTerm $ reverse $ map (\(inverted,tm) -> (not inverted,tm)) tms
-vgroupInv _                = error "internal: type error discovered in vgroupInv"
-
-{------------------------------------------------------------------------------}
 reflect :: Value -> ReifyFam Term -> Value
 reflect (VPi nm tA tB)   tm = VLam (fromMaybe "x" nm) $ \d -> reflect (tB d) (tm `tmApp` reify tA d)
 reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
@@ -410,7 +386,6 @@ reflect (VSigma _ tA tB) tm = let v1 = reflect tA (tmFst tm)
 reflect (VUnit _)        tm = VUnitI
 reflect (VIDesc vA)      tm = VIDesc_Bind vA tm "i" VIDesc_Id
 reflect (VSemI vI tmD i vA) tm = VMapI vA (VLam i $ \i -> VLam "x" $ \x -> x) tm
-reflect (VGroup nm ab _) tm = VGroupTerm [(False, tm)]
 reflect _                tm = VNeutral tm
 
 
@@ -427,8 +402,6 @@ reifyType (VMuI v1 v2 v3) = (In <$> (MuI <$> reifyType v1 <*> reify (v1 .->. VID
 reifyType (VIDesc s)      = pure (In IDesc) `tmApp` reifyType s
 reifyType (VSemI vI tmD i vA) =
     In <$> (SemI <$> reifyType vI <*> tmD <*> pure (Irrelevant i) <*> bound vI (\v -> reifyType (vA v)))
-reifyType (VGroup nm ab Nothing)         = In <$> pure (Group nm ab Nothing)
-reifyType (VGroup nm ab (Just (t1, t2))) = (In <$> (Group nm ab <$> (Just <$> reifyType t1))) `tmApp` reify t1 t2
 reifyType (VLabelledType nm args ty) =
     In <$> (LabelledType nm <$> mapM (\(Pair v t) -> Pair <$> reify t v <*> reifyType t) args <*> reifyType ty)
 reifyType (VNeutral t)    = t
@@ -504,48 +477,6 @@ reify (VSemI vI tmD i vA) (VMapI vB vf tmX) = do
                  <*> tmX)
 reify (VSemI vI tmD i vA) v                = error $ "internal: reify: non-canonical value of VSemI: " ++ show v
 reify (VEq tA _ ta _)  VRefl               = In <$> pure Refl
-reify (VGroup nm ab _) (VGroupTerm tms)    = reifyGroupTerm tms ab
 reify (VLabelledType _ _ ty) (VReturn v)   = In <$> (Return <$> reify ty v)
 reify _                (VNeutral tm)       = tm
 reify ty               v                   = error $ "internal: reify: attempt to reify: " ++ show v ++ " at type " ++ show ty
-
-reifyGroupTerm :: [(Bool, ReifyFam Term)] -> Abelian -> ReifyFam Term
-reifyGroupTerm l ab = ReifyFam $ \x ->
-                      foldr smartMul (In GroupUnit) $ map doInverses $ normaliser $ map (toTerm x) l
-    where
-      toTerm x (inverted, tm) = (inverted, runReifyFam tm x)
-
-      doInverses (True, tm)  = In $ GroupInv tm
-      doInverses (False, tm) = tm
-
-      normaliser = case ab of
-                     IsAbelian  -> collapseAb M.empty
-                     NotAbelian -> collapse []
-
-      collapse []             []             = []
-      collapse l1             []             = reverse l1
-      collapse []             ((inv, v):l2)  = collapse [(inv,v)] l2
-      collapse ((inv1,v1):l1) ((inv2,v2):l2) =
-          if inv1 == not inv2 && v1 == v2 then
-              collapse l1 l2
-          else
-              collapse ((inv2,v2):(inv1,v1):l1) l2
-
-      toNum True  = -1
-      toNum False = 1
-
-      collapseAb m [] = map toTermAb (M.assocs m)
-          where
-            toTermAb (tm, n) =
-                let t = foldr smartMul (In GroupUnit) (replicate (abs n) tm) in
-                if n < 0 then (True, t) else (False, t)
-      collapseAb m ((inv, tm):l) =
-          case M.lookup tm m of
-            Nothing -> collapseAb (M.insert tm (toNum inv) m) l
-            Just n  ->
-                let n' = n + toNum inv in
-                if n' == 0 then collapseAb (M.delete tm m) l
-                           else collapseAb (M.insert tm n' m) l
-
-      smartMul x (In GroupUnit) = x
-      smartMul x y              = In $ GroupMul x y

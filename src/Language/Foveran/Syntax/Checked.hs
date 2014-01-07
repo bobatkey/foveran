@@ -5,8 +5,6 @@ module Language.Foveran.Syntax.Checked
 
     , Irrelevant (..)
 
-    , Abelian (..)
-
     , Term
     , TermCon (..)
     , Binding (..)
@@ -31,7 +29,6 @@ import           Data.List (elemIndex)
 import           Data.Traversable
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier
-import           Language.Foveran.Syntax.Common (Abelian)
 
 --------------------------------------------------------------------------------
 newtype Irrelevant a = Irrelevant { fromIrrelevant :: a }
@@ -88,12 +85,6 @@ data TermCon tm
     | Eliminate  tm tm tm tm
                  (Irrelevant Ident) (Irrelevant Ident) tm
                  (Irrelevant Ident) (Irrelevant Ident) (Irrelevant Ident) tm
-
-    {- Group stuff -}
-    | Group      Ident Abelian (Maybe tm)
-    | GroupUnit
-    | GroupMul   tm tm
-    | GroupInv   tm
 
     | LabelledType Ident [Pair tm] tm
     | Return       tm
@@ -178,11 +169,6 @@ traverseSyn (Eliminate tI tD ti t i1 x1 tP i2 x2 p2 tK) =
     Eliminate <$> tI <*> tD <*> ti <*> t
               <*> pure i1 <*> pure x1 <*> binder (binder tP)
               <*> pure i2 <*> pure x2 <*> pure p2 <*> binder (binder (binder tK))
-
-traverseSyn (Group nm ab ty) = Group nm ab <$> sequenceA ty
-traverseSyn GroupUnit        = pure GroupUnit
-traverseSyn (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
-traverseSyn (GroupInv t)     = GroupInv <$> t
 
 traverseSyn (LabelledType nm args ty) =
     LabelledType nm <$> traverse sequenceA args <*> ty
@@ -324,11 +310,6 @@ toDisplay (Eliminate _ _ _ t ii1 ix1 tP ii2 ix2 ip2 tK) =
           x2 = fromIrrelevant ix2
           p2 = fromIrrelevant ip2
 
-toDisplay (Group nm ab paramTy)   = DS.Group nm ab <$> sequenceA paramTy
-toDisplay GroupUnit               = pure DS.GroupUnit
-toDisplay (GroupMul t1 t2)        = DS.GroupMul <$> t1 <*> t2
-toDisplay (GroupInv t)            = DS.GroupInv <$> t
-
 toDisplay (LabelledType nm args ty) =
     DS.LabelledType nm <$> traverse sequenceA args <*> ty
 toDisplay (Return t) =
@@ -439,17 +420,6 @@ cmp compareLevel (In (Eliminate tI  tD  ti  tx  _ _ tP  _ _ _ tK))
              , cmp (==) tP tP' -- FIXME: should this be variant? should the other elimination forms be invariant in any position?
              , cmp (==) tK tK'
              ]
-
-cmp compareLevel (In (Group nm ab Nothing)) (In (Group nm' ab' Nothing))
-    = nm == nm' && ab == ab'
-cmp compareLevel (In (Group nm ab (Just t))) (In (Group nm' ab' (Just t')))
-    = nm == nm' && ab == ab' && cmp (==) t t' -- FIXME: I think this is right, wrt to the levels
-cmp compareLevel (In GroupUnit)        (In GroupUnit)
-    = True
-cmp compareLevel (In (GroupMul t1 t2)) (In (GroupMul t1' t2'))
-    = cmp compareLevel t1 t1' && cmp compareLevel t2 t2'
-cmp compareLevel (In (GroupInv t))     (In (GroupInv t'))
-    = cmp compareLevel t t'
 
 cmp compareLevel (In (Hole nm tms))    (In (Hole nm' tms'))
     = nm == nm' && length tms == length tms' && all (uncurry (cmp compareLevel)) (zip tms tms') -- FIXME: write a proper comparison

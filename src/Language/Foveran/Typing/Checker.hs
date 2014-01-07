@@ -157,10 +157,6 @@ isVMuI_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Value, Val
 isVMuI_or (VMuI vI vD vi) (p,err) = return (vI,vD,vi)
 isVMuI_or v               (p,err) = raiseError p (err v)
 
-isVGroup_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, CS.Abelian, Maybe (Value, Value))
-isVGroup_or (VGroup nm ab v) (p,err) = return (nm, ab, v)
-isVGroup_or v                (p,err) = raiseError p (err v)
-
 isVLabelledType_or :: Value -> (Span, Value -> TypeError) -> TypingMonad ctxt (Ident, [Pair Value], Value)
 isVLabelledType_or (VLabelledType nm args ty) (p,err) = return (nm, args, ty)
 isVLabelledType_or v                          (p,err) = raiseError p (err v)
@@ -287,8 +283,6 @@ isType (Annot p (LiftI tD x tA i a tP tx)) = do
   tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
   let tmI = reifyType0 vI
   return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-isType (Annot p (Group nm ab Nothing)) = do
-  return (In $ CS.Group nm ab Nothing)
 isType (Annot p (LabelledType nm args ty)) = do
   argsTm <- forM args $ \(Pair t ty) -> do
               tyTm <- isType ty
@@ -378,10 +372,6 @@ hasType (Annot p (LiftI tD x tA i a tP tx)) v = do
   tmx <- tx `hasType` (vsemI vI vD x (\v -> vA [v]))
   let tmI = reifyType0 vI
   return (In $ CS.LiftI tmI tmD (CS.Irrelevant x) tmA (CS.Irrelevant i) (CS.Irrelevant a) tmP tmx)
-
-hasType (Annot p (Group nm ab Nothing)) v = do
-  l <- v `isVSet_or` (p, TermIsASet)
-  return (In $ CS.Group nm ab Nothing)
 
 {------------------------------}
 hasType (Annot p (Lam x tm)) v = do
@@ -636,24 +626,6 @@ hasType (Annot p (CasesOn isRecursive x clauses)) v = do
   desugared `hasType` v
 
 {------------------------------}
-{- Built-in group operations -}
-
-hasType (Annot p GroupUnit) v = do
-  (nm, ab, _) <- v `isVGroup_or` (p, TermIsAGroupExpression)
-  return (In $ CS.GroupUnit)
-
-hasType (Annot p (GroupMul t1 t2)) v = do
-  (nm, ab, ty) <- v `isVGroup_or` (p, TermIsAGroupExpression)
-  tm1 <- hasType t1 (VGroup nm ab ty)
-  tm2 <- hasType t2 (VGroup nm ab ty)
-  return (In $ CS.GroupMul tm1 tm2)
-
-hasType (Annot p (GroupInv t)) v = do
-  (nm, ab, ty) <- v `isVGroup_or` (p, TermIsAGroupExpression)
-  tm <- hasType t (VGroup nm ab ty)
-  return (In $ CS.GroupInv tm)
-
-{------------------------------}
 {- Fall through case -}
 hasType (Annot p t) v = do
   (v',tm) <- synthesiseTypeFor (Annot p t)
@@ -815,30 +787,6 @@ synthesiseTypeFor (Annot p (Eliminate t (Just (i,x,tP)) inm xnm pnm tK)) = do
          , In $ CS.Eliminate tyI desc tmi tm
                              (CS.Irrelevant i) (CS.Irrelevant x) tmP
                              (CS.Irrelevant inm) (CS.Irrelevant xnm) (CS.Irrelevant pnm) tmK)
-
-synthesiseTypeFor (Annot p (Group nm ab (Just ty))) = do
-  tyTm <- ty `hasType` VSet 0
-  vty  <- eval tyTm
-  return (vty .->. VSet 0, In $ CS.Group nm ab (Just tyTm))
-
--- FIXME: synthesise Set0 for (Group nm ab Nothing)?
-
-synthesiseTypeFor (Annot p (GroupMul t1 t2)) = do
-  (ty1, tm1) <- synthesiseTypeFor t1
-  (ty2, tm2) <- synthesiseTypeFor t2
-  (nm1, ab1, vparam1) <- ty1 `isVGroup_or` (annot t1, \_ -> OtherError "Operand is not a group element")
-  (nm2, ab2, vparam2) <- ty2 `isVGroup_or` (annot t2, \_ -> OtherError "Operand is not a group element")
-  let param1 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam1
-      param2 = fmap (\(vty,vtm) -> (reifyType0 vty, reify0 vty vtm)) vparam2
-  if nm1 == nm2 && ab1 == ab2 && param1 == param2 then
-      return (VGroup nm1 ab1 vparam1, In $ CS.GroupMul tm1 tm2)
-  else
-      raiseError p (OtherError "Groups not equal")
-
-synthesiseTypeFor (Annot p (GroupInv t)) = do
-  (ty, tm)         <- synthesiseTypeFor t
-  (nm, ab, vparam) <- ty `isVGroup_or` (annot t, \_ -> OtherError "Operand is not a group element")
-  return (VGroup nm ab vparam, In $ CS.GroupInv tm)
 
 --------------------------------------------------------------------------------
 -- Type ascription

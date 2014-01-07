@@ -6,7 +6,6 @@ module Language.Foveran.Syntax.LocallyNameless
     , GlobalFlag (..)
     , Binding (..)
     , bindingOfPattern
-    , Abelian (..)
     , toLocallyNamelessClosed
     , toLocallyNameless
     , close
@@ -22,7 +21,6 @@ import           Data.FreeMonad
 import           Data.Pair
 import qualified Language.Foveran.Syntax.Display as DS
 import           Language.Foveran.Syntax.Identifier (Ident)
-import           Language.Foveran.Syntax.Common (Abelian)
 
 type TermPos = AnnotRec Span TermCon
 type TermPos' p = AnnotRec p TermCon
@@ -82,11 +80,6 @@ data TermCon tm
   | NamedConstructor Ident [tm]
   | CasesOn          Bool tm [(Ident, [DS.Pattern], [Binding] -> tm)]
     -- a suspended conversion to locally nameless, waiting for the additional variables to be bound
-
-  | Group      Ident Abelian (Maybe tm)
-  | GroupUnit
-  | GroupMul   tm tm
-  | GroupInv   tm
 
   | TypeAscrip tm tm
 
@@ -255,11 +248,6 @@ toLN (DS.RecurseOn nm) bv =
 toLN (DS.TypeAscrip t1 t2) bv = Layer $ TypeAscrip (return $ t1 bv) (return $ t2 bv)
 toLN (DS.Generalise t1 t2) bv = Layer $ Generalise (return $ t1 bv) (return $ t2 bv)
 
-toLN (DS.Group nm ab ty)  bv = Layer $ Group nm ab ((return . ($bv)) <$> ty)
-toLN DS.GroupUnit         bv = Layer $ GroupUnit
-toLN (DS.GroupMul t1 t2)  bv = Layer $ GroupMul (return $ t1 bv) (return $ t2 bv)
-toLN (DS.GroupInv t)      bv = Layer $ GroupInv (return $ t bv)
-
 toLN (DS.LabelledType nm args ty) bv =
     Layer $ LabelledType nm (map (fmap (\x -> return (x bv))) args) (return $ ty bv)
 toLN (DS.Return t) bv =
@@ -342,11 +330,6 @@ close' fnm (CasesOn isRecursive tm clauses) =
 
 close' fnm UserHole         = pure UserHole
 close' fnm (Hole nm tms)    = Hole nm <$> sequenceA tms
-
-close' fnm (Group nm ab ty) = Group nm ab <$> sequenceA ty
-close' fnm GroupUnit        = pure GroupUnit
-close' fnm (GroupMul t1 t2) = GroupMul <$> t1 <*> t2
-close' fnm (GroupInv t)     = GroupInv <$> t
 
 close' fnm (TypeAscrip tm ty) = TypeAscrip <$> tm <*> ty
 

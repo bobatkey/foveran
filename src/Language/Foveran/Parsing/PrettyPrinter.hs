@@ -135,12 +135,6 @@ pprint (CasesOn isRecursive t clauses)      =
               sep [ppIdent ident <+> ppPatterns patterns <> ".", nest 2 tm]
 pprint (RecurseOn nm) = paren 01 ("recurseOn" <+> ppIdent nm)
 
-pprint (Group nm NotAbelian ty) = "Group[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
-pprint (Group nm IsAbelian ty)  = "AbGroup[" <> ppIdent nm <> maybe empty (comma <+>) ty <> "]"
-pprint GroupUnit           = "unit"
-pprint (GroupMul t1 t2)    = paren 08 (t1 <+> "#" <+> down t2)
-pprint (GroupInv t)        = paren 07 ("inv" <+> down t)
-
 pprint (TypeAscrip t1 t2)  = paren 06 (down t1 <+> ":" <+> down t2)
 
 pprint (Generalise t1 t2)  = paren 01 ("generalise" <+> resetPrec t1 <+> "then"

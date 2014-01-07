@@ -18,13 +18,10 @@ module Language.Foveran.Syntax.Display
     , Term
     , TermPos
     , TermCon (..)
-
-    , Abelian (..)
     )
     where
 
 import Language.Foveran.Syntax.Identifier (Ident)
-import Language.Foveran.Syntax.Common (Abelian (..))
 import Text.Position (Span)
 import Data.Pair
 import Data.Rec
@@ -134,12 +131,6 @@ data TermCon tm
     | NamedConstructor Ident [tm]
     | CasesOn          Bool tm [(Ident, [Pattern], tm)]
     | RecurseOn        Ident
-
-    {- Group stuff -}
-    | Group      Ident Abelian (Maybe tm)
-    | GroupUnit
-    | GroupMul   tm tm
-    | GroupInv   tm
 
     | Generalise  tm tm
     | TypeAscrip  tm tm
