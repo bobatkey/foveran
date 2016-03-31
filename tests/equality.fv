@@ -7,6 +7,12 @@
 leibniz : (A : Set) -> A -> A -> Set 1;
 leibniz A a1 a2 = (F : A -> Set) -> F a1 -> F a2;
 
+leibniz2 : (X : Set) -> (A : X -> Set) -> (x : X) -> A x -> (x' : X) -> A x' -> Set 1;
+leibniz2 X A x a x' a' = (F : (x : X) -> A x -> Set) -> F x a -> F x' a';
+
+cart2 : (X : Set) -> (A : X -> Set) -> (x : X) -> A x -> (x' : X) -> A x' -> Set 1;
+cart2 X A x a x' a' = (R : (x x' : X) -> A x -> A x' -> Set) -> ((x : A) -> (a : A x) -> R x x a a) -> R x x' a a';
+
 reflexivity : (A : Set) -> (a : A) -> leibniz A a a;
 reflexivity A a = \F x. x;
 

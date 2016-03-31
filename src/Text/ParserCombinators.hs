@@ -6,8 +6,6 @@ import           Prelude hiding (head)
 import           Control.Monad
 import           Control.Monad.Error
 import           Control.Applicative
-import qualified Data.DList as DL
-import           Data.DList hiding (head)
 import           Text.Lexeme (Lexeme (..))
 import           Text.Position
 import qualified Data.Text as T
@@ -60,38 +58,38 @@ data StateComponent tok a
     | ExpectingEOS                     (Parser tok a)
 
 type State tok a = [StateComponent tok a]
-type DState tok a = DList (StateComponent tok a)
+type DState tok a = [StateComponent tok a] -> [StateComponent tok a]
 
 expecting :: State tok a -> [Maybe tok]
 expecting = fmap expect
     where expect (ExpectingToken t _) = Just t
           expect (ExpectingEOS _)     = Nothing
 
-cut :: DList a -> DList a
-cut (DL l) = DL (\x -> l [])
+cut :: ([a] -> [a]) -> [a] -> [a]
+cut l = \x -> l []
 
 parserToStateH :: Parser tok a -> Either a (DState tok a)
 parserToStateH (Return a)     = Left a
-parserToStateH (Terminal t k) = pure $ singleton (ExpectingToken t k)
-parserToStateH (EOS k)        = pure $ singleton (ExpectingEOS k)
-parserToStateH (Choice k1 k2) = append <$> parserToStateH k1 <*> parserToStateH k2
-parserToStateH Fail           = pure $ DL.empty
+parserToStateH (Terminal t k) = pure $ (ExpectingToken t k:)
+parserToStateH (EOS k)        = pure $ (ExpectingEOS k:)
+parserToStateH (Choice k1 k2) = (.) <$> parserToStateH k1 <*> parserToStateH k2
+parserToStateH Fail           = pure $ id
 parserToStateH (Commit k)     = cut <$> parserToStateH k
 
 advanceH :: Eq tok => State tok a -> Maybe (Lexeme tok) -> Either a (DState tok a)
-advanceH [] _ = pure $ DL.empty
+advanceH [] _ = pure $ id
 advanceH (ExpectingToken p k:s) i@(Just t)
     | lexemeTok t == p =
-        append <$> parserToStateH (k t) <*> advanceH s i
+        (.) <$> parserToStateH (k t) <*> advanceH s i
 advanceH (ExpectingToken p k:s) i
     = advanceH s i
 advanceH (ExpectingEOS k:s) i@(Just _)
     = advanceH s i
 advanceH (ExpectingEOS k:s) i@Nothing
-    = append <$> parserToStateH k <*> advanceH s i
+    = (.) <$> parserToStateH k <*> advanceH s i
 
 advance :: Eq tok => State tok a -> Maybe (Lexeme tok) -> Either a (State tok a)
-advance s i = fmap toList $ advanceH s i
+advance s i = fmap ($ []) $ advanceH s i
 
 class ParsingError tok e where
     parseError :: Maybe (Lexeme tok) -> [Maybe tok] -> e
@@ -103,7 +101,7 @@ instance ParsingError tok String where
 parse :: (Eq tok, MonadError e m, ParsingError tok e) => Parser tok a -> Reader (Lexeme tok) m a
 parse p = case parserToStateH p of
             Left a  -> return a
-            Right s -> go (toList s)
+            Right s -> go (s [])
     where
       go state = do
         t <- head
