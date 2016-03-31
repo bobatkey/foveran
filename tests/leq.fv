@@ -1,0 +1,30 @@
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+data Leq : Nat × Nat -> Set where
+  `leq-zero : (n : Nat)  -> Leq «`zero,n»
+  `leq-step : (n1 : Nat) -> (n2 : Nat) -> Leq «n1,n2» -> Leq «`succ n1, `succ n2»
+
+Leq:refl : (n : Nat) -> Leq «n, n»
+Leq:refl n =
+  eliminate n then _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq     _.     rewriteBy eq then `leq-zero `zero
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then `leq-step n n r
+      }
+
+-- FIXME: do this by induction on the proof of Leq «n1,n2» instead...
+Leq:trans : (n1 n2 n3 : Nat) -> Leq «n1, n2» -> Leq «n2, n3» -> Leq «n1, n3»
+Leq:trans n1 n2 n3 =
+  eliminate n1 then _ «c,d» r.
+    generalise r then
+    generalise d then
+    case c with
+      { inl _. \eq     _.     rewriteBy eq then ?
+      ; inr _. \«n,eq» «r,_». rewriteBy eq then ?
+      }
+
+;

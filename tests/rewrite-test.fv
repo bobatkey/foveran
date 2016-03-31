@@ -1,0 +1,25 @@
+-- test to show that 'rewrite' is backwards (because it is thin layer over elimEq)
+test : (A : Set) ->
+       (a b : A) ->
+       a == b ->
+       a == b
+test A a b eq =
+  rewriteBy eq then
+  refl
+
+normalise test
+
+{-
+
+would it be OK to just assume that 'symmetry' exists?
+
+need to make rewriteBy handle the following:
+ - do not unfold every definition when looking for what to rewrite
+ - get it the right way round
+ - easy rewriting back and forth
+ - handle equalities between pairs by splitting them into two rewrites...
+ - possibly some unification?
+
+-}
+
+;

@@ -1,0 +1,98 @@
+– the “somewhere” predicate
+some : (I : Set) ->
+       (D : IDesc I) ->
+       (A : I -> Set) ->
+       (P : (i : I) -> A i -> Set) ->
+       (x : semI[D, i. A i]) ->
+       Set
+some I D A P =
+  elimID I
+    (λD. semI[D, i. A i] -> Set)
+    P
+    (λA a. Empty)
+    (λD₁ D₂ some₁ some₂ «x₁,x₂». some₁ x₁ + some₂ x₂)
+    (λA D some «a,x». some a x)
+    (λA D some f. (a : A) × some a (f a))
+    D
+
+– if it is Empty somewhere, then all is for naught
+zero : (I : Set) ->
+       (D : IDesc I) ->
+       (A : I -> Set) ->
+       (y : semI[D, i. A i]) ->
+       some I D A (λi a. Empty) y -> Empty
+zero I D A =
+  elimID I
+    (λD. (x : semI[D, i. A i]) -> some I D A (λi a. Empty) x -> Empty)
+    (λi a e. absurdBy e)
+    (λA a e. absurdBy e)
+    (λD₁ D₂ ih₁ ih₂ «x₁,x₂» y. case y with { inl y. ih₁ x₁ y; inr y. ih₂ x₂ y })
+    (λB D ih «b,x» y. ih b x y)
+    (λB D ih f «b,y». ih b (f b) y)
+    D
+
+split : (I : Set) ->
+        (D : IDesc I) ->
+        (A : I -> Set) ->
+        (P Q : (i : I) -> A i -> Set) ->
+        (x : semI[D, i. A i]) ->
+        some I D A (λi a. P i a + Q i a) x ->
+        some I D A (λi a. P i a) x + some I D A (λi a. Q i a) x
+split I D A P Q =
+  elimID I
+    (λD. (x : semI[D, i. A i]) ->
+         some I D A (λi a. P i a + Q i a) x ->
+         some I D A (λi a. P i a) x + some I D A (λi a. Q i a) x)
+    (λi a x. x)
+    (λA a x. absurdBy x)
+    (λD₁ D₂ ih₁ ih₂ «x₁,x₂» y.
+      case y with
+        { inl y. case ih₁ x₁ y with { inl y'. inl (inl y'); inr y'. inr (inl y') }
+        ; inr y. case ih₂ x₂ y with { inl y'. inl (inr y'); inr y'. inr (inr y') }
+        })
+    (λB D ih «b,x» y. ih b x y)
+    (λB D ih f «b, y».
+      case ih b (f b) y with
+        { inl y. inl «b, y»
+        ; inr y. inr «b, y»
+        })
+    D
+
+– what laws does this obey? Is it left adjoint to something?
+– is it useful for anything?
+
+assume someIDesc : (I : Set) ->
+                   (D : IDesc I) ->
+                   (A : I -> Set) ->
+                   (x : semI[D, i. A i]) ->
+                   IDesc ((i : I) × A i)
+
+data subterm (I : Set) (D : I -> IDesc I) (x : (i : I) × µI I D i) : ((i : I) × µI I D i) -> Set where
+  `here  : subterm I D x x
+  `below : (i : I) ->
+           (y : semI[D i, i. µI I D i]) ->
+           semI[someIDesc I (D i) (µI I D) y, y. subterm I D x y] ->
+           subterm I D x «i, construct y»
+
+– alter the recursive call checker to spot ones inside semI calls. And
+– turn them into compositions.
+
+– this is automatically reflexive, and ought to be transitive:
+trans : (I : Set) -> (D : IDesc I) ->
+        (x y z : ((i : I) × µI I D i)) ->
+        subterm I D x y ->
+        subterm I D y z ->
+        subterm I D x z
+trans I D x y z x_sub_y y_sub_z = ? – probably by induction on x_sub_y
+
+{-
+subterm : (I : Set) ->
+          (D : I -> IDesc I) ->
+          (i : I) -> µI I D i ->
+          (i : I) × µI I D i ->
+          Set
+subterm : I D i x =
+  µI I (λ«i', x'». “Σ”
+-}
+
+;

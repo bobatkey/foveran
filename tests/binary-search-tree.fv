@@ -1,0 +1,82 @@
+data Tree (K : Set) (E : Set) : Set where
+  `empty : Tree K E
+  `node  : Tree K E -> K -> E -> Tree K E -> Tree K E
+
+data Maybe (A : Set) : Set where
+  `nothing : Maybe A
+  `just    : A -> Maybe A
+
+data Ordering : Set where
+  `LT : Ordering
+  `EQ : Ordering
+  `GT : Ordering
+
+--------------------------------------------------------------------------------
+lookup : (K E : Set) ->
+         (cmp : K -> K -> Ordering) ->
+         K ->
+         Tree K E ->
+         Maybe E
+lookup K E cmp key tree =
+  recursionOn tree with
+    `empty. `nothing
+    `node l k e r.
+      casesOn cmp key k with
+        `LT. recurseOn l
+        `EQ. `just e
+        `GT. recurseOn r
+
+normalise lookup
+
+insert : (K E : Set) ->
+         (cmp : K -> K -> Ordering) ->
+         K ->
+         E ->
+         Tree K E ->
+         Tree K E
+insert K E cmp key elem tree =
+  recursionOn tree with
+    `empty. `node `empty key elem `empty
+    `node l k e r.
+      casesOn cmp key k with
+        `LT. `node (recurseOn l) k e r
+        `EQ. `node l key elem r
+        `GT. `node l k e (recurseOn r)
+
+--------------------------------------------------------------------------------
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+cmp : Nat -> Nat -> Ordering
+cmp n1 =
+  recursionOn n1 with
+    `zero. \n2.
+      casesOn n2 with
+       `zero.    `EQ
+       `succ n2. `LT
+    `succ n. \n2.
+      casesOn n2 with
+       `zero.    `GT
+       `succ n2. recurseOn n n2
+
+--------------------------------------------------------------------------------
+three : Nat
+three = `succ (`succ (`succ `zero))
+
+two : Nat
+two = `succ (`succ `zero)
+
+assume A : Set
+assume a : A
+assume b : A
+assume c : A
+
+t : Tree Nat A
+t = insert Nat A cmp three a (insert Nat A cmp two b `empty)
+
+normalise t
+
+normalise lookup Nat A cmp `zero t
+
+;

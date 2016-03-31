@@ -1,0 +1,6 @@
+data Nat : Set where `zero : Nat; `succ : Nat -> Nat
+                     `tri : Nat -> Nat -> Nat
+
+normalise Nat
+
+;

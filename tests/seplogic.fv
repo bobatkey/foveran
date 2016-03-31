@@ -1,0 +1,64 @@
+– plan: a thing that translates data type descriptions into separation logic predicates
+
+assume Prop : Set
+assume prf : Prop -> Set
+assume Heap : Set
+assume singleton : (A : Set) -> Heap -> A -> Prop
+assume combine : Heap -> Heap -> Heap -> Prop
+
+– plan: build prf and Prop in. With the definitional equality:
+–   x = y : prf A, for all x and y
+– this is handled by the 
+
+– also need a collection of codes for inductively defined propositions...
+
+deconstruct : (D : Desc) → µ D → sem D (µ D);
+deconstruct D = induction D (λx. sem D (µ D)) (λx p. x);
+
+– could just define this by induction on the data...
+translate : (D : Desc) -> (Heap × µ D) -> IDesc (Heap × µ D)
+translate D «h,d» =
+  elimD (λD'. Heap -> sem D' (µ D) -> IDesc (Heap × µ D))
+    (λA H a. “K” (singleton A H a))
+    (λH x. “IId” «H,x»)
+    (λD₁ D₂ φ₁ φ₂ H «x₁, x₂».
+      “Σ” Heap (λH₁. “Σ” Heap (λH₂. “Σ” (combine H₁ H₂ H) (λ_.  φ₁ H₁ x₁ “×” φ₂ H₂ x₂))))
+    (λD₁ D₂ φ₁ φ₂ H x.
+      case x with { inl x₁. φ₁ H x₁; inr x₂. φ₂ H x₂ })
+    D
+    h
+    (deconstruct D d)
+
+– Heap is just implemented as Unit
+– Need to resolve all the issues with 
+
+day : (Heap -> Set) -> (Heap -> Set) -> Heap -> Set
+day X Y H = ∃H₁ : Heap. ∃H₂ : Heap. prf (combine H₁ H₂ H) × X H₁ × Y H₂
+
+assume T      : (Heap -> Set) -> (Heap -> Set)
+assume return : (A : Heap -> Set) -> (H : Heap) -> A H -> T A H
+assume bindT  : (A B : Heap -> Set) -> (H : Heap) -> T A H -> ((H' : Heap) -> A H' -> T B H') -> T B H
+assume strong : (A B : Heap -> Set) -> (H : Heap) -> day A (T B) H -> T (day A B) H – the frame rule
+
+– there is also a combinator that witnesses that T is strong with respect to the symmetric monoidal structure on Heap predicates
+
+– actually, we want to describe T as a free monad, and have a run function that actually executes it
+– we also reflect the semantics into the theory by stating that the run function has type Heap -> T A -> Heap × A
+– this means that we can reason about heap manipulating programs inside the type theory
+
+– Heap : HeapDesc -> Set
+– the actual set of heaps for a given description.
+
+
+assume read : (A : Set) ->
+              (H : Heap) ->
+              prf (∃a : A. singleton A a H) ->
+              T (λH. (a : A) × prf (singleton A a H)) H
+
+assume write : (A : Set) ->
+               (a : A) ->
+               (H : Heap) ->
+               prf (∃a₀ : A. singleton A a₀ H) ->
+               T (λH. prf (singleton A a H)) H
+
+;

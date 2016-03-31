@@ -1,0 +1,199 @@
+assume Clock : Set
+
+--------------------------------------------------------------------------------
+eq1 : (A B : Clock -> Set) ->
+      ((k : Clock) -> A k × B k) ->
+      ((k : Clock) -> A k) × ((k : Clock) -> B k)
+eq1 A B t =
+  «λk. fst (t k), λk. snd (t k)»
+
+eq2 : (A B : Clock -> Set) ->
+      ((k : Clock) -> A k) × ((k : Clock) -> B k) ->
+      ((k : Clock) -> A k × B k)
+eq2 A B «x,y» = λk. «x k, y k»
+
+--------------------------------------------------------------------------------
+eq3 : (A B : Clock -> Set) ->
+      ((k : Clock) -> A k + B k) ->
+      ((k : Clock) -> A k) + ((k : Clock) -> B k)
+eq3 A B t = ?
+
+eq3₂ : (A : Set) ->
+       (B : Clock -> A -> Set) ->
+       ((k : Clock) -> (a : A) × B k a) ->
+       (a : A) × ((k : Clock) -> B k a)
+eq3₂ A B t = «?, ?»
+
+eq4 : (A B : Clock -> Set) ->
+      ((k : Clock) -> A k) + ((k : Clock) -> B k) ->
+      ((k : Clock) -> A k + B k)
+eq4 A B t = λk.
+  case t with { inl t. inl (t k); inr t. inr (t k) }
+
+--------------------------------------------------------------------------------
+eq5 : (A : Set) ->
+      (B : Clock -> Set) ->
+      ((k : Clock) -> A -> B k) ->
+      (A -> (k : Clock) -> B k)
+eq5 A B t = λA k. t k A
+
+eq6 : (A : Set) ->
+      (B : Clock -> Set) ->
+      (A -> (k : Clock) -> B k) ->
+      ((k : Clock) -> A -> B k)
+eq6 A B t = λk A. t A k
+
+--------------------------------------------------------------------------------
+eq7 : (A : Clock -> Clock -> Set) ->
+      ((k1 : Clock) -> (k2 : Clock) -> A k1 k2) ->
+      ((k2 : Clock) -> (k1 : Clock) -> A k1 k2)
+eq7 A t = λk2 k1. t k1 k2
+
+--------------------------------------------------------------------------------
+assume eq8 : (A : Set) ->
+             ((k : Clock) -> A) ->
+             A
+– eq8 A t = ? – need a clock?, just like in the one above
+
+– so the only cases where we need an explicit coercion are in the sum
+– and strengthening cases. Is there any similarity to the fact that
+– nominal name abstraction has qualities of both universal and
+– existential quantification?
+
+– The computational content of eq8 and eq3 is “straightfoward”: just feed in "undefined"
+– Why hasn't this come up when dealing with irrelevant types?
+
+--------------------------------------------------------------------------------
+assume Delay : Clock -> Set -> Set
+– Delay[k,A] type
+assume delay : (k : Clock) -> (A : Set) -> A -> Delay k A
+assume ap    : (k : Clock) -> (A B : Set) -> Delay k (A -> B) -> Delay k A -> Delay k B
+assume fix   : (A : Set) -> (k : Clock) -> (Delay k A -> A) -> A
+– fix[k,f]
+assume force : (A : Clock -> Set) ->
+               ((k : Clock) -> Delay k (A k)) ->
+               ((k : Clock) -> A k)
+– force[k. A] : ((k : Clock) -> Delay[k,A]) -> ((k : Clock) -> A k)
+assume nu    : (I : Set) ->
+               (D : I -> IDesc I) ->
+               (k : Clock) ->
+               I -> Set
+assume constr : (I : Set) -> (D : I -> IDesc I) -> (k : Clock) -> (i : I) -> semI[D i, i. Delay k (nu I D k i)] -> nu I D k i
+assume out    : (I : Set) -> (D : I -> IDesc I) -> (k : Clock) -> (i : I) -> nu I D k i -> semI[D i, i. Delay k (nu I D k i)]
+
+– Computation rule: fix f == f (delay (fix f))
+– and the rules for applicative functors for delay and ap
+– force A (λk. delay k (A k) a) == (λk. a) – pass in 'undefined', discover whether it is 'delay' or not
+
+--------------------------------------------------------------------------------
+Stream:code : Set -> Unit -> IDesc Unit
+Stream:code A _ = “Σ” A (λ_. “IId” ())
+
+ClockedStream : Set -> Clock -> Set
+ClockedStream A k = nu Unit (Stream:code A) k ()
+
+Stream : Set -> Set
+Stream A = (k : Clock) -> ClockedStream A k
+
+head : (A : Set) -> Stream A -> A
+head A stream = eq8 A (λk. fst (out Unit (Stream:code A) k () (stream k)))
+
+tail : (A : Set) -> Stream A -> Stream A
+tail A stream = force (ClockedStream A) (λk. snd (out Unit (Stream:code A) k () (stream k)))
+
+elem : (A : Set) -> A -> Stream A -> Stream A
+elem A a stream = λk. constr Unit (Stream:code A) k () «a, delay k (ClockedStream A k) (stream k)»
+
+test : (A : Set) -> (a : A) -> (s : Stream A) ->
+       head A (elem A a s) ≡ a
+test A a s = ? – refl
+
+--------------------------------------------------------------------------------
+forever : (A : Set) -> A -> Stream A
+forever A a = λk. fix (ClockedStream A k) k (λtail. constr Unit (Stream:code A) k () «a, tail»)
+
+map : (A B : Set) -> (A -> B) -> Stream A -> Stream B
+map A B f input =
+  λk. fix (Stream A -> ClockedStream B k) k
+          (λrest input.
+            constr Unit (Stream:code B) k () « f (head A input)
+                                             , {- rest <*> delay (tail A input) -}
+                                               ap k (Stream A) (ClockedStream B k) rest (delay k (Stream A) (tail A input))»)
+          input
+
+zipWith : (A B C : Set) -> (A -> B -> C) -> Stream A -> Stream B -> Stream C
+zipWith A B C f inputA inputB =
+  λk. fix (Stream A -> Stream B -> ClockedStream C k) k
+          (λrest inputA inputB.
+            constr Unit (Stream:code C) k ()
+              « f (head A inputA) (head B inputB)
+             –, rest <*> delay (tail A inputA) <*> delay (tail B inputB)
+             –, (| rest ~(tail A inputA) ~(tail B inputB) |)
+              , ap k (Stream B) (ClockedStream C k)
+                   (ap k (Stream A) (Stream B -> ClockedStream C k)
+                       rest (delay k (Stream A) (tail A inputA)))
+                   (delay k (Stream B) (tail B inputB))
+              »)
+          inputA inputB
+
+--------------------------------------------------------------------------------
+-- bisimilarity of streams...
+bisimilar:code : (A : Set) -> Stream A × Stream A -> IDesc (Stream A × Stream A)
+bisimilar:code A «stream1, stream2» =
+  “K” (head A stream1 ≡ head A stream2) “×” “IId” «tail A stream1, tail A stream2»
+
+bisimilar:clocked : (A : Set) -> Clock -> Stream A × Stream A -> Set
+bisimilar:clocked A = nu (Stream A × Stream A) (bisimilar:code A)
+
+bisimilar : (A : Set) -> Stream A × Stream A -> Set
+bisimilar A streams = (k : Clock) -> bisimilar:clocked A k streams
+
+proof1 : (A B : Set) ->
+         (f : A -> B) ->
+         (a : A) ->
+         bisimilar B «forever B (f a), map A B f (forever A a)»
+proof1 A B f a =
+  λk. fix (bisimilar:clocked B k «forever B (f a), map A B f (forever A a)») k
+          (λrest. constr (Stream B × Stream B) (bisimilar:code B) k «forever B (f a), map A B f (forever A a)»
+                         «?, ?»)
+
+– can't proceed without the proper computational behaviour of fix et al
+
+--------------------------------------------------------------------------------
+-- From the infinite to the finite
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+Nat:elim :
+  (P : Nat -> Set 2) ->
+  P `zero ->
+  ((n : Nat) -> P n -> P (`succ n)) ->
+  (n : Nat) ->
+  P n
+Nat:elim P pzero psucc n =
+  eliminate n then _ «c,d» p.
+    generalise p then
+    generalise d then
+    case c with
+      { inl _. λz      _.     rewriteBy z {-for u p. P (construct «inl (), p»)-} then pzero
+      ; inr _. λ«n,eq» «p,_». rewriteBy eq {-for u p. P (construct «inr (), n, p»)-} then psucc n p
+      }
+
+nth : (A : Set) -> Nat -> Stream A -> A
+nth A =
+  Nat:elim (λn. Stream A -> A)
+    (λstream.     head A stream)
+    (λn f stream. f (tail A stream))
+
+data List (A : Set) : Set where
+  `nil  : List A
+  `cons : A -> List A -> List A
+
+take : (A : Set) -> Nat -> Stream A -> List A
+take A =
+  Nat:elim (λn. Stream A -> List A)
+    (λstream. `nil)
+    (λn f stream. `cons (head A stream) (f (tail A stream)))
+
+;

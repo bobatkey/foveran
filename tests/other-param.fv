@@ -1,0 +1,184 @@
+{-
+test : (t : (α : Set) → (α → α) → α → α) →
+       (α : Set) →
+       (Φ : α → Set) →
+       ty-pred (arr (arr v v) (arr v v)) α Φ (λs z. s (t α (λa. t α s a) z));
+test t α Φ = param eps (arr (arr v v) (arr v v))
+                   (λα γ s z. s (t α (λa. t α s a) z))
+                   α Φ
+                   () ();
+
+normalise test;
+-}
+
+{-
+test' : (t : (α : Set) → (α → α) → α → α) →
+       (α : Set) →
+       (Φ : α → Set) →
+       ty-pred (arr (arr v v) (arr v v)) α Φ (λs z. s (t α (λa. t α s a) z));
+test' = λt0 α Φ x φx x0 φx0. φx (t0 α (λa. t0 α (λx1. x x1) a) x0)
+                            (param (construct (inr «construct (inr «construct (inl ()),
+                                                                    construct (inr «construct (inl ()),
+                                                                                    construct (inl ())»)»),
+                                                    construct (inl ())»))
+                                   (construct (inl ()))
+                                   (λA γ. t0 A (λa. t0 A (λx1. snd (fst γ) x1) a) (snd γ))
+                                   α
+                                   (λx1. Φ x1)
+                                   ««(), λx1. x x1», x0»
+                                   ««(), λa x1. φx a x1», φx0»);
+-}
+
+
+
+
+{-
+
+ty-rel :
+  (τ : Ty) →
+  (α β : Set) →
+  (Φ : α → β → Set) →
+  ty-sem τ α →
+  ty-sem τ β →
+  Set;
+ty-rel τ α β Φ =
+  tyInduction
+    (λτ. ty-sem τ α → ty-sem τ β → Set)
+    (λa b. Φ a b)
+    (λτ₁ τ₂ ρ₁ ρ₂ f g. (a : ty-sem τ₁ α) → (b : ty-sem τ₁ β) → ρ₁ a b → ρ₂ (f a) (g b))
+    τ;
+
+assume le : Nat → Nat → Set;
+
+ty-kripke-pred :
+  (τ : Ty) →
+  (α : Set) →
+  (Φ : α → Nat → Set) →
+  ty-sem τ α → Nat → Set;
+ty-kripke-pred τ α Φ =
+  tyInduction
+    (λτ. ty-sem τ α → Nat → Set)
+    (λa n. (n' : Nat) → le n n' → Φ a n')
+    (λτ₁ τ₂ Φ₁ Φ₂ f n. (n' : Nat) → le n n' → (a : ty-sem τ₁ α) → Φ₁ a n' → Φ₂ (f a) n')
+    τ;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+abs-ty : Ty → Set 1;
+abs-ty τ = (α : Set) → ty-sem τ α;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+churchNat : Ty;
+churchNat = arr (arr v v) (arr v v);
+
+assume t : (α : Set) → (α → α) → α → α;
+
+normalise param churchNat (λα. t α);
+
+normalise param churchNat (λα s z. s (s z));
+
+normalise param churchNat (λα s z. s (t α s z));
+
+normalise param churchNat (λα s. s);
+
+fromNat : Nat → abs-ty churchNat;
+fromNat n α s z =
+  natInduction (λn. α)
+    z
+    (λn a. s a)
+    n;
+
+toNat : abs-ty churchNat → Nat;
+toNat t = t Nat succ zero;
+
+normalise param churchNat (fromNat (succ (succ zero)));
+
+natTest : (Φ : Nat → Set) →
+          Φ zero →
+          ((n : Nat) → Φ n → Φ (succ n)) →
+          (n : Nat) →
+          Φ (toNat (fromNat n));
+natTest Φ φzero φsucc n =
+  param (arr (arr v v) (arr v v)) (fromNat n) Nat Φ succ φsucc zero φzero;
+
+assume eql : (n : Nat) → equal (toNat (fromNat n)) n;
+– is this provable using the binary parametricity principle?
+– can you prove it by induction on the natural numbers?
+
+– I think the binary parametricity principle is needed to prove that fromNat (toNat t) ≡ t
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– another sort of stuck term
+assume b : Unit + Unit ;
+
+normalise param (arr v (arr v v)) (λα x₁ x₂. case b for b. α with { inl u. x₁; inr u. x₂ });
+
+– normalising a case away
+f : (α : Set) → α → α + α;
+f α x = inr x;
+
+normalise param (arr v (arr v v)) (λα x₁ x₂. case f α x₁ for b. α with { inl x. x; inr x. x });
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+test : (A : Set) →
+       (P : A → Set) →
+       (a : A → A) → ((a' : A) → P a' → P (a a')) →
+       (a' : A) → P a' →
+       P (a (a a'));
+test = λA P s φs z φz. φs (s z) (φs z φz);
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+hoasTy : Ty;
+hoasTy = arr (arr (arr v v) v) (arr (arr v (arr v v)) v);
+
+hoasTerm : Set 1;
+hoasTerm = abs-ty hoasTy;
+
+tm : hoasTerm;
+tm α lam app =
+  lam (λx. app x x);
+
+normalise ty-pred hoasTy;
+
+normalise ty-kripke-pred hoasTy;
+
+normalise param hoasTy tm;
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– Making sure that the computed term type checks
+{-
+test2 : (A : Set) → (P : A → Set) → (a : (A → A) → A) → ((a' : A →
+                                                           A) → ((a'' : A) → P a'' → P (a' a'')) →
+                                                                P (a (λx. a' x))) →
+                                                    (a' : A → A → A) → ((a'' : A) → P a'' →
+                                                                                    (a''' : A) → P a''' →
+                                                                                                 P (a' a''
+                                                                                                       a''')) →
+                                                                       P (a (λx. a' x x));
+test2 = λA P lam φlam app φapp. φlam (λx. app x x)
+                                 (λx φx. φapp x φx x φx);
+-}
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+– to do Kripke parametricity:
+–   ty-pred v         α Φ = λa n. (n' : Nat) → n ≤ n' → Φ a n'
+–   ty-pred (τ₁ ⇒ τ₂) α Φ = λf n. (n' : Nat) → n ≤ n' → (a : ty-sem τ₁ α) → ty-pred τ₁ α Φ a n' → ty-pred τ₂ α Φ (f a) n'
+
+– the generated proof gets commensurately more complicated...
+– but the general idea is the same.
+
+– binary parametricity is probably easier to do, but needs equality to
+– do anything exciting. Proving initiality might be possible, with an
+– assumption of functional extensionality
+
+––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+– with sums in the little language:
+–   case x for x. P x with { inl y₁. blah
+–                          ; inr y₂. bloo
+–
+–
+– to be in the little language, P x must constantly be some little language type.
+– but it might be the case that P x = case x for x. Set with { inl u. α; inr u. α }, which is the right thing, but the type checker won't see that...
+– so this case doesn't matter, because we won't have proved that it is 
+
+– or we neutralise as something with values in. Then when we reify we
+– know what the type is.

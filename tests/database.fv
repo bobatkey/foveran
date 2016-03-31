@@ -1,0 +1,30 @@
+assume Relation : Set -> Set
+assume value : (X : Set) -> Relation X -> X
+
+assume String : Set
+assume Date   : Set
+
+----------------------------------------------------------------------
+
+assume Person : Relation (String × Date)
+
+name : Person -> String
+name p = fst (value (String × Date) p)
+
+dob : Person -> Date
+dob p = snd (value (String × Date) p)
+
+----------------------------------------------------------------------
+
+assume join : (X Y Z : Set) ->
+              (R₁ : Relation X) ->
+              (R₂ : Relation Y) ->
+              (p₁ : X -> Z) ->
+              (p₂ : Y -> Z) ->
+              Relation (X × Y)
+
+assume union : (X : Set) -> Relation X -> Relation X -> Relation X
+
+assume restrict : (X : Set) -> (X -> Y) -> X
+
+;

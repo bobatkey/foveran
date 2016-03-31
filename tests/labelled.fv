@@ -1,0 +1,47 @@
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+test : Nat
+test = `succ `zero
+
+add : (m n : Nat) -> < add (m : Nat) (n : Nat) : Nat >
+add m n = recursionOn m with
+  `zero.   return n
+  `succ m. return (`succ (call (recurseOn m)))
+
+assume n : Nat
+
+normalise
+  call (add (call (add (`succ n) n)) n)
+
+add-assoc : (x y z : Nat) -> call (add x (call (add y z))) == call (add (call (add x y)) z)
+add-assoc x y z = inductionOn x with
+  `zero.   refl
+  `succ x.
+      rewriteBy inductionHypothesisFor x then
+      refl
+
+add-zero : (x : Nat) -> x == call (add x `zero)
+add-zero x =
+  inductionOn x with
+    `zero.   refl
+    `succ x. rewriteBy inductionHypothesisFor x then refl
+
+add-succ : (x y : Nat) -> `succ (call (add x y)) : Nat == call (add x (`succ y))
+add-succ x y =
+  inductionOn x with
+    `zero.   refl
+    `succ x. rewriteBy inductionHypothesisFor x then refl
+
+add-comm : (x y : Nat) -> call (add x y) == call (add y x)
+add-comm x y =
+  inductionOn x with
+    `zero.
+      rewriteBy add-zero y then refl
+    `succ x.
+      rewriteBy add-succ y x then
+      rewriteBy inductionHypothesisFor x then
+      refl
+
+;

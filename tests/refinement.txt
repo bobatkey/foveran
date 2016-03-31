@@ -1,0 +1,46 @@
+– The code in this file is written in Foveran and all type checks
+– according to the Foveran type checker.
+
+– The Idea:
+– ————————–
+– 
+– Given a basic type like lists, there are many other types that seem related,
+– like vectors. Is there a way to express this commonality in dependently typed
+– language in such a way that it can be used effectively? McBride brought up
+– this question in his note “Ornamental Algebras, Algebraic Ornaments”.
+– 
+– FIXME: link to the blog post.
+–
+– The paper “When is a Type Refinement an Inductive Type” by myself,
+– Patricia Johann and Neil Ghani develops a theory that we called “refinement”
+– whereby a given inductive type “µ F” can be refined by an algebra “α ∈ FA → A”
+– to give a A-indexed refined type µ F^α such that, for a given index a ∈ A,
+– (µ F^α) a is isomorphic to the set of values of x ∈ µ F, such that
+– fold α x = a. This is similar to McBride’s algebraic ornaments.
+–
+– The main idea in our construction was to make use of the predicate lifting of
+– a functor, as is used for abstract study of structural induction. In short,
+– given a functor “F ∈ Set → Set”, there is a lifting of this functor to
+– predicates:
+–
+–     lift F : (A : Set) → (A → Set) → (F A → Set)
+–
+– So, for any set “A” and predicate “P” on A, “lift F A P” is a predicate on
+– “F A”. By setting A to be “µ F” this can be used to state the induction
+– principle for the type ”µ F”.
+–
+– To construct refinement “µ F^α”, defined another functor by composition with
+– the lifting:
+–
+–     F^α (X : A → Set) = λa. (x : F A) × (α x ≡ a) × lift F A X x
+–
+– In the paper, we proved that F^α has an initial fixpoint, and that it
+– satisfies the semantic correctness property stated above. We also went on to
+– explore the case when we only have a partial algebra “κ : F A → Unit + A”, in
+– which case the composed functor is:
+–
+–     F^κ (X : A → Set) = λa. (x : F A) × (κ x ≡ inl a) × lift F A X x
+–
+– Again, we have composed with the lifting of “F” to generate a new functor
+– that, when we take the initial fix point of it, will give us the refined
+– datatype we desire.

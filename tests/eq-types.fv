@@ -1,0 +1,139 @@
+not : Set -> Set
+not A = A -> Empty
+
+decidable-equality : Set -> Set
+decidable-equality A =
+  (a1 a2 : A) -> (a1 == a2) + not (a1 == a2)
+
+is-eq-type : (D : IDesc Unit) -> Set
+is-eq-type = elimID
+  Unit
+  (\D. Set)
+  {-IId-} (\x. Unit)
+  {-K-}   (\A. decidable-equality A)
+  {-×-}   (\D1 D2 rD1 rD2. rD1 × rD2)
+  {-Sg-}  (\A D rD. decidable-equality A × ((a : A) -> rD a))
+  {-Pi-}  (\A R rD. Empty)
+
+decide-eq-construct :
+  (I : Set) ->
+  (D : I -> IDesc I) ->
+  (i : I) ->
+  (a1 a2 : semI[D i, i. muI I D i]) ->
+  ((a1 == a2) + not (a1 == a2)) ->
+  ((construct a1 : muI I D i == construct a2 : muI I D i) + not (construct a1 : muI I D i == construct a2 : muI I D i))
+decide-eq-construct I D i a1 a2 e =
+  case e with
+    inl is_eq.
+      rewriteBy is_eq then
+      inl refl
+    inr isnt_eq.
+      inr (\is_eq. absurdBy (isnt_eq (elimEq is_eq for e p. eliminate e for _ _. Set then _ x _. a1 == x then refl)))
+
+assume cheat : Empty
+
+decide-eq :
+  (D : Unit -> IDesc Unit) ->
+  (eq : is-eq-type (D ())) ->
+  decidable-equality (muI Unit D ())
+decide-eq D eq x1 =
+  eliminate x1 then _ c1 r.
+  \x2.
+  eliminate x2 then _ c2 _.
+  decide-eq-construct Unit D () c1 c2
+    (generalise r then
+     generalise c2 then
+     generalise c1 then
+     generalise eq then
+     elimID Unit
+       (\D'. is-eq-type D' ->
+             (c1 : semI[D', i. muI Unit D i]) ->
+             (c2 : semI[D', i. muI Unit D i]) ->
+             liftI[D', i. muI Unit D i, i x. (a2 : muI Unit D ()) -> (x == a2) + not (x == a2), c1] ->
+             (c1 == c2) + not (c1 == c2))
+       {-IId-} (\_ _ x1 x2 recurse. recurse x2)
+       {-K-}   (\A A_eq_dec a1 a2 recurse. A_eq_dec a1 a2)
+       {-×-}   (\D1 D2 rD1 rD2 «D1_eq_dec, D2_eq_dec» «x1,y1» «x2,y2» «r1,r2».
+                 case rD1 D1_eq_dec x1 x2 r1 with
+                   { inl x1_eq_x2.
+                     rewriteBy x1_eq_x2 then
+                     case rD2 D2_eq_dec y1 y2 r2 with
+                       { inl y1_eq_y2.
+                         rewriteBy y1_eq_y2 then
+                         inl refl
+                       ; inr y1_ne_y2.
+                         inr (\p_eq_q. absurdBy (y1_ne_y2 (absurdBy cheat)))
+                       }
+                   ; inr x1_ne_x2.
+                     inr (\p_eq_q. absurdBy (x1_ne_x2 (absurdBy cheat)))
+                   })
+       {-Sg-}  (\A D rD «A_eq_dec, D_eq_dec» «a1,x1» «a2,x2».
+                 generalise x2 then
+                 generalise x1 then
+                 case A_eq_dec a1 a2 with
+                   { inl a1_eq_a2.
+                     rewriteBy a1_eq_a2 then
+                     \x1 x2 r.
+                     case rD a1 (D_eq_dec a1) x1 x2 r with
+                       inl x1_eq_x2.
+                         rewriteBy x1_eq_x2 then
+                         inl refl
+                       inr x1_ne_x2.
+                         inr (absurdBy cheat)
+                   ; inr a1_ne_a2. 
+                     \x1 x2 r.
+                     inr (absurdBy cheat)
+                   })
+       {-Pi-}  (\A D rD pi_not_eq.
+                 absurdBy pi_not_eq)
+       (D ()))
+
+--------------------------------------------------------------------------------
+data Nat : Set where
+  `zero : Nat
+  `succ : Nat -> Nat
+
+bool-eq-dec : decidable-equality (Unit + Unit)
+bool-eq-dec b1 b2 = case b1 with
+  inl _. case b2 with inl _. inl refl
+                      inr _. inr (\e. elimEq e for x p. case x for x. Set with { inl _. Unit; inr _. Empty } then ())
+  inr _. case b2 with inl _. inr (\e. elimEq e for x p. case x for x. Set with { inl _. Empty; inr _. Unit } then ())
+                      inr _. inl refl
+
+nat-is-eq : is-eq-type (Nat:code ())
+nat-is-eq = 
+  « bool-eq-dec
+  , \c. case c with
+      inl _. \e1 e2. inl (elimEq e1 then elimEq e2 then refl)
+      inr _. «(), \e1 e2. inl (elimEq e1 then elimEq e2 then refl)»
+  »
+
+nat-eq-dec : decidable-equality Nat
+nat-eq-dec = decide-eq Nat:code nat-is-eq
+
+normalise nat-eq-dec (`succ (`succ `zero)) (`succ (`succ `zero))
+
+--------------------------------------------------------------------------------
+data List (A : Set) : Set where
+  `nil  : List A
+  `cons : A -> List A -> List A
+
+list-is-eq : (A : Set) -> decidable-equality A -> is-eq-type (List:code A ())
+list-is-eq A A_eq_dec =
+  « bool-eq-dec
+  , \c. case c with
+      inl _. \e1 e2. inl (elimEq e1 then elimEq e2 then refl)
+      inr _.
+        « A_eq_dec
+        , \a. «()
+              , \e1 e2. inl (elimEq e1 then elimEq e2 then refl)
+              »
+        »
+  »
+
+list-eq-dec : (A : Set) -> decidable-equality A -> decidable-equality (List A)
+list-eq-dec A A_eq_dec = decide-eq (List:code A) (list-is-eq A A_eq_dec)
+
+normalise list-eq-dec Nat nat-eq-dec (`cons `zero `nil) (`cons (`succ `zero) `nil)
+
+;

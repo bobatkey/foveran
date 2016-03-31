@@ -1,0 +1,9 @@
+– problem: "IDesc Unit" has type Set 1, not Set
+
+data IsFinite : IDesc Unit -> Set where
+  `K    : IsFinite ("K" (Unit + Unit))
+  `Id   : IsFinite ("IId" ())
+  `Pair : (D1 D2 : IDesc Unit) -> IsFinite D1 -> IsFinite D2 -> IsFinite (D1 “×” D2)
+  `Sg   : (D : (Unit + Unit) -> IDesc Unit) -> ((b : Unit + Unit) -> IsFinite (D b)) -> IsFinite ("Sg" (Unit + Unit) D)
+
+;
