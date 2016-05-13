@@ -23,15 +23,15 @@ import           Text.Position
 
 import           Text.ParserCombinators
 import           Text.Lexeme (Lexeme (Lexeme))
-import           Language.Forvie.Lexing.Spec
-import           Language.Forvie.Lexing.Text
-import           Language.Forvie.Layout
+import           Language.Foveran.Lexing.Spec
+import           Language.Foveran.Lexing.Text
 
 import           Language.Foveran.Util.PrettyPrinting
 
 import           Language.Foveran.Syntax.Display (Declaration)
 
 import           Language.Foveran.Parsing.Token
+import           Language.Foveran.Parsing.Layout
 import           Language.Foveran.Parsing.LexicalSpec
 import           Language.Foveran.Parsing.Parser
 import           Language.Foveran.Parsing.PrettyPrinter

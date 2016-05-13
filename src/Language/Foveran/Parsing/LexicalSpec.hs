@@ -4,8 +4,8 @@ module Language.Foveran.Parsing.LexicalSpec
     ( lexicalSpec )
     where
 
-import Language.Forvie.Lexing.Spec
-import Language.Forvie.Layout
+import Language.Foveran.Lexing.Spec
+import Language.Foveran.Parsing.Layout
 import Language.Foveran.Parsing.Token
 
 emit = Emit . Token

@@ -6,17 +6,19 @@ Author:        Robert Atkey
 Synopsis:      A dependently-typed programming language
 Build-Type:    Simple
 
+data-files:          elisp/mode-template.el
+
 Executable foveran
   Build-Depends: text >= 0.7.1.0,
                  containers >= 0.3.0.0,
                  base >= 4,
+                 array >= 0.3.0.0,
                  pretty,
                  th-lift >= 0.3,
                  bytestring >= 0.9.1.5,
                  template-haskell,
                  transformers >= 0.2.2.0,
                  mtl >= 2.0.1.0,
-                 forvie >= 0.1,
                  blaze-html >= 0.3.2.0,
                  blaze-markup >= 0.5.1.0
   Main-Is:       Language/Foveran/Main.hs

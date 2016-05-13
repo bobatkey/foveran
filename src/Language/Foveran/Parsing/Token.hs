@@ -6,8 +6,8 @@ module Language.Foveran.Parsing.Token
     where
 
 import qualified Data.Set as S
-import           Language.Forvie.Layout
-import           Language.Forvie.Lexing.Spec
+import           Language.Foveran.Parsing.Layout
+import           Language.Foveran.Lexing.Spec
 import           Language.Haskell.TH.Lift
 
 data Token

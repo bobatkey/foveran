@@ -15,10 +15,9 @@ import qualified Text.Blaze.Html5.Attributes as A
 import qualified Data.ByteString.Lazy as BL
 import           Text.Blaze.Html.Renderer.Utf8
 
-import           Language.Forvie.SyntaxHighlight.Html (generateHtml)
-
 import           Language.Foveran.Parsing.Token ()
 import           Language.Foveran.Parsing (lexFile)
+import           Language.Foveran.SyntaxHighlight.Html (generateHtml)
 
 writeHtmlDocument :: FilePath -> Maybe FilePath -> IO ()
 writeHtmlDocument fnm ofnm = do
